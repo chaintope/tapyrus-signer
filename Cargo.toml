@@ -1,0 +1,8 @@
+[package]
+name = "signer-node"
+version = "0.1.0"
+authors = ["Kohei Taniguchi <kohei@chaintope.com>"]
+edition = "2018"
+
+[dependencies]
+http = "0.1.17"
