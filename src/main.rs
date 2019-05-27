@@ -11,7 +11,7 @@ mod rpc;
 use rpc::getnewblock;
 
 fn main() {
-    getnewblock();
+//    getnewblock();
 }
 
 

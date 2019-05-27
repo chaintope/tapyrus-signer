@@ -27,11 +27,7 @@ impl From<serde_json::error::Error> for Error {
     }
 }
 
-pub fn getnewblock() -> Result<serde_json::Value, Error> {
-    let private_key = PrivateKey::from_wif("cVkWtN9SaP8ywfyG1AwwjsZ5orN6a2x5wTaW2gGWkUCJVEPorDeK").unwrap();
-    let secp = Secp256k1::new();
-    let address = Address::p2pkh(&private_key.public_key(&secp), private_key.network);
-
+pub fn getnewblock(address: &Address) -> Result<serde_json::Value, Error> {
     let client = jsonrpc::client::Client::new("http://127.0.0.1:12381".to_string(), Some("user".to_string()), Some("pass".to_string()));
 
     let args = [address.to_string().into()];
@@ -55,7 +51,11 @@ pub fn getnewblock() -> Result<serde_json::Value, Error> {
 
 #[test]
 fn test_getnewblock() {
-    let result = getnewblock();
+    let private_key = PrivateKey::from_wif("cVkWtN9SaP8ywfyG1AwwjsZ5orN6a2x5wTaW2gGWkUCJVEPorDeK").unwrap();
+    let secp = Secp256k1::new();
+    let address = Address::p2pkh(&private_key.public_key(&secp), private_key.network);
+
+    let result = getnewblock(&address);
     assert!(result.is_ok());
 
     let value = result.unwrap();
