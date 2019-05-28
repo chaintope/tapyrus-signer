@@ -5,13 +5,13 @@ extern crate serde;
 extern crate serde_json;
 extern crate bitcoin_hashes;
 extern crate jsonrpc;
+extern crate hex;
 
 mod rpc;
-
-use rpc::getnewblock;
+mod process_master_round;
 
 fn main() {
-//    getnewblock();
+    process_master_round::process_master_round();
 }
 
 

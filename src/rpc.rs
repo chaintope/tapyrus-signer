@@ -1,13 +1,8 @@
-use bitcoin::{PrivateKey, Address};
-use secp256k1::Secp256k1;
+use bitcoin::Address;
 use log::Level::Trace;
 use log::{log_enabled, trace};
-use serde::{Serialize, Deserialize};
-use serde_json::Value;
 
-use bitcoin_hashes::sha256d;
-
-struct Rpc {
+pub struct Rpc {
     client: jsonrpc::client::Client,
 }
 
@@ -63,17 +58,25 @@ impl Rpc {
     }
 }
 
-#[test]
-fn test_getnewblock() {
-    let rpc = Rpc::new("http://127.0.0.1:12381".to_string(), Some("user".to_string()), Some("pass".to_string()));
 
-    let private_key = PrivateKey::from_wif("cVkWtN9SaP8ywfyG1AwwjsZ5orN6a2x5wTaW2gGWkUCJVEPorDeK").unwrap();
-    let secp = Secp256k1::new();
-    let address = Address::p2pkh(&private_key.public_key(&secp), private_key.network);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bitcoin::PrivateKey;
+    use secp256k1::Secp256k1;
 
-    let result = rpc.getnewblock(&address);
-    assert!(result.is_ok());
+    #[test]
+    fn test_getnewblock() {
+        let rpc = Rpc::new("http://127.0.0.1:12381".to_string(), Some("user".to_string()), Some("pass".to_string()));
 
-    let value = result.unwrap();
-    println!("{}", value);
+        let private_key = PrivateKey::from_wif("cVkWtN9SaP8ywfyG1AwwjsZ5orN6a2x5wTaW2gGWkUCJVEPorDeK").unwrap();
+        let secp = Secp256k1::new();
+        let address = Address::p2pkh(&private_key.public_key(&secp), private_key.network);
+
+        let result = rpc.getnewblock(&address);
+        assert!(result.is_ok());
+
+        let value = result.unwrap();
+        println!("{}", value);
+    }
 }
