@@ -6,6 +6,7 @@ extern crate serde_json;
 extern crate bitcoin_hashes;
 extern crate jsonrpc;
 extern crate hex;
+extern crate byteorder;
 
 mod rpc;
 mod process_master_round;
