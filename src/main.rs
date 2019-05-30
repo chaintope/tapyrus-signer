@@ -7,6 +7,7 @@ extern crate bitcoin_hashes;
 extern crate jsonrpc;
 extern crate hex;
 extern crate byteorder;
+extern crate base64;
 
 mod rpc;
 mod process_master_round;
