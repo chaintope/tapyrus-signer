@@ -11,6 +11,7 @@ extern crate base64;
 
 mod rpc;
 mod process_master_round;
+mod test_helper;
 
 fn main() {
     process_master_round::process_master_round();
