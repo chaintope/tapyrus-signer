@@ -1,29 +1,13 @@
 use bitcoin::Address;
 use log::Level::Trace;
 use log::{log_enabled, trace};
+use secp256k1::Signature;
+use crate::blockdata::Block;
+use crate::blockdata;
+use crate::errors::Error;
 
 pub struct Rpc {
     client: jsonrpc::client::Client,
-}
-
-#[derive(Debug)]
-pub enum Error {
-    JsonRpc(jsonrpc::error::Error),
-    Json(serde_json::error::Error),
-    /// Errors cause sender side matter, like parameter was wrong.
-    InvalidRequest,
-}
-
-impl From<jsonrpc::error::Error> for Error {
-    fn from(e: jsonrpc::error::Error) -> Error {
-        Error::JsonRpc(e)
-    }
-}
-
-impl From<serde_json::error::Error> for Error {
-    fn from(e: serde_json::error::Error) -> Error {
-        Error::Json(e)
-    }
 }
 
 impl Rpc {
@@ -37,7 +21,7 @@ impl Rpc {
     }
 
     /// Call getnewblock rpc
-    pub fn getnewblock(&self, address: &Address) -> Result<serde_json::Value, Error> {
+    pub fn getnewblock(&self, address: &Address) -> Result<Block, Error> {
         let args = [address.to_string().into()];
         let req = self.client.build_request("getnewblock", &args);
         if log_enabled!(Trace) {
@@ -50,15 +34,18 @@ impl Rpc {
             trace!("JSON-RPC response: {}", serde_json::to_string(resp).unwrap());
         }
 
-        if let Some(value) = resp?.result {
-            Ok(value)
-        } else {
-            Err(Error::InvalidRequest)
+        match resp {
+            Ok(jsonrpc::Response { result: Some(serde_json::Value::String(v)), .. }) => {
+                let raw_block= hex::decode(v).expect("Decoding block hex failed");
+                Ok(Block::new(raw_block))
+            },
+            Ok(_) => Err(Error::InvalidRequest),
+            Err(e) => Err(e),
         }
     }
 
-    pub fn testproposedblock(&self, block: &Vec<u8>) -> Result<(), Error>{
-        let blockhex = serde_json::Value::from(hex::encode(block));
+    pub fn testproposedblock(&self, block: &Block) -> Result<(), Error> {
+        let blockhex = serde_json::Value::from(block.hex());
         let acceptnonstdtxn = serde_json::Value::Bool(true);
         let args = [blockhex, acceptnonstdtxn];
         let req = self.client.build_request("testproposedblock", &args);
@@ -88,12 +75,13 @@ mod tests {
     use bitcoin::PrivateKey;
     use secp256k1::Secp256k1;
     use crate::test_helper::{TestKeys, get_block};
+    use crate::sign::sign;
 
     fn get_rpc_client() -> Rpc {
         Rpc::new("http://127.0.0.1:12381".to_string(), Some("user".to_string()), Some("pass".to_string()))
     }
 
-    fn call_getnewblock() -> Result<serde_json::Value, Error> {
+    fn call_getnewblock() -> Result<Block, Error> {
         let rpc = get_rpc_client();
 
         let private_key = TestKeys::new().key[0];
@@ -108,17 +96,26 @@ mod tests {
         let result = call_getnewblock();
         assert!(result.is_ok());
 
-        let value = result.unwrap();
-        println!("{}", value);
+        let _value = result.unwrap();
     }
 
     #[test]
     fn test_testproposedblock() {
-        let block = hex::decode(call_getnewblock().unwrap().as_str().unwrap()).unwrap();
+        let block = call_getnewblock().unwrap();
         let rpc = get_rpc_client();
 
         let result = rpc.testproposedblock(&block);
 
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_combineblocksigs() {
+        let block = get_block();
+
+//        for x in TestKeys::new().key {
+//            sign(&x, )
+//
+//        }
     }
 }

@@ -9,9 +9,12 @@ extern crate hex;
 extern crate byteorder;
 extern crate base64;
 
+mod blockdata;
 mod rpc;
 mod process_master_round;
+mod sign;
 mod test_helper;
+mod errors;
 
 fn main() {
     process_master_round::process_master_round();
