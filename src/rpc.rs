@@ -2,9 +2,20 @@ use bitcoin::Address;
 use log::Level::Trace;
 use log::{log_enabled, trace};
 use secp256k1::Signature;
+use serde_json::Value;
+use serde::{Deserialize, Serialize};
+
 use crate::blockdata::Block;
-use crate::blockdata;
 use crate::errors::Error;
+
+
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CombineBlockSigsResult {
+    hex: String,
+    warning: String,
+    complete: bool,
+}
 
 pub struct Rpc {
     client: jsonrpc::client::Client,
@@ -66,13 +77,39 @@ impl Rpc {
             Err(error) => Err(error),
         }
     }
+
+    pub fn combineblocksigs(&self, block: &Block, signatures: &Vec<Signature>) -> Result<Block, Error> {
+        let blockhex: Value = block.hex().into();
+        let signatures: Value = signatures.iter().map(|sig| { hex::encode(sig.serialize_der()) }).collect();
+        let args = [blockhex, signatures];
+        let req = self.client.build_request("combineblocksigs", &args);
+
+        if log_enabled!(Trace) {
+            trace!("JSON-RPC request: {}", serde_json::to_string(&req).unwrap());
+        }
+
+        let resp = self.client.send_request(&req).map_err(Error::from);
+
+        if log_enabled!(Trace) && resp.is_ok() {
+            let resp = resp.as_ref().unwrap();
+            let hoge = serde_json::to_string(resp).unwrap();
+            trace!("JSON-RPC response: {}", hoge);
+        }
+
+        match resp?.result::<CombineBlockSigsResult>() {
+            Ok(CombineBlockSigsResult { hex: v, .. }) => {
+                let raw_block= hex::decode(v).expect("Decoding block hex failed");
+                Ok(Block::new(raw_block))
+            },
+            Err(e) => Err(Error::JsonRpc(e)),
+        }
+    }
 }
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bitcoin::PrivateKey;
     use secp256k1::Secp256k1;
     use crate::test_helper::{TestKeys, get_block};
     use crate::sign::sign;
@@ -112,10 +149,15 @@ mod tests {
     #[test]
     fn test_combineblocksigs() {
         let block = get_block();
+        let block_hash = block.hash().unwrap();
+        let keys = &TestKeys::new().key[..1]; // Just 1 signature
+        let sigs: Vec<Signature> = keys.iter().map(|key| {
+            sign(&key, &block_hash)
+        }).collect();
 
-//        for x in TestKeys::new().key {
-//            sign(&x, )
-//
-//        }
+        let rpc = get_rpc_client();
+        let result = rpc.combineblocksigs(&block, &sigs);
+
+        assert!(result.is_ok());
     }
 }

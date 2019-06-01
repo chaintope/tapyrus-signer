@@ -1,11 +1,9 @@
 use bitcoin::{PrivateKey, Address};
-use secp256k1::{Secp256k1, Message, Signature};
-use serde_json::from_slice;
+use secp256k1::{Secp256k1, Message};
 use secp256k1;
 
 use crate::rpc::Rpc;
 use crate::sign::sign;
-use crate::blockdata::{Block, BlockHash};
 use crate::errors::Error;
 
 pub fn process_master_round() -> Result<(), Error> {
@@ -26,9 +24,12 @@ pub fn process_master_round() -> Result<(), Error> {
     let block_hash = block.hash().unwrap();
     let sig = sign(&private_key, &block_hash);
 
+    // combine block signatures
+    let sigs = vec![sig];
+    let block = rpc.combineblocksigs(&block, &sigs)?;
+
     Ok(())
 }
-
 
 #[cfg(test)]
 mod test {
