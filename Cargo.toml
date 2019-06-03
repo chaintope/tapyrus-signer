@@ -1,5 +1,5 @@
 [package]
-name = "signer-node"
+name = "tapyrus-siner"
 version = "0.1.0"
 authors = ["Kohei Taniguchi <kohei@chaintope.com>"]
 edition = "2018"
