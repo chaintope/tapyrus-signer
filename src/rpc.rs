@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::blockdata::Block;
 use crate::errors::Error;
-
+use http::Response;
+use jsonrpc::Request;
+use std::ptr::null;
 
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -104,6 +106,29 @@ impl Rpc {
             Err(e) => Err(Error::JsonRpc(e)),
         }
     }
+
+    pub fn submitblock(&self, block: &Block) -> Result<(), Error> {
+        let blockhex: Value = block.hex().into();
+        let args = [blockhex];
+        let req = self.client.build_request("submitblock", &args);
+
+        if log_enabled!(Trace) {
+            trace!("JSON-RPC request: {}", serde_json::to_string(&req).unwrap());
+        }
+
+        let resp = self.client.send_request(&req).map_err(Error::from);
+
+        if log_enabled!(Trace) && resp.is_ok() {
+            let resp = resp.as_ref().unwrap();
+            trace!("JSON-RPC response: {}", serde_json::to_string(resp).unwrap());
+        }
+
+        match resp {
+            Ok(jsonrpc::Response { result: None, .. } ) => Ok(()),
+            Ok(_) => Err(Error::InvalidRequest),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 
@@ -159,5 +184,26 @@ mod tests {
         let result = rpc.combineblocksigs(&block, &sigs);
 
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_submitblock() {
+        let rpc = get_rpc_client();
+
+        let block = call_getnewblock().unwrap();
+        let block_hash = block.hash().unwrap();
+        let keys = &TestKeys::new().key[..1]; // Just 1 signature
+        let sigs: Vec<Signature> = keys.iter().map(|key| {
+            sign(&key, &block_hash)
+        }).collect();
+
+        let result = rpc.combineblocksigs(&block, &sigs);
+        let completed_block = result.unwrap();
+        let result = rpc.submitblock(&completed_block);
+        assert!(result.is_ok());
+
+        // when invalid block.(cannot connect on the tip)
+        let block = get_block();
+        assert!(rpc.submitblock(&block).is_err());
     }
 }

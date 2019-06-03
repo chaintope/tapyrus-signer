@@ -28,6 +28,9 @@ pub fn process_master_round() -> Result<(), Error> {
     let sigs = vec![sig];
     let block = rpc.combineblocksigs(&block, &sigs)?;
 
+    // submitblock
+    rpc.submitblock(&block)?;
+
     Ok(())
 }
 
