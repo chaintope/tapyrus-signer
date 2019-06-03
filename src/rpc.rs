@@ -36,16 +36,7 @@ impl Rpc {
     /// Call getnewblock rpc
     pub fn getnewblock(&self, address: &Address) -> Result<Block, Error> {
         let args = [address.to_string().into()];
-        let req = self.client.build_request("getnewblock", &args);
-        if log_enabled!(Trace) {
-            trace!("JSON-RPC request: {}", serde_json::to_string(&req).unwrap());
-        }
-
-        let resp = self.client.send_request(&req).map_err(Error::from);
-        if log_enabled!(Trace) && resp.is_ok() {
-            let resp = resp.as_ref().unwrap();
-            trace!("JSON-RPC response: {}", serde_json::to_string(resp).unwrap());
-        }
+        let resp = self.call("getnewblock", &args);
 
         match resp {
             Ok(jsonrpc::Response { result: Some(serde_json::Value::String(v)), .. }) => {
@@ -61,17 +52,7 @@ impl Rpc {
         let blockhex = serde_json::Value::from(block.hex());
         let acceptnonstdtxn = serde_json::Value::Bool(true);
         let args = [blockhex, acceptnonstdtxn];
-        let req = self.client.build_request("testproposedblock", &args);
-        if log_enabled!(Trace) {
-            trace!("JSON-RPC request: {}", serde_json::to_string(&req).unwrap());
-        }
-
-        let resp = self.client.send_request(&req).map_err(Error::from);
-
-        if log_enabled!(Trace) && resp.is_ok() {
-            let resp = resp.as_ref().unwrap();
-            trace!("JSON-RPC response: {}", serde_json::to_string(resp).unwrap());
-        }
+        let resp = self.call("testproposedblock", &args);
 
         match resp {
             Ok(jsonrpc::Response { result: Some(serde_json::Value::Bool(true)), .. } ) => Ok(()),
@@ -84,19 +65,7 @@ impl Rpc {
         let blockhex: Value = block.hex().into();
         let signatures: Value = signatures.iter().map(|sig| { hex::encode(sig.serialize_der()) }).collect();
         let args = [blockhex, signatures];
-        let req = self.client.build_request("combineblocksigs", &args);
-
-        if log_enabled!(Trace) {
-            trace!("JSON-RPC request: {}", serde_json::to_string(&req).unwrap());
-        }
-
-        let resp = self.client.send_request(&req).map_err(Error::from);
-
-        if log_enabled!(Trace) && resp.is_ok() {
-            let resp = resp.as_ref().unwrap();
-            let hoge = serde_json::to_string(resp).unwrap();
-            trace!("JSON-RPC response: {}", hoge);
-        }
+        let resp = self.call("combineblocksigs", &args);
 
         match resp?.result::<CombineBlockSigsResult>() {
             Ok(CombineBlockSigsResult { hex: v, .. }) => {
@@ -110,7 +79,17 @@ impl Rpc {
     pub fn submitblock(&self, block: &Block) -> Result<(), Error> {
         let blockhex: Value = block.hex().into();
         let args = [blockhex];
-        let req = self.client.build_request("submitblock", &args);
+        let resp = self.call("submitblock", &args);
+
+        match resp {
+            Ok(jsonrpc::Response { result: None, .. } ) => Ok(()),
+            Ok(_) => Err(Error::InvalidRequest),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn call(&self, name: &str, params: &[serde_json::Value]) -> Result<jsonrpc::Response, Error> {
+        let req = self.client.build_request(name, params);
 
         if log_enabled!(Trace) {
             trace!("JSON-RPC request: {}", serde_json::to_string(&req).unwrap());
@@ -123,11 +102,7 @@ impl Rpc {
             trace!("JSON-RPC response: {}", serde_json::to_string(resp).unwrap());
         }
 
-        match resp {
-            Ok(jsonrpc::Response { result: None, .. } ) => Ok(()),
-            Ok(_) => Err(Error::InvalidRequest),
-            Err(e) => Err(e),
-        }
+        Ok(resp?)
     }
 }
 
