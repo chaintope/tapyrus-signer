@@ -18,7 +18,7 @@ struct RoundState {
     current_master: SignerID,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
 enum MessageType {
     Candidateblock,
     Signature,
@@ -26,9 +26,10 @@ enum MessageType {
     Roiundfailure,
 }
 
-struct Message<T> {
+#[derive(Debug, Serialize, Deserialize)]
+struct Message {
     message_type: MessageType,
-    payload: T,
+    payload: Vec<u8>,
 }
 
 // state パターン
@@ -49,7 +50,7 @@ struct Master {
 //}
 
 trait ConnectionManager {
-    fn broadcast_message(&self, message_type: MessageType, payload: &[u8]);
+    fn broadcast_message(&self, message: Message);
 }
 
 struct RedisManager {
@@ -57,7 +58,7 @@ struct RedisManager {
     subscriber: thread::JoinHandle<()>,
 }
 
-type MessageProcessor = fn(payload: String) -> ControlFlow<()>;
+type MessageProcessor = fn(message: Message) -> ControlFlow<()>;
 
 impl RedisManager {
     pub fn new(message_processor: MessageProcessor) -> RedisManager {
@@ -75,19 +76,19 @@ impl RedisManager {
             conn.subscribe(&["tapyrus-signer"], |msg| {
                 let _ch = msg.get_channel_name();
                 let payload: String = msg.get_payload().unwrap();
-
                 println!("receive message. payload: {}", payload);
 
-                message_processor(payload)
+                let message: Message = serde_json::from_str(&payload).unwrap();
+                message_processor(message)
             }).unwrap();
         })
     }
 }
 
 impl ConnectionManager for RedisManager {
-    fn broadcast_message(&self, message_type: MessageType, payload: &[u8]) {
+    fn broadcast_message(&self, message: Message) {
         let client = Arc::clone(&self.client);
-        let message_in_thread = serde_json::to_string(&message_type).unwrap();
+        let message_in_thread = serde_json::to_string(&message).unwrap();
         thread::spawn(move || {
             let conn = client.get_connection().unwrap();
             thread::sleep(Duration::from_millis(500));
@@ -101,7 +102,7 @@ impl ConnectionManager for RedisManager {
 
 
 pub fn initialize_network() {
-    let connection_manager = RedisManager::new(|payload|{
+    let connection_manager = RedisManager::new(|message|{
         ControlFlow::Break(())
     });
 }
@@ -114,11 +115,13 @@ mod test {
 
     #[test]
     fn redis_connection_test() {
-        let connection_manager = RedisManager::new(|payload| {
-            assert_eq!(payload, "\"Candidateblock\"");
+        let connection_manager = RedisManager::new(|message| {
+            assert_eq!(message.message_type, MessageType::Candidateblock);
             ControlFlow::Break(())
         });
-        connection_manager.broadcast_message(MessageType::Candidateblock, &[]);
+        let message = Message { message_type: MessageType::Candidateblock, payload: [].to_vec(), };
+        connection_manager.broadcast_message(message);
+
         assert!(true);
         connection_manager.subscriber.join();
     }
