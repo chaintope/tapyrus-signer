@@ -8,6 +8,7 @@ extern crate jsonrpc;
 extern crate hex;
 extern crate byteorder;
 extern crate base64;
+extern crate redis;
 
 mod blockdata;
 mod rpc;
@@ -15,6 +16,8 @@ mod process_master_round;
 mod sign;
 mod test_helper;
 mod errors;
+mod net;
+
 
 fn main() {
     process_master_round::process_master_round();
