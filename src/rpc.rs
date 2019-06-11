@@ -7,10 +7,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::blockdata::Block;
 use crate::errors::Error;
-use http::Response;
-use jsonrpc::Request;
-use std::ptr::null;
-
 
 #[derive(Debug, Serialize, Deserialize)]
 struct CombineBlockSigsResult {

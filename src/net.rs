@@ -1,75 +1,46 @@
 /// メッセージを受け取って、それを処理するためのモジュール
 /// メッセージの処理は、メッセージの種類とラウンドの状態に依存する。
 /// ラウンドの状態は 誰が master であるか（自身がmaster であるか）。ラウンドが実行中であるか、開始待ちであるか。などで変わる
-
-
-use bitcoin::PublicKey;
 use std::sync::Arc;
 use redis::{Client, Commands, ControlFlow, PubSubCommands};
 use std::thread;
 use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
-/// Signerの識別子。公開鍵を識別子にする。
-type SignerID = PublicKey;
-
-/// ラウンドの状態を持つ構造体。シングルトン。
-struct RoundState {
-    current_master: SignerID,
-}
-
 #[derive(PartialEq, Debug, Serialize, Deserialize)]
-enum MessageType {
+pub enum MessageType {
     Candidateblock,
     Signature,
     Completedblock,
-    Roiundfailure,
+    Roundfailure,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Message {
-    message_type: MessageType,
-    payload: Vec<u8>,
+pub struct Message {
+    pub message_type: MessageType,
+    pub payload: Vec<u8>,
 }
 
-// state パターン
-//trait MessageProcessor {
-//    fn process_candidateblock();
-//    fn process_signature();
-//    fn process_completedblock();
-//    fn process_roundfailure();
-//}
-
-// master用の Message Processor
-struct Master {
-
-}
-
-//impl MessageProcessor for Master {
-//
-//}
-
-trait ConnectionManager {
+pub trait ConnectionManager {
     fn broadcast_message(&self, message: Message);
+    fn start(&self, message_processor: MessageProcessor);
 }
 
-struct RedisManager {
+pub struct RedisManager {
     pub client: Arc<Client>,
-    subscriber: thread::JoinHandle<()>,
 }
 
 type MessageProcessor = fn(message: Message) -> ControlFlow<()>;
 
 impl RedisManager {
-    pub fn new(message_processor: MessageProcessor) -> RedisManager {
+    pub fn new() -> RedisManager {
         let client = Arc::new(Client::open("redis://localhost").unwrap());
-
-        let subscriber = RedisManager::subscribe(&client, message_processor);
-        RedisManager { client, subscriber, }
+        RedisManager { client }
     }
 
-    fn subscribe(client: &Arc<Client>, message_processor: MessageProcessor) -> thread::JoinHandle<()> {
-        let client = Arc::clone(client);
+    fn subscribe(&self, message_processor: MessageProcessor) -> thread::JoinHandle<()> {
+        let client = Arc::clone(&self.client);
+
         thread::spawn(move || {
             let mut conn = client.get_connection().unwrap();
 
@@ -98,13 +69,12 @@ impl ConnectionManager for RedisManager {
             let _: () = conn.publish("tapyrus-signer", message_in_thread).unwrap();
         });
     }
-}
 
+    fn start(&self, message_processor: MessageProcessor) {
+        let subscriber = self.subscribe(message_processor);
 
-pub fn initialize_network() {
-    let connection_manager = RedisManager::new(|message|{
-        ControlFlow::Break(())
-    });
+        subscriber.join().unwrap();
+    }
 }
 
 
@@ -115,14 +85,18 @@ mod test {
 
     #[test]
     fn redis_connection_test() {
-        let connection_manager = RedisManager::new(|message| {
+        let connection_manager = Arc::new(RedisManager::new());
+
+        let message_processor: MessageProcessor = |message| {
             assert_eq!(message.message_type, MessageType::Candidateblock);
             ControlFlow::Break(())
-        });
-        let message = Message { message_type: MessageType::Candidateblock, payload: [].to_vec(), };
+        };
+
+        let subscriber = connection_manager.subscribe(message_processor);
+
+        let message = Message { message_type: MessageType::Candidateblock, payload: [].to_vec() };
         connection_manager.broadcast_message(message);
 
-        assert!(true);
-        connection_manager.subscriber.join();
+        subscriber.join().unwrap();
     }
 }

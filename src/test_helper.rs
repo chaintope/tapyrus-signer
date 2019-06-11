@@ -12,9 +12,9 @@ pub struct TestKeys {
 impl TestKeys {
     pub fn new() -> TestKeys {
         // corresponding public keys are:
-        // 03831a69b809833ab5b32612eaf489bfea35a7321b1ca15b11d88131423fafc
-        // 02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e527b90
-        // 02785a891f323acd6ceffc59bb14304410595914267c50467e51c87142acbb5e
+        // 03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc
+        // 02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900
+        // 02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e
 
         let key: [PrivateKey; 3] = [
             PrivateKey::from_wif("cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA").unwrap(),
