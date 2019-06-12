@@ -67,7 +67,7 @@ impl ConnectionManager for RedisManager {
             println!("Publish {} to tapyrus-signer channel.", message_in_thread);
 
             let _: () = conn.publish("tapyrus-signer", message_in_thread).unwrap();
-        });
+        }).join().unwrap();
     }
 
     fn start(&self, message_processor: MessageProcessor) {
