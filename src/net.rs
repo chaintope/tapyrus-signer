@@ -23,7 +23,7 @@ pub struct Message {
 
 pub trait ConnectionManager {
     fn broadcast_message(&self, message: Message);
-    fn start(&self, message_processor: impl Fn(Message) -> ControlFlow<()>);
+    fn start(&self, message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + Sync + 'static);
 }
 
 pub struct RedisManager {
@@ -36,7 +36,8 @@ impl RedisManager {
         RedisManager { client }
     }
 
-    fn subscribe(&self, message_processor: impl Fn(Message) -> ControlFlow<()>) -> thread::JoinHandle<()> {
+    fn subscribe(&self, message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + Sync + 'static) -> thread::JoinHandle<()>
+     {
         let client = Arc::clone(&self.client);
 
         thread::spawn(move || {
@@ -68,7 +69,8 @@ impl ConnectionManager for RedisManager {
         }).join().unwrap();
     }
 
-    fn start(&self, message_processor: impl Fn(Message) -> ControlFlow<()>) {
+    fn start(&self, message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + Sync + 'static)
+         {
         let subscriber = self.subscribe(message_processor);
 
         subscriber.join().unwrap();
