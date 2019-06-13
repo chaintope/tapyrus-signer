@@ -81,7 +81,6 @@ impl ConnectionManager for RedisManager {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::net::MessageType::Candidateblock;
 
     #[test]
     fn redis_connection_test() {

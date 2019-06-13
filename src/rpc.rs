@@ -52,7 +52,7 @@ impl Rpc {
 
         match resp {
             Ok(jsonrpc::Response { result: Some(serde_json::Value::Bool(true)), .. } ) => Ok(()),
-            Ok(v) => Err(Error::InvalidRequest),
+            Ok(_v) => Err(Error::InvalidRequest),
             Err(error) => Err(error),
         }
     }

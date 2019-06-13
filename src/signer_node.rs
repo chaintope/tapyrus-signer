@@ -1,21 +1,18 @@
-use crate::net::{ConnectionManager, RedisManager, MessageType, Message};
-use crate::signer::{RoundState, StateContext, NodeState};
+use crate::net::{ConnectionManager, MessageType, Message};
+use crate::signer::{StateContext};
 use redis::ControlFlow;
 use bitcoin::{PublicKey, PrivateKey};
-use serde_json::error::ErrorCode::ControlCharacterWhileParsingString;
 
 pub struct SignerNode<T: ConnectionManager> {
     connection_manager: T,
-    state_context: StateContext,
-    params: NodeParameters,
+    _params: NodeParameters,
 }
 
 impl<T: ConnectionManager> SignerNode<T> {
-    pub fn new(connection_manager: T, state_context: StateContext, params: NodeParameters) -> SignerNode<T> {
+    pub fn new(connection_manager: T, _params: NodeParameters) -> SignerNode<T> {
         SignerNode {
             connection_manager,
-            state_context,
-            params,
+            _params,
         }
     }
 
@@ -39,5 +36,5 @@ impl<T: ConnectionManager> SignerNode<T> {
 pub struct NodeParameters {
     pub pubkey_list: Vec<PublicKey>,
     pub threshold: u32,
-    pub privateKey: PrivateKey,
+    pub private_key: PrivateKey,
 }

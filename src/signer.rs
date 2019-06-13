@@ -1,5 +1,4 @@
 use bitcoin::PublicKey;
-use std::collections::HashMap;
 
 /// Signerの識別子。公開鍵を識別子にする。
 pub type SignerID = PublicKey;
@@ -41,7 +40,7 @@ pub trait RoundState {
 //}
 
 impl NodeState {
-    pub fn process(&self) -> Box<RoundState> {
+    pub fn process(&self) -> Box<dyn RoundState> {
         match self {
             NodeState::Joining => Box::new(RoundStateJoining{}),
             _ => Box::new(RoundStateJoining),
@@ -64,19 +63,19 @@ impl StateContext {
 struct RoundStateJoining;
 
 impl RoundState for RoundStateJoining {
-    fn process_candidateblock(&self, payload: &[u8]) -> NodeState {
+    fn process_candidateblock(&self, _payload: &[u8]) -> NodeState {
         unimplemented!()
     }
 
-    fn process_signature(&self, payload: &[u8]) -> NodeState {
+    fn process_signature(&self, _payload: &[u8]) -> NodeState {
         unimplemented!()
     }
 
-    fn process_completedblock(&self, payload: &[u8]) -> NodeState {
+    fn process_completedblock(&self, _payload: &[u8]) -> NodeState {
         unimplemented!()
     }
 
-    fn process_roundfailure(&self, payload: &[u8]) -> NodeState {
+    fn process_roundfailure(&self, _payload: &[u8]) -> NodeState {
         unimplemented!()
     }
 }
