@@ -1,16 +1,16 @@
 use crate::net::{ConnectionManager, RedisManager, MessageType};
-use crate::signer::RoundState;
+use crate::signer::{RoundState, StateContext, Joining};
 use redis::ControlFlow;
 use bitcoin::{PublicKey, PrivateKey};
 
-pub struct SignerNode {
-    connection_manager: Box<ConnectionManager>,
-    round_state: RoundState,
+pub struct SignerNode<T: ConnectionManager, S: RoundState> {
+    connection_manager: T,
+    round_state: S,
     params: NodeParameters,
 }
 
-impl SignerNode {
-    pub fn new(connection_manager: Box<ConnectionManager>, round_state: RoundState, params: NodeParameters) -> SignerNode {
+impl SignerNode<T, S> {
+    pub fn new(connection_manager: T, round_state: S, params: NodeParameters) -> SignerNode {
         SignerNode {
             connection_manager,
             round_state,
@@ -19,17 +19,24 @@ impl SignerNode {
     }
 
     pub fn start(&mut self) {
+        let mut round_state: S = Joining{};
+
         self.connection_manager.start(|message| {
-            match message.message_type {
-                _ => { println!("receive message! {:?}", message); }
-//            MessageType::Candidateblock => { self.round_state.process_candidateblock(&self, message.payload) },
-//            MessageType::Signature => { self.round_state.process_signature(&self, message.payload) },
-//            MessageType::Completedblock => { self.round_state.process_completedblock(&self, message.payload) },
-//            MessageType::Roundfailure => { self.round_state.process_roundfailure(&self, message.payload) },
+            round_state = match message.message_type {
+                MessageType::Candidateblock => { round_state.process_candidateblock(&message.payload[..]) },
+                MessageType::Signature => { round_state.process_signature(&message.payload[..]) },
+                MessageType::Completedblock => { round_state.process_completedblock(&message.payload[..]) },
+                MessageType::Roundfailure => { round_state.process_roundfailure(&message.payload[..]) },
             };
 
             ControlFlow::Continue
         });
+    }
+}
+
+impl StateContext for &mut SignerNode<T, S> {
+    fn setState(&mut self, state: S) {
+        self.round_state = state;
     }
 }
 

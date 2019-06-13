@@ -1,14 +1,32 @@
-extern crate tapyrus_siner;
 extern crate bitcoin;
+extern crate secp256k1;
 extern crate log;
+extern crate serde;
+extern crate serde_json;
+extern crate bitcoin_hashes;
+extern crate jsonrpc;
+extern crate hex;
+extern crate byteorder;
+extern crate base64;
 extern crate redis;
 
 use bitcoin::{PrivateKey, PublicKey};
-use tapyrus_siner::signer_node::{NodeParameters, SignerNode};
+use crate::signer_node::{NodeParameters, SignerNode};
 use std::str::FromStr;
-use tapyrus_siner::signer::RoundState;
-use tapyrus_siner::net::{RedisManager, MessageType, ConnectionManager};
+use crate::signer::{RoundState, Joining};
+use crate::net::{RedisManager, MessageType, ConnectionManager};
 use redis::ControlFlow;
+
+mod blockdata;
+mod rpc;
+mod process_master_round;
+mod sign;
+mod test_helper;
+mod errors;
+mod net;
+mod signer;
+mod signer_node;
+
 
 fn main() {
     // todo: get pubkey_list and threshold from arguments.
@@ -21,7 +39,7 @@ fn main() {
     let privateKey = PrivateKey::from_wif("cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA").unwrap();
 
     let params = NodeParameters { pubkey_list, threshold, privateKey, };
-    let round_state = RoundState::new(params.pubkey_list[0].clone());
+    let round_state = Box::new(Joining {});
     let con = RedisManager::new();
 
     let mut node = SignerNode::new(Box::new(con), round_state, params);
