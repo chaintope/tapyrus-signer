@@ -24,10 +24,9 @@ impl<T: ConnectionManager> SignerNode<T> {
         let closure = move |message: Message| {
             let next = match message.message_type {
                 MessageType::Candidateblock => context.current_state.process().process_candidateblock(&message.payload[..]),
-                _ => NodeState::Joining,
-//                MessageType::Signature => { round_state.process_signature(&message.payload[..]) },
-//                MessageType::Completedblock => { round_state.process_completedblock(&message.payload[..]) },
-//                MessageType::Roundfailure => { round_state.process_roundfailure(&message.payload[..]) },
+                MessageType::Signature => { context.current_state.process().process_signature(&message.payload[..]) },
+                MessageType::Completedblock => { context.current_state.process().process_completedblock(&message.payload[..]) },
+                MessageType::Roundfailure => { context.current_state.process().process_roundfailure(&message.payload[..]) },
             };
 
             context.set_state(next);

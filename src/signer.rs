@@ -17,9 +17,9 @@ pub enum NodeState {
 // state パターン
 pub trait RoundState {
     fn process_candidateblock(&self, payload: &[u8]) -> NodeState;
-    fn process_signature(&self, payload: &[u8]) -> Box<RoundState>;
-    fn process_completedblock(&self, payload: &[u8]) -> Box<RoundState>;
-    fn process_roundfailure(&self, payload: &[u8]) -> Box<RoundState>;
+    fn process_signature(&self, payload: &[u8]) -> NodeState;
+    fn process_completedblock(&self, payload: &[u8]) -> NodeState;
+    fn process_roundfailure(&self, payload: &[u8]) -> NodeState;
 }
 
 ///// acts as master node in this round.
@@ -68,15 +68,15 @@ impl RoundState for RoundStateJoining {
         unimplemented!()
     }
 
-    fn process_signature(&self, payload: &[u8]) -> Box<RoundState> {
+    fn process_signature(&self, payload: &[u8]) -> NodeState {
         unimplemented!()
     }
 
-    fn process_completedblock(&self, payload: &[u8]) -> Box<RoundState> {
+    fn process_completedblock(&self, payload: &[u8]) -> NodeState {
         unimplemented!()
     }
 
-    fn process_roundfailure(&self, payload: &[u8]) -> Box<RoundState> {
+    fn process_roundfailure(&self, payload: &[u8]) -> NodeState {
         unimplemented!()
     }
 }

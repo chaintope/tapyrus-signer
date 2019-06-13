@@ -87,7 +87,7 @@ mod test {
     fn redis_connection_test() {
         let connection_manager = Arc::new(RedisManager::new());
 
-        let message_processor: MessageProcessor = |message| {
+        let message_processor = move |message: Message|  {
             assert_eq!(message.message_type, MessageType::Candidateblock);
             ControlFlow::Break(())
         };
