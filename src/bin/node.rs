@@ -6,7 +6,7 @@ extern crate redis;
 use bitcoin::{PrivateKey, PublicKey};
 use tapyrus_siner::signer_node::{NodeParameters, SignerNode};
 use std::str::FromStr;
-use tapyrus_siner::signer::RoundState;
+use tapyrus_siner::signer::{RoundState, NodeState, StateContext};
 use tapyrus_siner::net::{RedisManager, MessageType, ConnectionManager};
 use redis::ControlFlow;
 
@@ -21,11 +21,13 @@ fn main() {
     let privateKey = PrivateKey::from_wif("cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA").unwrap();
 
     let params = NodeParameters { pubkey_list, threshold, privateKey, };
-    let round_state = Box::new(Joining {});
+    let state_context = StateContext::new();
     let con = RedisManager::new();
 
-    let mut node = SignerNode::new(Box::new(con), round_state, params);
-    node.start();
+    let node = &mut SignerNode::new(con, state_context, params);
+    {
+        node.start();
+    }
 }
 
 

@@ -36,7 +36,7 @@ impl RedisManager {
         RedisManager { client }
     }
 
-    fn subscribe(&self, message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + Sync + 'static) -> thread::JoinHandle<()>
+    fn subscribe(&self, mut message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + Sync + 'static) -> thread::JoinHandle<()>
      {
         let client = Arc::clone(&self.client);
 
