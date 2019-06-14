@@ -1,5 +1,5 @@
 use bitcoin::{PrivateKey, Address};
-use secp256k1::{Secp256k1, Message};
+use secp256k1::Secp256k1;
 use secp256k1;
 
 use crate::rpc::Rpc;

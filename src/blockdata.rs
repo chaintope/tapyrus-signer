@@ -33,7 +33,7 @@ impl Block {
 
     pub fn hash(&self) -> Result<BlockHash, Error> {
         let header = self.get_header_without_proof();
-        let mut hash = sha256d::Hash::hash(header).into_inner();
+        let hash = sha256d::Hash::hash(header).into_inner();
         Ok(BlockHash::from_slice(&hash)?)
     }
 }

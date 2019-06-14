@@ -7,10 +7,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::blockdata::Block;
 use crate::errors::Error;
-use http::Response;
-use jsonrpc::Request;
-use std::ptr::null;
-
 
 #[derive(Debug, Serialize, Deserialize)]
 struct CombineBlockSigsResult {
@@ -56,7 +52,7 @@ impl Rpc {
 
         match resp {
             Ok(jsonrpc::Response { result: Some(serde_json::Value::Bool(true)), .. } ) => Ok(()),
-            Ok(v) => Err(Error::InvalidRequest),
+            Ok(_v) => Err(Error::InvalidRequest),
             Err(error) => Err(error),
         }
     }
