@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use bitcoin_hashes::{sha256d, Hash};
 use crate::errors::Error;
 
@@ -20,6 +21,7 @@ impl BlockHash {
     pub fn borrow_inner(&self) -> &[u8; 32] { &self.0 }
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Block(Vec<u8>);
 
 impl Block {

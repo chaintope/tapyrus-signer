@@ -1,4 +1,4 @@
-use crate::net::{ConnectionManager, Message};
+use crate::net::{ConnectionManager, MessageType, Message};
 use crate::signer::{StateContext};
 use redis::ControlFlow;
 use bitcoin::{PublicKey, PrivateKey};
@@ -20,7 +20,7 @@ impl<T: ConnectionManager> SignerNode<T> {
     pub fn start(&mut self) {
         let mut context: StateContext = StateContext::new();
         let closure = move |message: Message| {
-            let next = context.current_state.process(message);
+            let next = context.current_state.process_message(message);
             context.set_state(next);
             ControlFlow::Continue
         };
