@@ -15,4 +15,4 @@ pub mod errors;
 pub mod net;
 pub mod signer;
 pub mod signer_node;
-
+pub mod serialize;

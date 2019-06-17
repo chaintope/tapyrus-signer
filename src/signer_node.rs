@@ -2,6 +2,7 @@ use crate::net::{ConnectionManager, Message};
 use crate::signer::{StateContext};
 use redis::ControlFlow;
 use bitcoin::{PublicKey, PrivateKey};
+use std::sync::mpsc::channel;
 
 pub struct SignerNode<T: ConnectionManager> {
     connection_manager: T,

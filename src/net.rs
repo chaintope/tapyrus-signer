@@ -5,7 +5,48 @@ use std::sync::Arc;
 use redis::{Client, Commands, ControlFlow, PubSubCommands};
 use std::thread;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer, Deserializer};
+use bitcoin::PublicKey;
+use crate::serialize::ByteBufVisitor;
+
+/// Signerの識別子。公開鍵を識別子にする。
+#[derive(Debug, PartialEq)]
+pub struct SignerID {
+    pub pubkey: PublicKey
+}
+
+impl SignerID {
+    pub fn new(pubkey: PublicKey) -> SignerID {
+        SignerID {
+            pubkey
+        }
+    }
+}
+
+impl Serialize for SignerID {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        use bitcoin::util::psbt::serialize::Serialize;
+
+        let ser = self.pubkey.serialize();
+        serializer.serialize_bytes(&ser[..])
+    }
+}
+
+impl<'de> Deserialize<'de> for SignerID {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>
+    {
+        let vec = deserializer.deserialize_byte_buf(ByteBufVisitor)?;
+
+        // TODO: Handle when PublicKey::from_slice returns Error
+        let pubkey = PublicKey::from_slice(&vec).unwrap();
+        let signer_id = SignerID::new(pubkey);
+        Ok(signer_id)
+    }
+}
 
 #[derive(PartialEq, Debug, Serialize, Deserialize)]
 pub enum MessageType {
@@ -18,6 +59,7 @@ pub enum MessageType {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
     pub message_type: MessageType,
+    pub sender_id: SignerID,
     pub payload: Vec<u8>,
 }
 
@@ -81,10 +123,12 @@ impl ConnectionManager for RedisManager {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_helper::TestKeys;
 
     #[test]
     fn redis_connection_test() {
         let connection_manager = Arc::new(RedisManager::new());
+        let sender_id = SignerID { pubkey: TestKeys::new().pubkeys()[0] };
 
         let message_processor = move |message: Message|  {
             assert_eq!(message.message_type, MessageType::Candidateblock);
@@ -93,9 +137,31 @@ mod test {
 
         let subscriber = connection_manager.subscribe(message_processor);
 
-        let message = Message { message_type: MessageType::Candidateblock, payload: [].to_vec() };
+        let message = Message {
+            message_type: MessageType::Candidateblock,
+            sender_id,
+            payload: [].to_vec()
+        };
         connection_manager.broadcast_message(message);
 
         subscriber.join().unwrap();
+    }
+
+    #[test]
+    fn signer_id_serialize_test() {
+        let pubkey = TestKeys::new().pubkeys()[0];
+        let signer_id: SignerID = SignerID{ pubkey };
+        let serialized = serde_json::to_string(&signer_id).unwrap();
+        assert_eq!("[3,131,26,105,184,0,152,51,171,91,3,38,1,46,175,72,155,254,163,90,115,33,177,202,21,177,29,136,19,20,35,250,252]", serialized);
+    }
+
+    #[test]
+    fn signer_id_deserialize_test() {
+        let serialized = "[3,131,26,105,184,0,152,51,171,91,3,38,1,46,175,72,155,254,163,90,115,33,177,202,21,177,29,136,19,20,35,250,252]";
+        let signer_id = serde_json::from_str::<SignerID>(serialized).unwrap();
+
+        let pubkey = TestKeys::new().pubkeys()[0];
+        let expected: SignerID = SignerID{ pubkey };
+        assert_eq!(expected, signer_id);
     }
 }
