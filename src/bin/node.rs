@@ -28,7 +28,9 @@ fn main() {
     let threshold: u32 = threshold.parse().unwrap();
 
     validate_options(&pubkey_list, &private_key, &threshold).unwrap();
-    let params = NodeParameters { pubkey_list, threshold, private_key };
+    // TODO: RPC params should be got from command line args.
+    let rpc = tapyrus_siner::rpc::Rpc::new("http://127.0.0.1:12381".to_string(), Some("user".to_string()), Some("pass".to_string()));
+    let params = NodeParameters::new(pubkey_list,  private_key, threshold, rpc);
     let con = RedisManager::new();
     let node = &mut SignerNode::new(con, params);
 
