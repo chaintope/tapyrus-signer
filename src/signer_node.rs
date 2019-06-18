@@ -1,5 +1,7 @@
 use crate::net::{ConnectionManager, MessageType, Message};
 use crate::signer::{StateContext};
+use crate::net::{ConnectionManager, Message};
+use crate::signer::{StateContext, NodeState};
 use redis::ControlFlow;
 use bitcoin::{PublicKey, PrivateKey};
 use std::sync::mpsc::channel;
@@ -17,8 +19,8 @@ impl<T: ConnectionManager> SignerNode<T> {
         }
     }
 
-    pub fn start(&mut self) {
-        let mut context: StateContext = StateContext::new();
+    pub fn start(&mut self, state: NodeState) {
+        let mut context: StateContext = StateContext::new(state);
         let closure = move |message: Message| {
             let next = context.current_state.process_message(message);
             context.set_state(next);
