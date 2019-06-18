@@ -3,6 +3,7 @@ pub enum Error {
     JsonRpc(jsonrpc::error::Error),
     Json(serde_json::error::Error),
     InvalidLength(usize, usize),
+    InvalidArgs(String),
     /// Errors cause sender side matter, like parameter was wrong.
     InvalidRequest,
 }

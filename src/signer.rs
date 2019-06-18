@@ -1,4 +1,5 @@
 use bitcoin::PublicKey;
+use crate::net::{Message, MessageType};
 
 /// Signerの識別子。公開鍵を識別子にする。
 pub type SignerID = PublicKey;
@@ -40,7 +41,17 @@ pub trait RoundState {
 //}
 
 impl NodeState {
-    pub fn process(&self) -> Box<dyn RoundState> {
+    pub fn process(&self, message: Message) -> NodeState {
+        let processor = &self.to_processor();
+        match message.message_type {
+            MessageType::Candidateblock => processor.process_candidateblock(&message.payload[..]),
+            MessageType::Signature => { processor.process_signature(&message.payload[..]) },
+            MessageType::Completedblock => { processor.process_completedblock(&message.payload[..]) },
+            MessageType::Roundfailure => { processor.process_roundfailure(&message.payload[..]) },
+        }
+    }
+
+    fn to_processor(&self) -> Box<dyn RoundState> {
         match self {
             NodeState::Joining => Box::new(RoundStateJoining{}),
             _ => Box::new(RoundStateJoining),
