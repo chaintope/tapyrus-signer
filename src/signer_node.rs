@@ -12,11 +12,13 @@ pub struct SignerNode<T: ConnectionManager> {
     current_state: NodeState,
     stop_signal: Option<Receiver<u32>>,
 }
-
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum NodeState {
     Joining,
-    Master,
+    Master {
+        signatures: Vec<secp256k1::Signature>,
+        candidate_block: Block,
+    },
     Member,
 }
 
@@ -47,13 +49,8 @@ impl<T: ConnectionManager> SignerNode<T> {
         };
 
         let _handler = self.connection_manager.start(closure);
-        if self.current_state == NodeState::Master {
-            // TODO: pseudo-implementation.
-            let block = self.params.rpc.getnewblock(&self.params.address).unwrap();
-            self.connection_manager.broadcast_message(Message {
-                message_type: MessageType::Candidateblock(block),
-                sender_id: self.params.signer_id,
-            })
+        if let NodeState::Master { .. } = &self.current_state {
+            self.start_new_round();
         };
 
         loop {
@@ -78,6 +75,16 @@ impl<T: ConnectionManager> SignerNode<T> {
             let next = self.process_message(msg);
             self.current_state = next;
         }
+    }
+
+    // TODO: pseudo-implementation.
+    fn start_new_round(&self) -> Block {
+        let block = self.params.rpc.getnewblock(&self.params.address).unwrap();
+        self.connection_manager.broadcast_message(Message {
+            message_type: MessageType::Candidateblock(block.clone()),
+            sender_id: self.params.signer_id,
+        });
+        block
     }
 
     pub fn process_message(&self, message: Message) -> NodeState {
@@ -110,11 +117,47 @@ impl<T: ConnectionManager> SignerNode<T> {
             _ => {}
         };
 
-        self.current_state
+        self.current_state.clone()
     }
 
 
-    fn process_signature(&self, _sender_id: &SignerID, _signature: &Signature) -> NodeState {
+    fn process_signature(&self, sender_id: &SignerID, signature: &Signature) -> NodeState {
+        match &self.current_state {
+            NodeState::Master { signatures: ref sigs, candidate_block: ref block } => {
+                let mut sigs = sigs.clone();
+                sigs.push(signature.0.clone());
+
+                if sigs.len() as u8 >= self.params.threshold {
+                    // call combineblocksigs
+                    let completed_block = self.params.rpc.combineblocksigs(&block, &sigs).unwrap();
+
+                    // call submitblock
+                    self.params.rpc.submitblock(&completed_block).unwrap();
+
+                    // send completeblock message
+                    let message = Message {
+                        message_type: MessageType::Completedblock(completed_block),
+                        sender_id: self.params.signer_id.clone(),
+                    };
+                    self.connection_manager.broadcast_message(message);
+
+                    // start next round
+                    let next_block = self.start_new_round();
+                    let sig = sign(&self.params.private_key, &next_block.hash().unwrap());
+
+                    NodeState::Master { signatures: vec![sig], candidate_block: next_block }
+                } else {
+                    NodeState::Master { signatures: sigs, candidate_block: block.clone() }
+                }
+
+            }
+            state => {
+                state.clone()
+            }
+        }
+    }
+
+    fn process_completedblock(&self, sender_id: &SignerID, block: &Block) -> NodeState {
         unimplemented!()
     }
 
@@ -129,7 +172,7 @@ impl<T: ConnectionManager> SignerNode<T> {
 
 pub struct NodeParameters {
     pub pubkey_list: Vec<PublicKey>,
-    pub threshold: u32,
+    pub threshold: u8,
     pub private_key: PrivateKey,
     pub rpc: Rpc,
     pub address: Address,
@@ -137,7 +180,7 @@ pub struct NodeParameters {
 }
 
 impl NodeParameters {
-    pub fn new(pubkey_list: Vec<PublicKey>, private_key: PrivateKey, threshold: u32, rpc: Rpc) -> NodeParameters {
+    pub fn new(pubkey_list: Vec<PublicKey>, private_key: PrivateKey, threshold: u8, rpc: Rpc) -> NodeParameters {
         let secp = secp256k1::Secp256k1::new();
         let self_pubkey = private_key.public_key(&secp);
         let address = Address::p2pkh(&self_pubkey, private_key.network);
@@ -158,12 +201,15 @@ mod tests {
     use crate::signer_node::{NodeParameters, SignerNode, NodeState};
     use crate::net::{ConnectionManager, Message};
     use crate::test_helper::TestKeys;
+    use crate::net::{RedisManager, SignerID, Signature};
+    use crate::test_helper::{TestKeys, get_block};
     use std::thread;
     use crate::rpc::Rpc;
     use std::sync::mpsc::{Sender, Receiver, channel};
     use redis::ControlFlow;
     use std::thread::JoinHandle;
     use std::sync::Arc;
+    use crate::sign::sign;
 
     pub struct TestConnectionManager<F: Fn(Arc<Message>) -> () + Send + 'static> {
         pub sender: Sender<Message>,
@@ -203,6 +249,19 @@ mod tests {
         }
     }
 
+    fn create_node(current_state: NodeState) -> SignerNode<RedisManager> {
+        let testkeys = TestKeys::new();
+        let pubkey_list = testkeys.pubkeys();
+        let threshold = 2;
+        let private_key = testkeys.key[0];
+
+        let rpc = Rpc::new("http://localhost:1281".to_string(), Some("user".to_string()), Some("pass".to_string()));
+        let params = NodeParameters::new(pubkey_list, private_key, threshold, rpc);
+        let con = RedisManager::new();
+
+        SignerNode::new(con, params, current_state)
+    }
+
     pub fn setup_node<F>(con: TestConnectionManager<F>) -> (thread::JoinHandle<()>, Sender<u32>)
         where F: Fn(Arc<Message>) -> () + Send + 'static {
         let testkeys = TestKeys::new();
@@ -220,6 +279,63 @@ mod tests {
         }).unwrap();
 
         (handle, stop_signal)
+    }
+
+    /// 3 of 5 multisig
+    /// Round owner will collect signatures.
+    #[test]
+    fn process_signature_test() {
+        let node_owner = SignerID::new(TestKeys::new().pubkeys()[0]);
+        let owner_private_key = TestKeys::new().key[0];
+
+        let block = get_block();
+
+        // Round master create signature itself, when broadcast candidate block. So,
+        // signatures vector has one signature.
+        let initial_state = NodeState::Master {
+            candidate_block: block.clone(),
+            signatures: vec![sign(&owner_private_key, &block.hash().unwrap())],
+        };
+        let mut node = create_node(initial_state);
+
+        // sign node1
+        {
+            let private_key = TestKeys::new().key[1];
+            let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
+            let block_hash = block.hash().unwrap();
+            let sig = sign(&private_key, &block_hash);
+
+            let next_state =  node.process_signature(&sender_id, &Signature(sig));
+
+            match next_state {
+                NodeState::Master { signatures: ref sigs, .. } => {
+                    assert_eq!(sigs.len(), 2);
+                },
+                _ => assert!(false),
+            }
+
+            node.current_state = next_state;
+        }
+
+        // sign node2
+        // After node2 send signature, threshold is going to be met. So, signatures vector is
+        // cleared and the block state object has is renewed.
+        {
+            let private_key = TestKeys::new().key[2];
+            let sender_id = SignerID::new(TestKeys::new().pubkeys()[2]);
+            let block_hash = block.hash().unwrap();
+            let sig = sign(&private_key, &block_hash);
+
+            let next_state =  node.process_signature(&sender_id, &Signature(sig));
+
+            match next_state {
+                NodeState::Master { signatures: sigs, candidate_block: next_block } => {
+                    assert_eq!(sigs.len(), 0);
+                    assert_ne!(block, next_block);
+                },
+                _ => assert!(false),
+            }
+        }
     }
 }
 
