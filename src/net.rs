@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize, Serializer, Deserializer};
 use bitcoin::PublicKey;
 use crate::serialize::ByteBufVisitor;
 use crate::blockdata::Block;
+use std::thread::JoinHandle;
 
 
 /// Signerの識別子。公開鍵を識別子にする。
@@ -71,8 +72,6 @@ impl Serialize for Signature {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        use bitcoin::util::psbt::serialize::Serialize;
-
         let ser = self.0.serialize_der();
         serializer.serialize_bytes(&ser[..])
     }
@@ -94,7 +93,7 @@ impl<'de> Deserialize<'de> for Signature {
 
 pub trait ConnectionManager {
     fn broadcast_message(&self, message: Message);
-    fn start(&self, message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + Sync + 'static);
+    fn start(&self, message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static) -> JoinHandle<()>;
 }
 
 pub struct RedisManager {
@@ -107,8 +106,8 @@ impl RedisManager {
         RedisManager { client }
     }
 
-    fn subscribe(&self, mut message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + Sync + 'static) -> thread::JoinHandle<()>
-     {
+    fn subscribe(&self, mut message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static) -> thread::JoinHandle<()>
+    {
         let client = Arc::clone(&self.client);
 
         thread::spawn(move || {
@@ -140,11 +139,9 @@ impl ConnectionManager for RedisManager {
         }).join().unwrap();
     }
 
-    fn start(&self, message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + Sync + 'static)
-         {
-        let subscriber = self.subscribe(message_processor);
-
-        subscriber.join().unwrap();
+    fn start(&self, message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static) -> JoinHandle<()>
+    {
+        self.subscribe(message_processor)
     }
 }
 
@@ -153,14 +150,13 @@ impl ConnectionManager for RedisManager {
 mod test {
     use super::*;
     use crate::test_helper::{TestKeys, create_message};
-    use secp256k1::ffi::secp256k1_context_clone;
 
     #[test]
     fn redis_connection_test() {
         let connection_manager = Arc::new(RedisManager::new());
         let sender_id = SignerID { pubkey: TestKeys::new().pubkeys()[0] };
 
-        let message_processor = move |message: Message|  {
+        let message_processor = move |message: Message| {
             assert_eq!(message.message_type, MessageType::Roundfailure);
             ControlFlow::Break(())
         };
@@ -179,7 +175,7 @@ mod test {
     #[test]
     fn signer_id_serialize_test() {
         let pubkey = TestKeys::new().pubkeys()[0];
-        let signer_id: SignerID = SignerID{ pubkey };
+        let signer_id: SignerID = SignerID { pubkey };
         let serialized = serde_json::to_string(&signer_id).unwrap();
         assert_eq!("[3,131,26,105,184,0,152,51,171,91,3,38,1,46,175,72,155,254,163,90,115,33,177,202,21,177,29,136,19,20,35,250,252]", serialized);
     }
@@ -190,7 +186,7 @@ mod test {
         let signer_id = serde_json::from_str::<SignerID>(serialized).unwrap();
 
         let pubkey = TestKeys::new().pubkeys()[0];
-        let expected: SignerID = SignerID{ pubkey };
+        let expected: SignerID = SignerID { pubkey };
         assert_eq!(expected, signer_id);
     }
 

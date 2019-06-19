@@ -1,8 +1,5 @@
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use crate::net::{MessageType, Message, SignerID, Signature};
-use crate::serialize::ByteBufVisitor;
 use crate::blockdata::Block;
-use crate::net;
 
 pub struct StateContext {
     pub current_state: NodeState,
@@ -16,16 +13,6 @@ pub enum NodeState {
     Member,
 }
 
-// state パターン
-pub trait RoundState {
-    fn process_candidateblock(&self, sender_id: &SignerID, block: &Block) -> NodeState;
-    fn process_signature(&self, sender_id: &SignerID, signature: &Signature) -> NodeState;
-    fn process_completedblock(&self, sender_id: &SignerID, block: &Block) -> NodeState;
-    fn process_roundfailure(&self, sender_id: &SignerID) -> NodeState;
-}
-
-impl NodeState {}
-
 impl StateContext {
     pub fn new(current_state: NodeState) -> StateContext {
         StateContext {
@@ -36,46 +23,13 @@ impl StateContext {
     pub fn set_state(&mut self, s: NodeState) {
         self.current_state = s;
     }
-
-    pub fn process_message(&self, message: Message) -> NodeState {
-        match message.message_type {
-            MessageType::Candidateblock(block) => {
-                self.process_candidateblock(&message.sender_id, &block)
-            }
-            MessageType::Signature(sig) => {
-                self.process_signature(&message.sender_id, &sig)
-            }
-            MessageType::Completedblock(block) => {
-                self.process_completedblock(&message.sender_id, &block)
-            }
-            MessageType::Roundfailure => {
-                self.process_roundfailure(&message.sender_id)
-            }
-        }
-    }
-
-    fn process_candidateblock(&self, sender_id: &SignerID, block: &Block) -> NodeState {
-        unimplemented!()
-    }
-
-    fn process_signature(&self, sender_id: &SignerID, signature: &Signature) -> NodeState {
-        unimplemented!()
-    }
-
-    fn process_completedblock(&self, sender_id: &SignerID, block: &Block) -> NodeState {
-        unimplemented!()
-    }
-
-    fn process_roundfailure(&self, sender_id: &SignerID) -> NodeState {
-        unimplemented!()
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::signer_node::{NodeParameters, SignerNode};
-    use crate::net::{RedisManager, ConnectionManager, MessageType, Message, SignerID};
-    use crate::test_helper::{TestKeys, create_message};
+    use crate::net::{RedisManager};
+    use crate::test_helper::TestKeys;
     use std::thread;
     use crate::signer::NodeState;
     use crate::rpc::Rpc;
