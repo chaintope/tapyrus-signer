@@ -39,7 +39,7 @@ fn main() {
     } else {
         NodeState::Member
     };
-    println!("node start. NodeState: {}", &current_state);
+    println!("node start. NodeState: {:?}", &current_state);
     node.start(current_state);
 }
 
