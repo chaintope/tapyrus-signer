@@ -9,7 +9,7 @@ use bitcoin::{PrivateKey, PublicKey};
 use tapyrus_siner::signer_node::{NodeParameters, SignerNode};
 use std::str::FromStr;
 use tapyrus_siner::net::RedisManager;
-use tapyrus_siner::signer::NodeState;
+use tapyrus_siner::signer_node::NodeState;
 
 pub const OPTION_NAME_PUBLIC_KEY: &str = "publickey";
 pub const OPTION_NAME_PRIVATE_KEY: &str = "privatekey";
@@ -32,15 +32,15 @@ fn main() {
     let rpc = tapyrus_siner::rpc::Rpc::new("http://127.0.0.1:12381".to_string(), Some("user".to_string()), Some("pass".to_string()));
     let params = NodeParameters::new(pubkey_list,  private_key, threshold, rpc);
     let con = RedisManager::new();
-    let node = &mut SignerNode::new(con, params);
-
     let current_state = if options.is_present(OPTION_NAME_MASTER_FLAG) {
         NodeState::Master
     } else {
         NodeState::Member
     };
+
     println!("node start. NodeState: {:?}", &current_state);
-    node.start(current_state);
+    let node = &mut SignerNode::new(con, params, current_state);
+    node.start();
 }
 
 

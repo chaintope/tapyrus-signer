@@ -192,7 +192,6 @@ mod test {
 
     #[test]
     fn signature_message_serialize_deserialize_test() {
-        let redis = RedisManager::new();
         let message = create_message();
 
         let serialized = serde_json::to_string(&message).unwrap();
