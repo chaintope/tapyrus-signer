@@ -1,27 +1,33 @@
 use crate::net::{ConnectionManager, Message, MessageType, SignerID, Signature};
-use crate::signer::{StateContext, NodeState};
 use redis::ControlFlow;
 use bitcoin::{PublicKey, PrivateKey, Address};
 use crate::rpc::Rpc;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use crate::blockdata::Block;
+use crate::sign::sign;
 
 pub struct SignerNode<T: ConnectionManager> {
     connection_manager: T,
     params: NodeParameters,
+    current_state: NodeState,
+}
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum NodeState {
+    Joining,
+    Master,
+    Member,
 }
 
 impl<T: ConnectionManager> SignerNode<T> {
-    pub fn new(connection_manager: T, params: NodeParameters) -> SignerNode<T> {
+    pub fn new(connection_manager: T, params: NodeParameters, current_state: NodeState) -> SignerNode<T> {
         SignerNode {
             connection_manager,
             params,
+            current_state,
         }
     }
 
-    pub fn start(&self, state: NodeState) {
-        let mut context: StateContext = StateContext::new(state);
-
+    pub fn start(&mut self) {
         let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
         let closure = move |message: Message| {
             match sender.send(message) {
@@ -34,11 +40,12 @@ impl<T: ConnectionManager> SignerNode<T> {
         };
 
         let _handler = self.connection_manager.start(closure);
-        if let NodeState::Master = &context.current_state {
+        if self.current_state == NodeState::Master {
+            // TODO: pseudo-implementation.
             let block = self.params.rpc.getnewblock(&self.params.address).unwrap();
             self.connection_manager.broadcast_message(Message {
                 message_type: MessageType::Candidateblock(block),
-                sender_id: self.params.signer_id
+                sender_id: self.params.signer_id,
             })
         };
 
@@ -49,7 +56,7 @@ impl<T: ConnectionManager> SignerNode<T> {
             // stateの変更はmain thread側で行う。
             let msg = receiver.recv().unwrap();
             let next = self.process_message(msg);
-            context.set_state(next);
+            self.current_state = next;
         }
     }
 
@@ -71,8 +78,21 @@ impl<T: ConnectionManager> SignerNode<T> {
     }
 
     fn process_candidateblock(&self, sender_id: &SignerID, block: &Block) -> NodeState {
-        unimplemented!()
+        match self.current_state {
+            NodeState::Member => {
+                let block_hash = block.hash().unwrap();
+                let sig = sign(&self.params.private_key, &block_hash);
+                self.connection_manager.broadcast_message(Message {
+                    message_type: MessageType::Signature(crate::net::Signature(sig)),
+                    sender_id: self.params.signer_id,
+                });
+            }
+            _ => {}
+        };
+
+        self.current_state
     }
+
 
     fn process_signature(&self, sender_id: &SignerID, signature: &Signature) -> NodeState {
         unimplemented!()
@@ -108,7 +128,32 @@ impl NodeParameters {
             private_key,
             rpc,
             address,
-            signer_id
+            signer_id,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::signer_node::{NodeParameters, SignerNode, NodeState};
+    use crate::net::{RedisManager};
+    use crate::test_helper::TestKeys;
+    use std::thread;
+    use crate::rpc::Rpc;
+
+    fn setup_node() -> thread::JoinHandle<()> {
+        let testkeys = TestKeys::new();
+        let pubkey_list = testkeys.pubkeys();
+        let threshold = 2;
+        let private_key = testkeys.key[0];
+
+        let rpc = Rpc::new("http://localhost:1281".to_string(), Some("user".to_string()), Some("pass".to_string()));
+        let params = NodeParameters::new(pubkey_list, private_key, threshold, rpc);
+        let con = RedisManager::new();
+
+        let mut node = SignerNode::new(con, params, NodeState::Member);
+        thread::spawn(move || {
+            node.start();
+        })
     }
 }
