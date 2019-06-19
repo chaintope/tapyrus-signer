@@ -29,7 +29,7 @@ impl<T: ConnectionManager> SignerNode<T> {
         };
 
         let closure = move |message: Message| {
-            let next = context.current_state.process_message(message);
+            let next = context.process_message(message);
             context.set_state(next);
             ControlFlow::Continue
         };

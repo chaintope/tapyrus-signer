@@ -13,7 +13,7 @@ pub struct StateContext {
 pub enum NodeState {
     Joining,
     Master,
-    Member
+    Member,
 }
 
 // state パターン
@@ -23,29 +23,8 @@ pub trait RoundState {
     fn process_completedblock(&self, sender_id: &SignerID, block: &Block) -> NodeState;
     fn process_roundfailure(&self, sender_id: &SignerID) -> NodeState;
 }
-impl NodeState {
-    pub fn process_message(&self, message: Message) -> NodeState {
-        let state = match self {
-            NodeState::Joining => Box::new(RoundStateJoining{}),
-            _ => Box::new(RoundStateJoining),
-        };
 
-        match message {
-            Message { sender_id: sender_id, message_type: MessageType::Candidateblock(block)} => {
-                state.process_candidateblock(&sender_id, &block)
-            },
-            Message { sender_id: sender_id, message_type: MessageType::Signature(sig)} => {
-                state.process_signature(&sender_id, &sig)
-            },
-            Message { sender_id: sender_id, message_type: MessageType::Completedblock(block)} => {
-                state.process_completedblock(&sender_id, &block)
-            },
-            Message { sender_id: sender_id, message_type: MessageType::Roundfailure} => {
-                state.process_roundfailure(&sender_id)
-            },
-        }
-    }
-}
+impl NodeState {}
 
 impl StateContext {
     pub fn new(current_state: NodeState) -> StateContext {
@@ -57,11 +36,24 @@ impl StateContext {
     pub fn set_state(&mut self, s: NodeState) {
         self.current_state = s;
     }
-}
 
-struct RoundStateJoining;
+    pub fn process_message(&self, message: Message) -> NodeState {
+        match message.message_type {
+            MessageType::Candidateblock(block) => {
+                self.process_candidateblock(&message.sender_id, &block)
+            }
+            MessageType::Signature(sig) => {
+                self.process_signature(&message.sender_id, &sig)
+            }
+            MessageType::Completedblock(block) => {
+                self.process_completedblock(&message.sender_id, &block)
+            }
+            MessageType::Roundfailure => {
+                self.process_roundfailure(&message.sender_id)
+            }
+        }
+    }
 
-impl RoundState for RoundStateJoining {
     fn process_candidateblock(&self, sender_id: &SignerID, block: &Block) -> NodeState {
         unimplemented!()
     }
@@ -78,7 +70,6 @@ impl RoundState for RoundStateJoining {
         unimplemented!()
     }
 }
-
 
 #[cfg(test)]
 mod tests {
