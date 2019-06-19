@@ -38,4 +38,8 @@ impl Block {
         let hash = sha256d::Hash::hash(header).into_inner();
         Ok(BlockHash::from_slice(&hash)?)
     }
+
+    pub fn payload(&self) -> &[u8] {
+        &self.0
+    }
 }

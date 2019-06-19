@@ -12,7 +12,7 @@ use crate::blockdata::Block;
 
 
 /// Signerの識別子。公開鍵を識別子にする。
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub struct SignerID {
     pub pubkey: PublicKey
 }

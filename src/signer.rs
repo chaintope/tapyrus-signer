@@ -9,9 +9,11 @@ pub struct StateContext {
 }
 
 /// When node don't know round status because of just now joining to signer network.
+#[derive(Debug)]
 pub enum NodeState {
     Joining,
     Master,
+    Member
 }
 
 // state パターン
@@ -21,25 +23,6 @@ pub trait RoundState {
     fn process_completedblock(&self, sender_id: &SignerID, block: &Block) -> NodeState;
     fn process_roundfailure(&self, sender_id: &SignerID) -> NodeState;
 }
-
-///// acts as master node in this round.
-//pub struct Master {
-//
-//}
-//
-//impl RoundState for Master {
-//
-//}
-//
-///// acts as member node in this round.
-//pub struct Member {
-//    current_master: SignerID,
-//}
-//
-//impl RoundState for Member {
-//
-//}
-
 impl NodeState {
     pub fn process_message(&self, message: Message) -> NodeState {
         let state = match self {
@@ -65,9 +48,9 @@ impl NodeState {
 }
 
 impl StateContext {
-    pub fn new() -> StateContext {
+    pub fn new(current_state: NodeState) -> StateContext {
         StateContext {
-            current_state: NodeState::Joining
+            current_state
         }
     }
 
@@ -104,6 +87,7 @@ mod tests {
     use crate::test_helper::{TestKeys, create_message};
     use std::thread;
     use crate::signer::NodeState;
+    use crate::rpc::Rpc;
 
     fn setup_node() -> thread::JoinHandle<()> {
         let testkeys = TestKeys::new();
@@ -111,12 +95,13 @@ mod tests {
         let threshold = 2;
         let private_key = testkeys.key[0];
 
-        let params = NodeParameters { pubkey_list, threshold, private_key };
+        let rpc = Rpc::new("http://localhost:1281".to_string(), Some("user".to_string()), Some("pass".to_string()));
+        let params = NodeParameters::new(pubkey_list, private_key, threshold, rpc);
         let con = RedisManager::new();
 
         let mut node = SignerNode::new(con, params);
         thread::spawn(move || {
-            node.start();
+            node.start(NodeState::Member);
         })
     }
 }
