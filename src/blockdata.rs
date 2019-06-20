@@ -21,7 +21,7 @@ impl BlockHash {
     pub fn borrow_inner(&self) -> &[u8; 32] { &self.0 }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Block(Vec<u8>);
 
 impl Block {
