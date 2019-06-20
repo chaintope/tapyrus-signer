@@ -44,4 +44,7 @@ impl TestKeys {
             PublicKey::from_str("02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e").unwrap(),
         ]
     }
+    pub fn signer_id(&self) -> SignerID {
+        SignerID::new(self.pubkeys()[0])
+    }
 }
