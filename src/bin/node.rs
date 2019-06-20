@@ -25,21 +25,15 @@ fn main() {
     let privkey_value = options.value_of(OPTION_NAME_PRIVATE_KEY); // required
     let pubkey_list: Vec<PublicKey> = get_public_keys_from_options(pubkey_values).unwrap();
     let private_key = PrivateKey::from_wif(privkey_value.unwrap()).unwrap();
-    let threshold: u32 = threshold.parse().unwrap();
+    let threshold: u8 = threshold.parse().unwrap();
 
     validate_options(&pubkey_list, &private_key, &threshold).unwrap();
     // TODO: RPC params should be got from command line args.
     let rpc = tapyrus_siner::rpc::Rpc::new("http://127.0.0.1:12381".to_string(), Some("user".to_string()), Some("pass".to_string()));
-    let params = NodeParameters::new(pubkey_list,  private_key, threshold, rpc);
+    let params = NodeParameters::new(pubkey_list,  private_key, threshold, rpc, options.is_present(OPTION_NAME_MASTER_FLAG));
     let con = RedisManager::new();
-    let current_state = if options.is_present(OPTION_NAME_MASTER_FLAG) {
-        NodeState::Master
-    } else {
-        NodeState::Member
-    };
+    let node = &mut SignerNode::new(con, params);
 
-    println!("node start. NodeState: {:?}", &current_state);
-    let node = &mut SignerNode::new(con, params, current_state);
     node.start();
 }
 
@@ -79,7 +73,7 @@ fn get_public_keys_from_options(keyargs: Values) -> Result<Vec<PublicKey>, bitco
     }).collect()
 }
 
-fn validate_options(public_keys: &Vec<PublicKey>, private_key: &PrivateKey, threshold: &u32) -> Result<(), tapyrus_siner::errors::Error> {
+fn validate_options(public_keys: &Vec<PublicKey>, private_key: &PrivateKey, threshold: &u8) -> Result<(), tapyrus_siner::errors::Error> {
     if public_keys.len() < *threshold as usize {
         let error_msg = format!("Not enough number of public keys. publicKeys.len: {}, threshold: {}",
                                 public_keys.len(), threshold);

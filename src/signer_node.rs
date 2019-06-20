@@ -23,11 +23,11 @@ pub enum NodeState {
 }
 
 impl<T: ConnectionManager> SignerNode<T> {
-    pub fn new(connection_manager: T, params: NodeParameters, current_state: NodeState) -> SignerNode<T> {
+    pub fn new(connection_manager: T, params: NodeParameters) -> SignerNode<T> {
         SignerNode {
             connection_manager,
             params,
-            current_state,
+            current_state: NodeState::Joining,
             stop_signal: None,
         }
     }
@@ -49,9 +49,14 @@ impl<T: ConnectionManager> SignerNode<T> {
         };
 
         let _handler = self.connection_manager.start(closure);
-        if let NodeState::Master { .. } = &self.current_state {
-            self.start_new_round();
+
+        self.current_state = if self.params.master_flag {
+            let (block, sig) = self.start_new_round();
+            NodeState::Master { signatures: vec![sig], candidate_block: block }
+        } else {
+            NodeState::Member
         };
+        println!("node start. NodeState: {:?}", &self.current_state);
 
         loop {
             // After process when received message. Get message from receiver,
@@ -78,13 +83,16 @@ impl<T: ConnectionManager> SignerNode<T> {
     }
 
     // TODO: pseudo-implementation.
-    fn start_new_round(&self) -> Block {
+    pub fn start_new_round(&self) -> (Block, secp256k1::Signature) {
         let block = self.params.rpc.getnewblock(&self.params.address).unwrap();
         self.connection_manager.broadcast_message(Message {
             message_type: MessageType::Candidateblock(block.clone()),
             sender_id: self.params.signer_id,
         });
-        block
+
+        let sig = sign(&self.params.private_key, &block.hash().unwrap());
+
+        (block, sig)
     }
 
     pub fn process_message(&self, message: Message) -> NodeState {
@@ -142,8 +150,7 @@ impl<T: ConnectionManager> SignerNode<T> {
                     self.connection_manager.broadcast_message(message);
 
                     // start next round
-                    let next_block = self.start_new_round();
-                    let sig = sign(&self.params.private_key, &next_block.hash().unwrap());
+                    let (next_block, sig) = self.start_new_round();
 
                     NodeState::Master { signatures: vec![sig], candidate_block: next_block }
                 } else {
@@ -158,15 +165,11 @@ impl<T: ConnectionManager> SignerNode<T> {
     }
 
     fn process_completedblock(&self, sender_id: &SignerID, block: &Block) -> NodeState {
-        unimplemented!()
-    }
-
-    fn process_completedblock(&self, _sender_id: &SignerID, _block: &Block) -> NodeState {
-        unimplemented!()
+        self.current_state.clone()
     }
 
     fn process_roundfailure(&self, _sender_id: &SignerID) -> NodeState {
-        self.current_state
+        self.current_state.clone()
     }
 }
 
@@ -177,14 +180,17 @@ pub struct NodeParameters {
     pub rpc: Rpc,
     pub address: Address,
     pub signer_id: SignerID,
+    pub master_flag: bool,
 }
 
 impl NodeParameters {
-    pub fn new(pubkey_list: Vec<PublicKey>, private_key: PrivateKey, threshold: u8, rpc: Rpc) -> NodeParameters {
+    pub fn new(pubkey_list: Vec<PublicKey>, private_key: PrivateKey, threshold: u8, rpc: Rpc, master_flag: bool) -> NodeParameters {
         let secp = secp256k1::Secp256k1::new();
         let self_pubkey = private_key.public_key(&secp);
         let address = Address::p2pkh(&self_pubkey, private_key.network);
         let signer_id = SignerID { pubkey: self_pubkey };
+        let master_flag = master_flag;
+
         NodeParameters {
             pubkey_list,
             threshold,
@@ -192,6 +198,7 @@ impl NodeParameters {
             rpc,
             address,
             signer_id,
+            master_flag,
         }
     }
 }
@@ -200,7 +207,6 @@ impl NodeParameters {
 mod tests {
     use crate::signer_node::{NodeParameters, SignerNode, NodeState};
     use crate::net::{ConnectionManager, Message};
-    use crate::test_helper::TestKeys;
     use crate::net::{RedisManager, SignerID, Signature};
     use crate::test_helper::{TestKeys, get_block};
     use std::thread;
@@ -256,10 +262,10 @@ mod tests {
         let private_key = testkeys.key[0];
 
         let rpc = Rpc::new("http://localhost:1281".to_string(), Some("user".to_string()), Some("pass".to_string()));
-        let params = NodeParameters::new(pubkey_list, private_key, threshold, rpc);
+        let params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, true);
         let con = RedisManager::new();
 
-        SignerNode::new(con, params, current_state)
+        SignerNode::new(con, params)
     }
 
     pub fn setup_node<F>(con: TestConnectionManager<F>) -> (thread::JoinHandle<()>, Sender<u32>)
@@ -271,9 +277,9 @@ mod tests {
 
         let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
         let rpc = Rpc::new("http://localhost:1281".to_string(), Some("user".to_string()), Some("pass".to_string()));
-        let params = NodeParameters::new(pubkey_list, private_key, threshold, rpc);
+        let params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, false);
         let handle = thread::Builder::new().name("NodeMainThread".to_string()).spawn(move || {
-            let mut node = SignerNode::new(con, params, NodeState::Member);
+            let mut node = SignerNode::new(con, params);
             node.stop_handler(stop_handler);
             node.start();
         }).unwrap();
