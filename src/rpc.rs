@@ -134,15 +134,16 @@ pub mod tests {
         rpc.getnewblock(&address)
     }
 
-    pub struct MockRpc<'a> {
-        pub return_block: Option<&'a Block>,
+    use std::cell::RefCell;
+    use std::sync::Arc;
+    pub struct MockRpc {
+        pub return_block: Arc<RefCell<Option<Block>>>,
     }
 
-    impl<'a> MockRpc<'a> {
-
+    impl MockRpc {
         pub fn result(&self) -> Result<Block, Error> {
-            match self.return_block {
-                Some(b) => Ok(b.clone()),
+            match *self.return_block.borrow() {
+                Some(ref b) => Ok(b.clone()),
                 None => Err(Error::JsonRpc(jsonrpc::error::Error::Rpc(jsonrpc::error::RpcError {
                     code: 0,
                     message: "return_block is None.".to_string(),
@@ -151,7 +152,7 @@ pub mod tests {
             }
         }
     }
-    impl<'a> TapyrusApi for MockRpc<'a> {
+    impl TapyrusApi for MockRpc {
         fn getnewblock(&self, _address: &Address) -> Result<Block, Error> {
             self.result()
         }

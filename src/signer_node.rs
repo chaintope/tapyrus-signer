@@ -216,6 +216,7 @@ mod tests {
     use std::sync::Arc;
     use crate::sign::sign;
     use crate::rpc::tests::MockRpc;
+    use crate::blockdata::Block;
 
     pub struct TestConnectionManager<F: Fn(Arc<Message>) -> () + Send + 'static> {
         pub sender: Sender<Message>,
@@ -255,13 +256,12 @@ mod tests {
         }
     }
 
-    fn create_node<'a>(current_state: NodeState) -> SignerNode<MockRpc<'a>, RedisManager> {
+    fn create_node(current_state: NodeState, rpc: MockRpc) -> SignerNode<MockRpc, RedisManager> {
         let testkeys = TestKeys::new();
         let pubkey_list = testkeys.pubkeys();
-        let threshold = 2;
+        let threshold = 3;
         let private_key = testkeys.key[0];
 
-        let rpc = MockRpc { return_block: None };
         let params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, true);
         let con = RedisManager::new();
 
@@ -286,6 +286,7 @@ mod tests {
             node.start();
         }).unwrap();
 
+
         (handle, stop_signal)
     }
 
@@ -293,7 +294,9 @@ mod tests {
     /// Round owner will collect signatures.
     #[test]
     fn process_signature_test() {
-        let _node_owner = SignerID::new(TestKeys::new().pubkeys()[0]);
+        use std::cell::RefCell;
+        use std::sync::Arc;
+
         let owner_private_key = TestKeys::new().key[0];
 
         let block = get_block();
@@ -304,13 +307,16 @@ mod tests {
             candidate_block: block.clone(),
             signatures: vec![sign(&owner_private_key, &block.hash().unwrap())],
         };
-        let mut node = create_node(initial_state);
+
+        let arc_block = Arc::new(RefCell::new(Some(get_block())));
+        let rpc = MockRpc { return_block:   arc_block.clone()};
+        let mut node = create_node(initial_state, rpc);
 
         // sign node1
         {
             let private_key = TestKeys::new().key[1];
             let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
-            let block_hash = block.hash().unwrap();
+            let block_hash = get_block().hash().unwrap();
             let sig = sign(&private_key, &block_hash);
 
             let next_state = node.process_signature(&sender_id, &Signature(sig));
@@ -329,6 +335,10 @@ mod tests {
         // After node2 send signature, threshold is going to be met. So, signatures vector is
         // cleared and the block state object has is renewed.
         {
+            let mut bytes = Vec::from(block.payload());
+            bytes[0] = bytes[0] + 1;
+            *arc_block.borrow_mut() = Some(Block::new(bytes));
+
             let private_key = TestKeys::new().key[2];
             let sender_id = SignerID::new(TestKeys::new().pubkeys()[2]);
             let block_hash = block.hash().unwrap();
@@ -338,7 +348,7 @@ mod tests {
 
             match next_state {
                 NodeState::Master { signatures: sigs, candidate_block: next_block } => {
-                    assert_eq!(sigs.len(), 0);
+                    assert_eq!(sigs.len(), 1); // has self signature at start.
                     assert_ne!(block, next_block);
                 }
                 _ => assert!(false),
