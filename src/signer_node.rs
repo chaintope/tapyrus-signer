@@ -1,14 +1,15 @@
 use crate::net::{ConnectionManager, Message, MessageType, SignerID, Signature};
 use redis::ControlFlow;
 use bitcoin::{PublicKey, PrivateKey, Address};
-use crate::rpc::Rpc;
+use crate::rpc::TapyrusApi;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use crate::blockdata::Block;
 use crate::sign::sign;
+use std::sync::Arc;
 
-pub struct SignerNode<T: ConnectionManager> {
-    connection_manager: T,
-    params: NodeParameters,
+pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
+    connection_manager: C,
+    params: NodeParameters<T>,
     current_state: NodeState,
     stop_signal: Option<Receiver<u32>>,
 }
@@ -22,8 +23,8 @@ pub enum NodeState {
     Member,
 }
 
-impl<T: ConnectionManager> SignerNode<T> {
-    pub fn new(connection_manager: T, params: NodeParameters) -> SignerNode<T> {
+impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
+    pub fn new(connection_manager: C, params: NodeParameters<T>) -> SignerNode<T, C> {
         SignerNode {
             connection_manager,
             params,
@@ -51,8 +52,7 @@ impl<T: ConnectionManager> SignerNode<T> {
         let _handler = self.connection_manager.start(closure);
 
         self.current_state = if self.params.master_flag {
-            let (block, sig) = self.start_new_round();
-            NodeState::Master { signatures: vec![sig], candidate_block: block }
+            self.start_new_round()
         } else {
             NodeState::Member
         };
@@ -83,7 +83,7 @@ impl<T: ConnectionManager> SignerNode<T> {
     }
 
     // TODO: pseudo-implementation.
-    pub fn start_new_round(&self) -> (Block, secp256k1::Signature) {
+    pub fn start_new_round(&self) -> NodeState {
         let block = self.params.rpc.getnewblock(&self.params.address).unwrap();
         self.connection_manager.broadcast_message(Message {
             message_type: MessageType::Candidateblock(block.clone()),
@@ -91,8 +91,10 @@ impl<T: ConnectionManager> SignerNode<T> {
         });
 
         let sig = sign(&self.params.private_key, &block.hash().unwrap());
-
-        (block, sig)
+        NodeState::Master {
+            candidate_block: block,
+            signatures: vec![sig],
+        }
     }
 
     pub fn process_message(&self, message: Message) -> NodeState {
@@ -129,7 +131,7 @@ impl<T: ConnectionManager> SignerNode<T> {
     }
 
 
-    fn process_signature(&self, sender_id: &SignerID, signature: &Signature) -> NodeState {
+    fn process_signature(&self, _sender_id: &SignerID, signature: &Signature) -> NodeState {
         match &self.current_state {
             NodeState::Master { signatures: ref sigs, candidate_block: ref block } => {
                 let mut sigs = sigs.clone();
@@ -150,13 +152,10 @@ impl<T: ConnectionManager> SignerNode<T> {
                     self.connection_manager.broadcast_message(message);
 
                     // start next round
-                    let (next_block, sig) = self.start_new_round();
-
-                    NodeState::Master { signatures: vec![sig], candidate_block: next_block }
+                    self.start_new_round()
                 } else {
                     NodeState::Master { signatures: sigs, candidate_block: block.clone() }
                 }
-
             }
             state => {
                 state.clone()
@@ -164,7 +163,7 @@ impl<T: ConnectionManager> SignerNode<T> {
         }
     }
 
-    fn process_completedblock(&self, sender_id: &SignerID, block: &Block) -> NodeState {
+    fn process_completedblock(&self, _sender_id: &SignerID, _block: &Block) -> NodeState {
         self.current_state.clone()
     }
 
@@ -173,18 +172,18 @@ impl<T: ConnectionManager> SignerNode<T> {
     }
 }
 
-pub struct NodeParameters {
+pub struct NodeParameters<T: TapyrusApi> {
     pub pubkey_list: Vec<PublicKey>,
     pub threshold: u8,
     pub private_key: PrivateKey,
-    pub rpc: Rpc,
+    pub rpc: std::sync::Arc<T>,
     pub address: Address,
     pub signer_id: SignerID,
     pub master_flag: bool,
 }
 
-impl NodeParameters {
-    pub fn new(pubkey_list: Vec<PublicKey>, private_key: PrivateKey, threshold: u8, rpc: Rpc, master_flag: bool) -> NodeParameters {
+impl<T: TapyrusApi> NodeParameters<T> {
+    pub fn new(pubkey_list: Vec<PublicKey>, private_key: PrivateKey, threshold: u8, rpc: T, master_flag: bool) -> NodeParameters<T> {
         let secp = secp256k1::Secp256k1::new();
         let self_pubkey = private_key.public_key(&secp);
         let address = Address::p2pkh(&self_pubkey, private_key.network);
@@ -195,7 +194,7 @@ impl NodeParameters {
             pubkey_list,
             threshold,
             private_key,
-            rpc,
+            rpc: Arc::new(rpc),
             address,
             signer_id,
             master_flag,
@@ -216,6 +215,7 @@ mod tests {
     use std::thread::JoinHandle;
     use std::sync::Arc;
     use crate::sign::sign;
+    use crate::rpc::tests::MockRpc;
 
     pub struct TestConnectionManager<F: Fn(Arc<Message>) -> () + Send + 'static> {
         pub sender: Sender<Message>,
@@ -255,17 +255,19 @@ mod tests {
         }
     }
 
-    fn create_node(current_state: NodeState) -> SignerNode<RedisManager> {
+    fn create_node<'a>(current_state: NodeState) -> SignerNode<MockRpc<'a>, RedisManager> {
         let testkeys = TestKeys::new();
         let pubkey_list = testkeys.pubkeys();
         let threshold = 2;
         let private_key = testkeys.key[0];
 
-        let rpc = Rpc::new("http://localhost:1281".to_string(), Some("user".to_string()), Some("pass".to_string()));
+        let rpc = MockRpc { return_block: None };
         let params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, true);
         let con = RedisManager::new();
 
-        SignerNode::new(con, params)
+        let mut node = SignerNode::new(con, params);
+        node.current_state = current_state;
+        node
     }
 
     pub fn setup_node<F>(con: TestConnectionManager<F>) -> (thread::JoinHandle<()>, Sender<u32>)
@@ -276,7 +278,7 @@ mod tests {
         let private_key = testkeys.key[0];
 
         let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
-        let rpc = Rpc::new("http://localhost:1281".to_string(), Some("user".to_string()), Some("pass".to_string()));
+        let rpc = Rpc::new("http://localhost:12381".to_string(), Some("user".to_string()), Some("pass".to_string()));
         let params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, false);
         let handle = thread::Builder::new().name("NodeMainThread".to_string()).spawn(move || {
             let mut node = SignerNode::new(con, params);
@@ -291,7 +293,7 @@ mod tests {
     /// Round owner will collect signatures.
     #[test]
     fn process_signature_test() {
-        let node_owner = SignerID::new(TestKeys::new().pubkeys()[0]);
+        let _node_owner = SignerID::new(TestKeys::new().pubkeys()[0]);
         let owner_private_key = TestKeys::new().key[0];
 
         let block = get_block();
@@ -311,13 +313,13 @@ mod tests {
             let block_hash = block.hash().unwrap();
             let sig = sign(&private_key, &block_hash);
 
-            let next_state =  node.process_signature(&sender_id, &Signature(sig));
+            let next_state = node.process_signature(&sender_id, &Signature(sig));
 
             match next_state {
                 NodeState::Master { signatures: ref sigs, .. } => {
                     assert_eq!(sigs.len(), 2);
-                },
-                _ => assert!(false),
+                }
+                ref state => panic!("{:?}", state),
             }
 
             node.current_state = next_state;
@@ -332,13 +334,13 @@ mod tests {
             let block_hash = block.hash().unwrap();
             let sig = sign(&private_key, &block_hash);
 
-            let next_state =  node.process_signature(&sender_id, &Signature(sig));
+            let next_state = node.process_signature(&sender_id, &Signature(sig));
 
             match next_state {
                 NodeState::Master { signatures: sigs, candidate_block: next_block } => {
                     assert_eq!(sigs.len(), 0);
                     assert_ne!(block, next_block);
-                },
+                }
                 _ => assert!(false),
             }
         }

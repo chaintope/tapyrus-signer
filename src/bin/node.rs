@@ -9,7 +9,6 @@ use bitcoin::{PrivateKey, PublicKey};
 use tapyrus_siner::signer_node::{NodeParameters, SignerNode};
 use std::str::FromStr;
 use tapyrus_siner::net::RedisManager;
-use tapyrus_siner::signer_node::NodeState;
 
 pub const OPTION_NAME_PUBLIC_KEY: &str = "publickey";
 pub const OPTION_NAME_PRIVATE_KEY: &str = "privatekey";
