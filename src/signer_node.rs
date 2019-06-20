@@ -216,7 +216,6 @@ mod tests {
     use std::sync::Arc;
     use crate::sign::sign;
     use crate::rpc::tests::MockRpc;
-    use crate::blockdata::Block;
 
     pub struct TestConnectionManager<F: Fn(Arc<Message>) -> () + Send + 'static> {
         pub sender: Sender<Message>,
@@ -299,7 +298,7 @@ mod tests {
 
         let owner_private_key = TestKeys::new().key[0];
 
-        let block = get_block();
+        let block = get_block(0);
 
         // Round master create signature itself, when broadcast candidate block. So,
         // signatures vector has one signature.
@@ -308,7 +307,7 @@ mod tests {
             signatures: vec![sign(&owner_private_key, &block.hash().unwrap())],
         };
 
-        let arc_block = Arc::new(RefCell::new(Some(get_block())));
+        let arc_block = Arc::new(RefCell::new(Some(get_block(0))));
         let rpc = MockRpc { return_block:   arc_block.clone()};
         let mut node = create_node(initial_state, rpc);
 
@@ -316,7 +315,7 @@ mod tests {
         {
             let private_key = TestKeys::new().key[1];
             let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
-            let block_hash = get_block().hash().unwrap();
+            let block_hash = get_block(0).hash().unwrap();
             let sig = sign(&private_key, &block_hash);
 
             let next_state = node.process_signature(&sender_id, &Signature(sig));
@@ -335,9 +334,7 @@ mod tests {
         // After node2 send signature, threshold is going to be met. So, signatures vector is
         // cleared and the block state object has is renewed.
         {
-            let mut bytes = Vec::from(block.payload());
-            bytes[0] = bytes[0] + 1;
-            *arc_block.borrow_mut() = Some(Block::new(bytes));
+            *arc_block.borrow_mut() = Some(get_block(1));
 
             let private_key = TestKeys::new().key[2];
             let sender_id = SignerID::new(TestKeys::new().pubkeys()[2]);

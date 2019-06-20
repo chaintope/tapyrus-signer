@@ -191,7 +191,7 @@ pub mod tests {
 
     #[test]
     fn test_combineblocksigs() {
-        let block = get_block();
+        let block = get_block(0);
         let block_hash = block.hash().unwrap();
         let keys = &TestKeys::new().key[..1]; // Just 1 signature
         let sigs: Vec<Signature> = keys.iter().map(|key| {
@@ -221,7 +221,7 @@ pub mod tests {
         assert!(result.is_ok());
 
         // when invalid block.(cannot connect on the tip)
-        let block = get_block();
+        let block = get_block(0);
         assert!(rpc.submitblock(&block).is_err());
     }
 }
