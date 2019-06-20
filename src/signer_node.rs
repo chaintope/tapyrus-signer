@@ -145,7 +145,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 match secp256k1::Secp256k1::verification_only().verify(&self.block2message(block), &signature.0, &sender_id.pubkey.key) {
                     Ok(_) => {
                         sigs.push(signature.0.clone());
-
                         if sigs.len() as u8 >= self.params.threshold {
                             // call combineblocksigs
                             let completed_block = self.params.rpc.combineblocksigs(&block, &sigs).unwrap();
@@ -205,6 +204,8 @@ impl<T: TapyrusApi> NodeParameters<T> {
         let signer_id = SignerID { pubkey: self_pubkey };
         let master_flag = master_flag;
 
+        let mut pubkey_list = pubkey_list;
+        &pubkey_list.sort();
         NodeParameters {
             pubkey_list,
             threshold,
@@ -220,8 +221,7 @@ impl<T: TapyrusApi> NodeParameters<T> {
 #[cfg(test)]
 mod tests {
     use crate::signer_node::{NodeParameters, SignerNode, NodeState};
-    use crate::net::{ConnectionManager, Message};
-    use crate::net::{RedisManager, SignerID, Signature};
+    use crate::net::{ConnectionManager, Message, RedisManager, SignerID, Signature};
     use crate::test_helper::{TestKeys, get_block};
     use std::thread;
     use crate::rpc::Rpc;
@@ -303,6 +303,28 @@ mod tests {
 
 
         (handle, stop_signal)
+    }
+
+    #[test]
+    fn test_pubkey_list_sort() {
+        use bitcoin::util::key::PublicKey;
+        use std::str::FromStr;
+
+        let testkeys = TestKeys::new();
+        let pubkey_list =
+            vec![
+                PublicKey::from_str("03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc").unwrap(),
+                PublicKey::from_str("02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900").unwrap(),
+                PublicKey::from_str("02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e").unwrap(),
+                PublicKey::from_str("02d111519ba1f3013a7a613ecdcc17f4d53fbcb558b70404b5fb0c84ebb90a8d3c").unwrap(),
+                PublicKey::from_str("02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506").unwrap(),
+            ];
+        let threshold = 3;
+        let private_key = testkeys.key[0];
+        let params = NodeParameters::new(pubkey_list.clone(), private_key, threshold, MockRpc{return_block: Arc::new(RefCell::new(None))}, true);
+
+        assert_ne!(params.pubkey_list[0], pubkey_list[0]);
+        assert_eq!(params.pubkey_list[1], pubkey_list[4]);
     }
 
     /// 3 of 5 multisig
