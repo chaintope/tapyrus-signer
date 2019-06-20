@@ -13,6 +13,7 @@ pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     current_state: NodeState,
     stop_signal: Option<Receiver<u32>>,
 }
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeState {
     Joining,
@@ -131,30 +132,44 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     }
 
 
-    fn process_signature(&self, _sender_id: &SignerID, signature: &Signature) -> NodeState {
+    fn block2message(&self, block: &Block) -> secp256k1::Message {
+        secp256k1::Message::from_slice(block.hash().unwrap().borrow_inner()).unwrap()
+    }
+    fn process_signature(&self, sender_id: &SignerID, signature: &Signature) -> NodeState {
         match &self.current_state {
             NodeState::Master { signatures: ref sigs, candidate_block: ref block } => {
+                println!("hoge");
                 let mut sigs = sigs.clone();
-                sigs.push(signature.0.clone());
+                let veryfied = secp256k1::Secp256k1::verification_only().verify(&self.block2message(block), &signature.0, &sender_id.pubkey.key);
+                println!("veryfied={}", veryfied.is_ok());
+                match secp256k1::Secp256k1::verification_only().verify(&self.block2message(block), &signature.0, &sender_id.pubkey.key) {
+                    Ok(_) => {
+                        sigs.push(signature.0.clone());
 
-                if sigs.len() as u8 >= self.params.threshold {
-                    // call combineblocksigs
-                    let completed_block = self.params.rpc.combineblocksigs(&block, &sigs).unwrap();
+                        if sigs.len() as u8 >= self.params.threshold {
+                            // call combineblocksigs
+                            let completed_block = self.params.rpc.combineblocksigs(&block, &sigs).unwrap();
 
-                    // call submitblock
-                    self.params.rpc.submitblock(&completed_block).unwrap();
+                            // call submitblock
+                            self.params.rpc.submitblock(&completed_block).unwrap();
 
-                    // send completeblock message
-                    let message = Message {
-                        message_type: MessageType::Completedblock(completed_block),
-                        sender_id: self.params.signer_id.clone(),
-                    };
-                    self.connection_manager.broadcast_message(message);
+                            // send completeblock message
+                            let message = Message {
+                                message_type: MessageType::Completedblock(completed_block),
+                                sender_id: self.params.signer_id.clone(),
+                            };
+                            self.connection_manager.broadcast_message(message);
 
-                    // start next round
-                    self.start_new_round()
-                } else {
-                    NodeState::Master { signatures: sigs, candidate_block: block.clone() }
+                            // start next round
+                            self.start_new_round()
+                        } else {
+                            NodeState::Master { signatures: sigs, candidate_block: block.clone() }
+                        }
+                    }
+                    Err(e) => {
+                        println!("Invalid Signature!: sender={:?}, error={:?}", &sender_id, e);
+                        self.current_state.clone()
+                    }
                 }
             }
             state => {
@@ -216,6 +231,7 @@ mod tests {
     use std::sync::Arc;
     use crate::sign::sign;
     use crate::rpc::tests::MockRpc;
+    use std::cell::RefCell;
 
     pub struct TestConnectionManager<F: Fn(Arc<Message>) -> () + Send + 'static> {
         pub sender: Sender<Message>,
@@ -293,9 +309,6 @@ mod tests {
     /// Round owner will collect signatures.
     #[test]
     fn process_signature_test() {
-        use std::cell::RefCell;
-        use std::sync::Arc;
-
         let owner_private_key = TestKeys::new().key[0];
 
         let block = get_block(0);
@@ -308,7 +321,7 @@ mod tests {
         };
 
         let arc_block = Arc::new(RefCell::new(Some(get_block(0))));
-        let rpc = MockRpc { return_block:   arc_block.clone()};
+        let rpc = MockRpc { return_block: arc_block.clone() };
         let mut node = create_node(initial_state, rpc);
 
         // sign node1
@@ -350,6 +363,42 @@ mod tests {
                 }
                 _ => assert!(false),
             }
+        }
+    }
+
+    #[test]
+    fn test_invalid_signature() {
+        let owner_private_key = TestKeys::new().key[0];
+
+        let block = get_block(0);
+
+        // Round master create signature itself, when broadcast candidate block. So,
+        // signatures vector has one signature.
+        let initial_state = NodeState::Master {
+            candidate_block: block.clone(),
+            signatures: vec![sign(&owner_private_key, &block.hash().unwrap())],
+        };
+
+        let arc_block = Arc::new(RefCell::new(Some(get_block(0))));
+        let rpc = MockRpc { return_block: arc_block.clone() };
+        let mut node = create_node(initial_state, rpc);
+
+        // sign node1
+        {
+            let private_key = TestKeys::new().key[1];
+            let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
+            let block_hash = get_block(0).hash().unwrap();
+            let sig = sign(&private_key, &block_hash);
+            let next_state = node.process_signature(&sender_id, &Signature(sig));
+
+            match next_state {
+                NodeState::Master { signatures: ref sigs, .. } => {
+                    assert_eq!(sigs.len(), 1); // invalid signature do not include.
+                }
+                ref state => panic!("{:?}", state),
+            }
+
+            node.current_state = next_state;
         }
     }
 }
