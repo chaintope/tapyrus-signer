@@ -19,6 +19,9 @@ pub const OPTION_NAME_RPC_ENDPOINT_PORT: &str = "rpc_endpoint_port";
 pub const OPTION_NAME_RPC_ENDPOINT_USER: &str = "rpc_endpoint_user";
 pub const OPTION_NAME_RPC_ENDPOINT_PASS: &str = "rpc_endpoint_pass";
 
+pub const OPTION_NAME_REDIS_HOST: &str = "redis_host";
+pub const OPTION_NAME_REDIS_PORT: &str = "redis_port";
+
 /// This command is for launch tapyrus-signer-node.
 /// command example:
 /// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e --privatekey=cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA -t 2 --master
@@ -34,7 +37,6 @@ fn main() {
     let threshold: u8 = threshold.parse().unwrap();
 
     validate_options(&pubkey_list, &private_key, &threshold).unwrap();
-    // TODO: RPC params should be got from command line args.
     let rpc = {
         let host = options.value_of(OPTION_NAME_RPC_ENDPOINT_HOST).unwrap_or_default();
         let port = options.value_of(OPTION_NAME_RPC_ENDPOINT_PORT).unwrap_or_default();
@@ -44,7 +46,11 @@ fn main() {
         tapyrus_siner::rpc::Rpc::new(format!("http://{}:{}", host, port), user, pass)
     };
     let params = NodeParameters::new(pubkey_list,  private_key, threshold, rpc, options.is_present(OPTION_NAME_MASTER_FLAG));
-    let con = RedisManager::new();
+    let con = {
+        let host = options.value_of(OPTION_NAME_REDIS_HOST).unwrap_or_default();
+        let port = options.value_of(OPTION_NAME_REDIS_PORT).unwrap_or_default();
+        RedisManager::new(host.to_string(), port.to_string())
+    };
     let node = &mut SignerNode::new(con, params);
 
     node.start();
@@ -95,6 +101,16 @@ fn get_options() -> ArgMatches<'static> {
             .long("rpc-endpoint-pass")
             .value_name("PASS")
             .help("TapyrusCore RPC user password."))
+        .arg(Arg::with_name(OPTION_NAME_REDIS_HOST)
+            .long("redis-host")
+            .value_name("HOST_NAME or IP")
+            .default_value("127.0.0.1")
+            .help("Redis host."))
+        .arg(Arg::with_name(OPTION_NAME_REDIS_PORT)
+            .long("redis-port")
+            .value_name("PORT")
+            .default_value("6379")
+            .help("Redis port."))
         .get_matches()
 }
 

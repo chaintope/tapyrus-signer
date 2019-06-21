@@ -101,8 +101,9 @@ pub struct RedisManager {
 }
 
 impl RedisManager {
-    pub fn new() -> RedisManager {
-        let client = Arc::new(Client::open("redis://localhost").unwrap());
+    pub fn new(host: String, port: String) -> RedisManager {
+        let url: &str = &format!("redis://{}:{}", host, port);
+        let client = Arc::new(Client::open(url).unwrap());
         RedisManager { client }
     }
 
@@ -153,7 +154,7 @@ mod test {
 
     #[test]
     fn redis_connection_test() {
-        let connection_manager = Arc::new(RedisManager::new());
+        let connection_manager = Arc::new(RedisManager::new("localhost".to_string(), "6379".to_string()));
         let sender_id = SignerID { pubkey: TestKeys::new().pubkeys()[0] };
 
         let message_processor = move |message: Message| {
