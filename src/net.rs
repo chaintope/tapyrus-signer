@@ -13,7 +13,7 @@ use std::thread::JoinHandle;
 
 
 /// Signerの識別子。公開鍵を識別子にする。
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub struct SignerID {
     pub pubkey: PublicKey
 }

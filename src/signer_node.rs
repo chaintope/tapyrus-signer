@@ -6,6 +6,7 @@ use std::sync::mpsc::{channel, Sender, Receiver};
 use crate::blockdata::Block;
 use crate::sign::sign;
 use std::sync::Arc;
+use std::collections::HashMap;
 
 pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     connection_manager: C,
@@ -14,11 +15,14 @@ pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     stop_signal: Option<Receiver<u32>>,
 }
 
+/// Signature HashMap type alias.
+type SignatureMap = HashMap<SignerID, secp256k1::Signature>;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeState {
     Joining,
     Master {
-        signatures: Vec<secp256k1::Signature>,
+        signature_map: SignatureMap,
         candidate_block: Block,
     },
     Member,
@@ -92,9 +96,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         });
 
         let sig = sign(&self.params.private_key, &block.hash().unwrap());
+        let mut signature_map: SignatureMap = HashMap::new();
+        signature_map.insert(self.params.signer_id, sig);
         NodeState::Master {
             candidate_block: block,
-            signatures: vec![sig],
+            signature_map,
         }
     }
 
@@ -135,18 +141,27 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     fn block2message(&self, block: &Block) -> secp256k1::Message {
         secp256k1::Message::from_slice(block.hash().unwrap().borrow_inner()).unwrap()
     }
+    fn verify_signature(&self, signature_map: &SignatureMap, block: &Block, sig: &secp256k1::Signature, sender_id: &SignerID) -> Result<(), crate::errors::Error> {
+        if signature_map.contains_key(sender_id) {
+            Err(crate::errors::Error::DuplicatedMessage)
+        } else {
+            let verifier = secp256k1::Secp256k1::verification_only();
+            match verifier.verify(&self.block2message(block), sig, &sender_id.pubkey.key) {
+                Err(e) => Err(crate::errors::Error::InvalidSignature(e)),
+                Ok(_) => Ok(()),
+            }
+        }
+    }
     fn process_signature(&self, sender_id: &SignerID, signature: &Signature) -> NodeState {
         match &self.current_state {
-            NodeState::Master { signatures: ref sigs, candidate_block: ref block } => {
-                println!("hoge");
-                let mut sigs = sigs.clone();
-                let veryfied = secp256k1::Secp256k1::verification_only().verify(&self.block2message(block), &signature.0, &sender_id.pubkey.key);
-                println!("veryfied={}", veryfied.is_ok());
-                match secp256k1::Secp256k1::verification_only().verify(&self.block2message(block), &signature.0, &sender_id.pubkey.key) {
+            NodeState::Master { signature_map: ref sig_map, candidate_block: ref block } => {
+                let mut signature_map: SignatureMap = sig_map.clone();
+                match self.verify_signature(&signature_map, &block, &signature.0, &sender_id) {
                     Ok(_) => {
-                        sigs.push(signature.0.clone());
-                        if sigs.len() as u8 >= self.params.threshold {
+                        signature_map.insert(*sender_id, signature.0.clone());
+                        if signature_map.len() as u8 >= self.params.threshold {
                             // call combineblocksigs
+                            let sigs = signature_map.values().map(|v| *v).collect();
                             let completed_block = self.params.rpc.combineblocksigs(&block, &sigs).unwrap();
 
                             // call submitblock
@@ -162,7 +177,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                             // start next round
                             self.start_new_round()
                         } else {
-                            NodeState::Master { signatures: sigs, candidate_block: block.clone() }
+                            NodeState::Master { signature_map, candidate_block: block.clone() }
                         }
                     }
                     Err(e) => {
@@ -232,6 +247,7 @@ mod tests {
     use crate::sign::sign;
     use crate::rpc::tests::MockRpc;
     use std::cell::RefCell;
+    use std::collections::HashMap;
 
     pub struct TestConnectionManager<F: Fn(Arc<Message>) -> () + Send + 'static> {
         pub sender: Sender<Message>,
@@ -305,6 +321,21 @@ mod tests {
         (handle, stop_signal)
     }
 
+    pub fn get_initial_master_state() -> NodeState {
+        let owner_private_key = TestKeys::new().key[0];
+        let block = get_block(0);
+
+        // Round master create signature itself, when broadcast candidate block. So,
+        // signatures vector has one signature.
+        let mut signature_map = HashMap::new();
+        let signer_id = SignerID::new(owner_private_key.public_key(&secp256k1::Secp256k1::new()));
+        signature_map.insert(signer_id, sign(&owner_private_key, &block.hash().unwrap()));
+        NodeState::Master {
+            candidate_block: block.clone(),
+            signature_map,
+        }
+    }
+
     #[test]
     fn test_pubkey_list_sort() {
         use bitcoin::util::key::PublicKey;
@@ -321,7 +352,7 @@ mod tests {
             ];
         let threshold = 3;
         let private_key = testkeys.key[0];
-        let params = NodeParameters::new(pubkey_list.clone(), private_key, threshold, MockRpc{return_block: Arc::new(RefCell::new(None))}, true);
+        let params = NodeParameters::new(pubkey_list.clone(), private_key, threshold, MockRpc { return_block: Arc::new(RefCell::new(None)) }, true);
 
         assert_ne!(params.pubkey_list[0], pubkey_list[0]);
         assert_eq!(params.pubkey_list[1], pubkey_list[4]);
@@ -331,16 +362,8 @@ mod tests {
     /// Round owner will collect signatures.
     #[test]
     fn process_signature_test() {
-        let owner_private_key = TestKeys::new().key[0];
-
         let block = get_block(0);
-
-        // Round master create signature itself, when broadcast candidate block. So,
-        // signatures vector has one signature.
-        let initial_state = NodeState::Master {
-            candidate_block: block.clone(),
-            signatures: vec![sign(&owner_private_key, &block.hash().unwrap())],
-        };
+        let initial_state = get_initial_master_state();
 
         let arc_block = Arc::new(RefCell::new(Some(get_block(0))));
         let rpc = MockRpc { return_block: arc_block.clone() };
@@ -356,7 +379,7 @@ mod tests {
             let next_state = node.process_signature(&sender_id, &Signature(sig));
 
             match next_state {
-                NodeState::Master { signatures: ref sigs, .. } => {
+                NodeState::Master { signature_map: ref sigs, .. } => {
                     assert_eq!(sigs.len(), 2);
                 }
                 ref state => panic!("{:?}", state),
@@ -379,7 +402,7 @@ mod tests {
             let next_state = node.process_signature(&sender_id, &Signature(sig));
 
             match next_state {
-                NodeState::Master { signatures: sigs, candidate_block: next_block } => {
+                NodeState::Master { signature_map: sigs, candidate_block: next_block } => {
                     assert_eq!(sigs.len(), 1); // has self signature at start.
                     assert_ne!(block, next_block);
                 }
@@ -390,16 +413,7 @@ mod tests {
 
     #[test]
     fn test_invalid_signature() {
-        let owner_private_key = TestKeys::new().key[0];
-
-        let block = get_block(0);
-
-        // Round master create signature itself, when broadcast candidate block. So,
-        // signatures vector has one signature.
-        let initial_state = NodeState::Master {
-            candidate_block: block.clone(),
-            signatures: vec![sign(&owner_private_key, &block.hash().unwrap())],
-        };
+        let initial_state = get_initial_master_state();
 
         let arc_block = Arc::new(RefCell::new(Some(get_block(0))));
         let rpc = MockRpc { return_block: arc_block.clone() };
@@ -414,8 +428,38 @@ mod tests {
             let next_state = node.process_signature(&sender_id, &Signature(sig));
 
             match next_state {
-                NodeState::Master { signatures: ref sigs, .. } => {
+                NodeState::Master { signature_map: ref sigs, .. } => {
                     assert_eq!(sigs.len(), 1); // invalid signature do not include.
+                }
+                ref state => panic!("{:?}", state),
+            }
+
+            node.current_state = next_state;
+        }
+    }
+
+    #[test]
+    fn test_ignore_duplicate_signature() {
+        let initial_state = get_initial_master_state();
+
+        let arc_block = Arc::new(RefCell::new(Some(get_block(0))));
+        let rpc = MockRpc { return_block: arc_block.clone() };
+        let mut node = create_node(initial_state, rpc);
+
+        // sign node1
+        {
+            let private_key = TestKeys::new().key[1];
+            let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
+            let block_hash = get_block(0).hash().unwrap();
+            let sig = sign(&private_key, &block_hash);
+
+            node.process_signature(&sender_id, &Signature(sig));
+            // duplicate message
+            let next_state = node.process_signature(&sender_id, &Signature(sig));
+
+            match next_state {
+                NodeState::Master { signature_map: ref sigs, .. } => {
+                    assert_eq!(sigs.len(), 2); // ignore duplicate.
                 }
                 ref state => panic!("{:?}", state),
             }
