@@ -1,6 +1,7 @@
 extern crate tapyrus_siner;
 extern crate bitcoin;
 extern crate log;
+extern crate env_logger;
 extern crate redis;
 extern crate clap;
 
@@ -24,9 +25,12 @@ pub const OPTION_NAME_REDIS_PORT: &str = "redis_port";
 
 /// This command is for launch tapyrus-signer-node.
 /// command example:
-/// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e --privatekey=cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA -t 2 --master
+/// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e -p=02d111519ba1f3013a7a613ecdcc17f4d53fbcb558b70404b5fb0c84ebb90a8d3c -p=02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506 --privatekey=cTRkG8i8PP7imvryqQwcYm787WHRdMmUqBvi1Z456gHvVoKnJ9TK -t 3 --rpcport=12381 --rpcuser=user --rpcpass=pass --master
 fn main() {
     let options = get_options();
+
+//    std::env::set_var("RUST_LOG", "debug");
+    env_logger::init();
 
     // 引数を解析
     let pubkey_values = options.values_of(OPTION_NAME_PUBLIC_KEY).unwrap(); // required
