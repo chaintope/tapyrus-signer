@@ -2,7 +2,7 @@ use bitcoin::{PrivateKey, Address};
 use secp256k1::Secp256k1;
 use secp256k1;
 
-use crate::rpc::Rpc;
+use crate::rpc::{Rpc, TapyrusApi};
 use crate::sign::sign;
 use crate::errors::Error;
 

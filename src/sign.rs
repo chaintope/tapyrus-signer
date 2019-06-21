@@ -17,19 +17,18 @@ mod test {
     #[test]
     fn sign_test() {
         let private_key = TestKeys::new().key[0];
-        let block = get_block();
+        let block = get_block(0);
         let block_hash = block.hash().unwrap();
 
         let sig = sign(&private_key, &block_hash);
 
-        assert_eq!("MEUCIQDRTksobD+H7H46+EXJhsZ7CWSIZcqohndyAFYkEe6YvgIgWwzqhQr/IHrX+RU+CliF35tFzasfaXINrhWfdqErOok=",
+        assert_eq!("MEQCIDAL9iCj1rcP+pkj04erS31tGOtpOSKbCsNmG2796U+9AiADPTOWf1PxAhaaX+cZHW1ZAaJNNwoTBwqDM3V4Xz3j3g==",
                    base64::encode(&sig.serialize_der()));
 
         // check verifiable
         let secp = Secp256k1::new();
-        let verify = Secp256k1::verification_only();
         let message = Message::from_slice(&(block_hash.borrow_inner())[..]).unwrap();
         let public_key = private_key.public_key(&secp).key;
-        assert!(verify.verify(&message, &sig, &public_key).is_ok());
+        assert!(&secp.verify(&message, &sig, &public_key).is_ok());
     }
 }

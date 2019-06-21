@@ -9,13 +9,15 @@ use bitcoin::{PrivateKey, PublicKey};
 use tapyrus_siner::signer_node::{NodeParameters, SignerNode};
 use std::str::FromStr;
 use tapyrus_siner::net::RedisManager;
-use tapyrus_siner::signer_node::NodeState;
 
 pub const OPTION_NAME_PUBLIC_KEY: &str = "publickey";
 pub const OPTION_NAME_PRIVATE_KEY: &str = "privatekey";
 pub const OPTION_NAME_THRESHOLD: &str = "threshold";
 pub const OPTION_NAME_MASTER_FLAG: &str = "master_flag";
 
+/// This command is for launch tapyrus-signer-node.
+/// command example:
+/// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e --privatekey=cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA -t 2 --master
 fn main() {
     let options = get_options();
 
