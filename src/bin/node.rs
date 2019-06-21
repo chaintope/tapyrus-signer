@@ -14,6 +14,10 @@ pub const OPTION_NAME_PUBLIC_KEY: &str = "publickey";
 pub const OPTION_NAME_PRIVATE_KEY: &str = "privatekey";
 pub const OPTION_NAME_THRESHOLD: &str = "threshold";
 pub const OPTION_NAME_MASTER_FLAG: &str = "master_flag";
+pub const OPTION_NAME_RPC_ENDPOINT_HOST: &str = "rpc_endpoint_host";
+pub const OPTION_NAME_RPC_ENDPOINT_PORT: &str = "rpc_endpoint_port";
+pub const OPTION_NAME_RPC_ENDPOINT_USER: &str = "rpc_endpoint_user";
+pub const OPTION_NAME_RPC_ENDPOINT_PASS: &str = "rpc_endpoint_pass";
 
 /// This command is for launch tapyrus-signer-node.
 /// command example:
@@ -31,7 +35,14 @@ fn main() {
 
     validate_options(&pubkey_list, &private_key, &threshold).unwrap();
     // TODO: RPC params should be got from command line args.
-    let rpc = tapyrus_siner::rpc::Rpc::new("http://127.0.0.1:12381".to_string(), Some("user".to_string()), Some("pass".to_string()));
+    let rpc = {
+        let host = options.value_of(OPTION_NAME_RPC_ENDPOINT_HOST).unwrap_or_default();
+        let port = options.value_of(OPTION_NAME_RPC_ENDPOINT_PORT).unwrap_or_default();
+        let user = options.value_of(OPTION_NAME_RPC_ENDPOINT_USER).map(|v|v.to_string());
+        let pass = options.value_of(OPTION_NAME_RPC_ENDPOINT_PASS).map(|v|v.to_string());
+
+        tapyrus_siner::rpc::Rpc::new(format!("http://{}:{}", host, port), user, pass)
+    };
     let params = NodeParameters::new(pubkey_list,  private_key, threshold, rpc, options.is_present(OPTION_NAME_MASTER_FLAG));
     let con = RedisManager::new();
     let node = &mut SignerNode::new(con, params);
@@ -66,6 +77,24 @@ fn get_options() -> ArgMatches<'static> {
         .arg(Arg::with_name(OPTION_NAME_MASTER_FLAG)
             .long("master")
             .help("Master Node Flag. If launch as Master node, then set this option."))
+        .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_HOST)
+            .long("rpc-endpoint-host")
+            .value_name("HOST_NAME or IP")
+            .help("TapyrusCore RPC endpoint host.")
+            .default_value("127.0.0.1"))
+        .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_PORT)
+            .long("rpc-endpoint-port")
+            .value_name("PORT")
+            .help("TapyrusCore RPC endpoint port number. Default is Tapyrus Test net port.")
+            .default_value("12381"))
+        .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_USER)
+            .long("rpc-endpoint-user")
+            .value_name("USER")
+            .help("TapyrusCore RPC user name."))
+        .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_PASS)
+            .long("rpc-endpoint-pass")
+            .value_name("PASS")
+            .help("TapyrusCore RPC user password."))
         .get_matches()
 }
 
