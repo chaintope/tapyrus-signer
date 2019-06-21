@@ -1,21 +1,23 @@
+extern crate tapyrus_siner;
 use bitcoin::{PrivateKey, Address};
 use secp256k1::Secp256k1;
 use secp256k1;
 
-use crate::rpc::{Rpc, TapyrusApi};
-use crate::sign::sign;
-use crate::errors::Error;
+use tapyrus_siner::rpc::{Rpc, TapyrusApi};
+use tapyrus_siner::sign::sign;
+use tapyrus_siner::errors::Error;
 
-pub fn process_master_round() -> Result<(), Error> {
+pub fn main() {
     // initialize
     let rpc = Rpc::new("http://127.0.0.1:12381".to_string(), Some("user".to_string()), Some("pass".to_string()));
-    let private_key = PrivateKey::from_wif("cVkWtN9SaP8ywfyG1AwwjsZ5orN6a2x5wTaW2gGWkUCJVEPorDeK").unwrap();
-
+    let private_key = PrivateKey::from_wif("cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA").unwrap();
     // call getnewblock rpc
     let secp = Secp256k1::new();
     let address = Address::p2pkh(&private_key.public_key(&secp), private_key.network);
-    let block = rpc.getnewblock(&address)?;
+    println!("address: {:?}", address.to_string());
+    let block = rpc.getnewblock(&address).unwrap();
 
+    println!("block: {:?}", block);
     // call testproposedblock RPC
     // In real master round, this phase is not necessary. Because in getnewblock RPC already tested.
     rpc.testproposedblock(&block)?;
