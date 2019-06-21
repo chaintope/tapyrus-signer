@@ -134,30 +134,57 @@ pub mod tests {
         rpc.getnewblock(&address)
     }
 
-    use std::cell::RefCell;
-    use std::sync::Arc;
-    pub struct MockRpc {
-        pub return_block: Arc<RefCell<Option<Block>>>,
-    }
+    use std::sync::{Arc, Mutex};
 
+    pub type SafetyBlock = Arc<Mutex<Result<Block, AnyError>>>;
+    pub struct MockRpc {
+        pub return_block: SafetyBlock,
+    }
     impl MockRpc {
         pub fn result(&self) -> Result<Block, Error> {
-            match *self.return_block.borrow() {
-                Some(ref b) => Ok(b.clone()),
-                None => Err(Error::JsonRpc(jsonrpc::error::Error::Rpc(jsonrpc::error::RpcError {
-                    code: 0,
-                    message: "return_block is None.".to_string(),
-                    data: None,
-                })))
+            let gard_block = self.return_block.try_lock().unwrap();
+            let result = (*gard_block).as_ref();
+            match result {
+                Ok(b) => Ok(b.clone()),
+                Err(error) => Err(self.create_error(error.to_string()))
             }
         }
+
+        fn create_error(&self, message: String) -> Error {
+            Error::JsonRpc(jsonrpc::error::Error::Rpc(jsonrpc::error::RpcError {
+                code: 0,
+                message,
+                data: None,
+            }))
+        }
     }
+
+    #[derive(Debug)]
+    pub struct AnyError(pub String);
+
+    impl core::fmt::Display for AnyError {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(f, "{:?}", self)
+        }
+    }
+
+    impl std::error::Error for AnyError {}
+
+    pub fn safety(block: Block) -> SafetyBlock {
+        Arc::new(Mutex::new(Ok(block)))
+    }
+
+    pub fn safety_error(error_msg: String) -> SafetyBlock {
+        Arc::new(Mutex::new(Err(AnyError(error_msg))))
+    }
+
     impl TapyrusApi for MockRpc {
         fn getnewblock(&self, _address: &Address) -> Result<Block, Error> {
             self.result()
         }
 
         fn testproposedblock(&self, _block: &Block) -> Result<(), Error> {
+            let _block = self.result()?;
             Ok(())
         }
 
@@ -166,6 +193,7 @@ pub mod tests {
         }
 
         fn submitblock(&self, _block: &Block) -> Result<(), Error> {
+            let _block = self.result()?;
             Ok(())
         }
     }
