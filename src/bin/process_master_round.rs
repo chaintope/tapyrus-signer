@@ -5,7 +5,6 @@ use secp256k1;
 
 use tapyrus_siner::rpc::{Rpc, TapyrusApi};
 use tapyrus_siner::sign::sign;
-use tapyrus_siner::errors::Error;
 
 pub fn main() {
     // initialize
@@ -20,7 +19,7 @@ pub fn main() {
     println!("block: {:?}", block);
     // call testproposedblock RPC
     // In real master round, this phase is not necessary. Because in getnewblock RPC already tested.
-    rpc.testproposedblock(&block)?;
+    rpc.testproposedblock(&block).unwrap();
 
     // create sign with secp256k1
     let block_hash = block.hash().unwrap();
@@ -28,10 +27,8 @@ pub fn main() {
 
     // combine block signatures
     let sigs = vec![sig];
-    let block = rpc.combineblocksigs(&block, &sigs)?;
+    let block = rpc.combineblocksigs(&block, &sigs).unwrap();
 
     // submitblock
-    rpc.submitblock(&block)?;
-
-    Ok(())
+    rpc.submitblock(&block).unwrap();
 }

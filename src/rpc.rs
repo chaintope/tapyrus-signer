@@ -42,12 +42,9 @@ impl Rpc {
     fn call(&self, name: &str, params: &[serde_json::Value]) -> Result<jsonrpc::Response, Error> {
         let req = self.client.build_request(name, params);
 
-        if log_enabled!(Trace) {
-            trace!("JSON-RPC request: {}", serde_json::to_string(&req).unwrap());
-        }
+        trace!("JSON-RPC request: {}", serde_json::to_string(&req).unwrap());
 
         let resp = self.client.send_request(&req).map_err(Error::from);
-
         if log_enabled!(Trace) && resp.is_ok() {
             let resp = resp.as_ref().unwrap();
             trace!("JSON-RPC response: {}", serde_json::to_string(resp).unwrap());
