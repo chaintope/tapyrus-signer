@@ -14,6 +14,13 @@ pub const OPTION_NAME_PUBLIC_KEY: &str = "publickey";
 pub const OPTION_NAME_PRIVATE_KEY: &str = "privatekey";
 pub const OPTION_NAME_THRESHOLD: &str = "threshold";
 pub const OPTION_NAME_MASTER_FLAG: &str = "master_flag";
+pub const OPTION_NAME_RPC_ENDPOINT_HOST: &str = "rpc_endpoint_host";
+pub const OPTION_NAME_RPC_ENDPOINT_PORT: &str = "rpc_endpoint_port";
+pub const OPTION_NAME_RPC_ENDPOINT_USER: &str = "rpc_endpoint_user";
+pub const OPTION_NAME_RPC_ENDPOINT_PASS: &str = "rpc_endpoint_pass";
+
+pub const OPTION_NAME_REDIS_HOST: &str = "redis_host";
+pub const OPTION_NAME_REDIS_PORT: &str = "redis_port";
 
 /// This command is for launch tapyrus-signer-node.
 /// command example:
@@ -30,10 +37,20 @@ fn main() {
     let threshold: u8 = threshold.parse().unwrap();
 
     validate_options(&pubkey_list, &private_key, &threshold).unwrap();
-    // TODO: RPC params should be got from command line args.
-    let rpc = tapyrus_siner::rpc::Rpc::new("http://127.0.0.1:12381".to_string(), Some("user".to_string()), Some("pass".to_string()));
+    let rpc = {
+        let host = options.value_of(OPTION_NAME_RPC_ENDPOINT_HOST).unwrap_or_default();
+        let port = options.value_of(OPTION_NAME_RPC_ENDPOINT_PORT).unwrap_or_default();
+        let user = options.value_of(OPTION_NAME_RPC_ENDPOINT_USER).map(|v|v.to_string());
+        let pass = options.value_of(OPTION_NAME_RPC_ENDPOINT_PASS).map(|v|v.to_string());
+
+        tapyrus_siner::rpc::Rpc::new(format!("http://{}:{}", host, port), user, pass)
+    };
     let params = NodeParameters::new(pubkey_list,  private_key, threshold, rpc, options.is_present(OPTION_NAME_MASTER_FLAG));
-    let con = RedisManager::new();
+    let con = {
+        let host = options.value_of(OPTION_NAME_REDIS_HOST).unwrap_or_default();
+        let port = options.value_of(OPTION_NAME_REDIS_PORT).unwrap_or_default();
+        RedisManager::new(host.to_string(), port.to_string())
+    };
     let node = &mut SignerNode::new(con, params);
 
     node.start();
@@ -66,6 +83,34 @@ fn get_options() -> ArgMatches<'static> {
         .arg(Arg::with_name(OPTION_NAME_MASTER_FLAG)
             .long("master")
             .help("Master Node Flag. If launch as Master node, then set this option."))
+        .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_HOST)
+            .long("rpchost")
+            .value_name("HOST_NAME or IP")
+            .help("TapyrusCore RPC endpoint host.")
+            .default_value("127.0.0.1"))
+        .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_PORT)
+            .long("rpcport")
+            .value_name("PORT")
+            .help("TapyrusCore RPC endpoint port number. These are TapyrusCore default port, mainnet: 2377, testnet: 12377, regtest: 12381.")
+            .default_value("2377"))
+        .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_USER)
+            .long("rpcuser")
+            .value_name("USER")
+            .help("TapyrusCore RPC user name."))
+        .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_PASS)
+            .long("rpcpass")
+            .value_name("PASS")
+            .help("TapyrusCore RPC user password."))
+        .arg(Arg::with_name(OPTION_NAME_REDIS_HOST)
+            .long("redishost")
+            .value_name("HOST_NAME or IP")
+            .default_value("127.0.0.1")
+            .help("Redis host."))
+        .arg(Arg::with_name(OPTION_NAME_REDIS_PORT)
+            .long("redisport")
+            .value_name("PORT")
+            .default_value("6379")
+            .help("Redis port."))
         .get_matches()
 }
 

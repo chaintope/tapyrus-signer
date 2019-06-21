@@ -294,7 +294,7 @@ mod tests {
         let private_key = testkeys.key[0];
 
         let params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, true);
-        let con = RedisManager::new();
+        let con = RedisManager::new("localhost".to_string(), "6379".to_string());
 
         let mut node = SignerNode::new(con, params);
         node.current_state = current_state;
