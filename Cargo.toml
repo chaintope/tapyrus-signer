@@ -1,11 +1,9 @@
-cargo-features = ["default-run"]
 
 [package]
-name = "tapyrus_siner"
+name = "tapyrus_signer"
 version = "0.1.0"
 authors = ["Kohei Taniguchi <kohei@chaintope.com>"]
 edition = "2018"
-default-run = "node"
 
 [dependencies]
 http = "0.1.17"

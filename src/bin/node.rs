@@ -1,4 +1,4 @@
-extern crate tapyrus_siner;
+extern crate tapyrus_signer;
 extern crate bitcoin;
 extern crate log;
 extern crate env_logger;
@@ -7,9 +7,9 @@ extern crate clap;
 
 use clap::{App, Arg, Values, ArgMatches};
 use bitcoin::{PrivateKey, PublicKey};
-use tapyrus_siner::signer_node::{NodeParameters, SignerNode};
+use tapyrus_signer::signer_node::{NodeParameters, SignerNode};
 use std::str::FromStr;
-use tapyrus_siner::net::RedisManager;
+use tapyrus_signer::net::RedisManager;
 
 pub const OPTION_NAME_PUBLIC_KEY: &str = "publickey";
 pub const OPTION_NAME_PRIVATE_KEY: &str = "privatekey";
@@ -47,7 +47,7 @@ fn main() {
         let user = options.value_of(OPTION_NAME_RPC_ENDPOINT_USER).map(|v|v.to_string());
         let pass = options.value_of(OPTION_NAME_RPC_ENDPOINT_PASS).map(|v|v.to_string());
 
-        tapyrus_siner::rpc::Rpc::new(format!("http://{}:{}", host, port), user, pass)
+        tapyrus_signer::rpc::Rpc::new(format!("http://{}:{}", host, port), user, pass)
     };
     let params = NodeParameters::new(pubkey_list,  private_key, threshold, rpc, options.is_present(OPTION_NAME_MASTER_FLAG));
     let con = {
@@ -124,11 +124,11 @@ fn get_public_keys_from_options(keyargs: Values) -> Result<Vec<PublicKey>, bitco
     }).collect()
 }
 
-fn validate_options(public_keys: &Vec<PublicKey>, private_key: &PrivateKey, threshold: &u8) -> Result<(), tapyrus_siner::errors::Error> {
+fn validate_options(public_keys: &Vec<PublicKey>, private_key: &PrivateKey, threshold: &u8) -> Result<(), tapyrus_signer::errors::Error> {
     if public_keys.len() < *threshold as usize {
         let error_msg = format!("Not enough number of public keys. publicKeys.len: {}, threshold: {}",
                                 public_keys.len(), threshold);
-        return Err(tapyrus_siner::errors::Error::InvalidArgs(error_msg));
+        return Err(tapyrus_signer::errors::Error::InvalidArgs(error_msg));
     }
     let pubkey_from_private = private_key.public_key(&secp256k1::Secp256k1::new());
     match public_keys.iter().find(|&&p| p == pubkey_from_private) {
@@ -136,7 +136,7 @@ fn validate_options(public_keys: &Vec<PublicKey>, private_key: &PrivateKey, thre
             ()
         }
         None => {
-            return Err(tapyrus_siner::errors::Error::InvalidArgs(
+            return Err(tapyrus_signer::errors::Error::InvalidArgs(
                 "Private key is not pair of any one of Public key list.".to_string()));
         }
     }

@@ -1,10 +1,10 @@
-extern crate tapyrus_siner;
+extern crate tapyrus_signer;
 use bitcoin::{PrivateKey, Address};
 use secp256k1::Secp256k1;
 use secp256k1;
 
-use tapyrus_siner::rpc::{Rpc, TapyrusApi};
-use tapyrus_siner::sign::sign;
+use tapyrus_signer::rpc::{Rpc, TapyrusApi};
+use tapyrus_signer::sign::sign;
 
 pub fn main() {
     // initialize
