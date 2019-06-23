@@ -341,7 +341,7 @@ mod tests {
 
         let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, true);
         params.round_duration = 0;
-        let closure: SpyMethod = Box::new(move |_message: Arc<Message>| { () });
+        let closure: SpyMethod = Box::new(move |_message: Arc<Message>| { });
         let con = TestConnectionManager::new(closure);
 
         let mut node = SignerNode::new(con, params);
@@ -614,7 +614,7 @@ mod tests {
         let next_state = node.process_completedblock(&sender_id, &get_block(0));
         assert_eq!(node.master_index, 4); // wrap back to 0.
         match next_state {
-            NodeState::Master { signature_map, candidate_block:_ } => {
+            NodeState::Master { signature_map, .. } => {
                 assert_eq!(signature_map.len(), 1); // has self signature at start.
             }
             n => panic!("Should be Master, but state:{:?}", n),
