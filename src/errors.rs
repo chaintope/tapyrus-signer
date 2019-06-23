@@ -9,6 +9,7 @@ pub enum Error {
     InvalidRequest,
     DuplicatedMessage,
     InvalidSignature(secp256k1::Error),
+    TimerAlreadyStarted,
 }
 
 impl From<jsonrpc::error::Error> for Error {
