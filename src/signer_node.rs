@@ -8,9 +8,12 @@ use crate::sign::sign;
 use std::sync::Arc;
 use std::collections::HashMap;
 use std::time::Duration;
+use crate::timer::RoundTimeOutObserver;
 
 /// Round interval.
 static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
+/// Round time limit delta. Round timeout timer should be little longer than `ROUND_INTERVAL_DEFAULT_SECS`.
+static ROUND_TIMELIMIT_DELTA: u64 = 2;
 
 pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     connection_manager: C,
@@ -18,6 +21,7 @@ pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     current_state: NodeState,
     stop_signal: Option<Receiver<u32>>,
     master_index: usize,
+    round_timer: RoundTimeOutObserver,
 }
 
 /// Signature HashMap type alias.
@@ -41,12 +45,14 @@ fn sender_index(sender_id: &SignerID, pubkey_list: &[PublicKey]) -> usize {
 
 impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     pub fn new(connection_manager: C, params: NodeParameters<T>) -> SignerNode<T, C> {
+        let timer_limit = params.round_duration + ROUND_TIMELIMIT_DELTA;
         SignerNode {
             connection_manager,
             params,
             current_state: NodeState::Joining,
             stop_signal: None,
             master_index: 0,
+            round_timer: RoundTimeOutObserver::new(timer_limit),
         }
     }
 
@@ -66,8 +72,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             }
         };
 
+        // Rpcとの通信を行うthreadを開始
         let _handler = self.connection_manager.start(closure);
-
         self.current_state = if self.params.master_flag {
             self.start_new_round()
         } else {
@@ -75,6 +81,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         };
         println!("node start. NodeState: {:?}, node_index: {}", &self.current_state, &self.params.self_node_index);
 
+        // Roundのtimeoutを監視するthreadを開始
+        self.round_timer.start().unwrap();
         loop {
             // After process when received message. Get message from receiver,
             // then change that state in main thread side.
@@ -84,6 +92,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 Some(ref r) => match r.try_recv() {
                     Ok(_) => {
                         println!("Stop by Terminate Signal.");
+                        self.round_timer.stop();
                         break;
                     }
                     Err(std::sync::mpsc::TryRecvError::Empty) => {}
@@ -99,6 +108,15 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     self.current_state = next;
                 }
                 Err(_e) => {}
+            }
+            // Process for exceed time limit of Round.
+            match self.round_timer.receiver.try_recv() {
+                Ok(_) => {
+                    // Round timeout. force round robin master node.
+                    self.current_state = self.round_robin_master();
+                    self.round_timer.restart().unwrap();
+                }
+                Err(_e) => {} // nothing to do.
             }
         }
     }
@@ -148,6 +166,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                             message_type: MessageType::Signature(crate::net::Signature(sig)),
                             sender_id: self.params.signer_id,
                         });
+                        // TODO: Errorを処理する必要あるかな？
+                        self.round_timer.restart().unwrap();
                     }
                     Err(_e) => {
                         println!("Received Invalid candidate block!!: sender: {:?}", sender_id);
@@ -289,7 +309,7 @@ mod tests {
     use std::sync::mpsc::{Sender, Receiver, channel};
     use redis::ControlFlow;
     use std::thread::JoinHandle;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
     use crate::sign::sign;
     use crate::rpc::tests::{MockRpc, safety, SafetyBlock, safety_error};
     use std::collections::HashMap;
@@ -297,15 +317,17 @@ mod tests {
 
     type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
     pub struct TestConnectionManager {
+        pub receive_count: u32,
         pub sender: Sender<Message>,
         pub receiver: Receiver<Message>,
         pub broadcast_assert: SpyMethod,
     }
 
     impl TestConnectionManager {
-        pub fn new(broadcast_assert: SpyMethod) -> TestConnectionManager {
+        pub fn new(receive_count: u32, broadcast_assert: SpyMethod) -> TestConnectionManager {
             let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
             TestConnectionManager {
+                receive_count,
                 sender,
                 receiver,
                 broadcast_assert,
@@ -320,12 +342,14 @@ mod tests {
         }
 
         fn start(&self, mut message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static) -> JoinHandle<()> {
-            match self.receiver.recv() {
-                Ok(message) => {
-                    println!("Test message receiving!! {:?}", message.message_type);
-                    message_processor(message);
+            for _count in 0..self.receive_count {
+                match self.receiver.recv() {
+                    Ok(message) => {
+                        println!("Test message receiving!! {:?}", message.message_type);
+                        message_processor(message);
+                    }
+                    Err(e) => println!("happend receiver error: {:?}", e),
                 }
-                Err(e) => println!("happend receiver error: {:?}", e),
             }
             thread::Builder::new().name("TestConnectionManager start Thread".to_string()).spawn(|| {
                 thread::sleep(Duration::from_millis(300));
@@ -334,6 +358,13 @@ mod tests {
     }
 
     fn create_node(current_state: NodeState, rpc: MockRpc) -> SignerNode<MockRpc, TestConnectionManager> {
+        let closure: SpyMethod = Box::new(move |_message: Arc<Message>| {});
+        let(node, _) = create_node_with_closure_publishcount(current_state, rpc, closure, 1);
+        node
+    }
+
+    fn create_node_with_closure_publishcount(current_state: NodeState, rpc: MockRpc, spy: SpyMethod, publish_count: u32)
+                    -> (SignerNode<MockRpc, TestConnectionManager>, Sender<Message>) {
         let testkeys = TestKeys::new();
         let pubkey_list = testkeys.pubkeys();
         let threshold = 3;
@@ -341,35 +372,37 @@ mod tests {
 
         let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, true);
         params.round_duration = 0;
-        let closure: SpyMethod = Box::new(move |_message: Arc<Message>| { });
-        let con = TestConnectionManager::new(closure);
-
+        let con = TestConnectionManager::new(publish_count, spy);
+        let broadcaster = con.sender.clone();
         let mut node = SignerNode::new(con, params);
         node.current_state = current_state;
-        node
+        (node, broadcaster)
     }
 
-    pub fn setup_node(spy: SpyMethod, arc_block: SafetyBlock) -> (Sender<u32>, Sender<Message>) {
+    pub fn setup_node(spy: SpyMethod, arc_block: SafetyBlock)
+                      -> (Arc<Mutex<SignerNode<MockRpc, TestConnectionManager>>>, Sender<u32>, Sender<Message>) {
         let testkeys = TestKeys::new();
         let pubkey_list = testkeys.pubkeys();
         let threshold = 2;
         let private_key = testkeys.key[0];
 
-        let con = TestConnectionManager::new(spy);
+        let con = TestConnectionManager::new(1, spy);
         let rpc = MockRpc { return_block: arc_block.clone() };
         let broadcaster = con.sender.clone();
 
         let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
         let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, false);
         params.round_duration = 0;
+        let arc_node = Arc::new(Mutex::new(SignerNode::new(con, params)));
+        let node = arc_node.clone();
         let _handle = thread::Builder::new().name("NodeMainThread".to_string()).spawn(move || {
-            let mut node = SignerNode::new(con, params);
+            let mut node = node.lock().unwrap();
             node.stop_handler(stop_handler);
             node.start();
         }).unwrap();
 
 
-        (stop_signal, broadcaster)
+        (arc_node, stop_signal, broadcaster)
     }
 
     pub fn get_initial_master_state() -> NodeState {
@@ -416,7 +449,7 @@ mod tests {
             broadcast_s.send(message).unwrap();
         });
         let arc_block = safety(get_block(0));
-        let (stop_signal, broadcaster) = setup_node(assertion, arc_block);
+        let (_node, stop_signal, broadcaster) = setup_node(assertion, arc_block);
         let message_str = r#"{"message_type": {"Candidateblock": [0, 0, 0, 32, 237, 101, 140, 196, 6, 112, 204, 237, 162, 59, 176, 182, 20, 130, 31, 230, 212, 138, 65, 209, 7, 209, 159, 63, 58, 86, 8, 173, 61, 72, 48, 146, 177, 81, 22, 10, 183, 17, 51, 180, 40, 225, 246, 46, 174, 181, 152, 174, 133, 143, 246, 96, 23, 201, 150, 1, 242, 144, 136, 183, 198, 74, 72, 29, 98, 132, 225, 69, 210, 155, 112, 191, 84, 57, 45, 41, 112, 16, 49, 210, 175, 159, 237, 95, 155, 178, 31, 187, 40, 79, 167, 28, 235, 35, 143, 105, 166, 212, 9, 93, 0, 1, 2, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 3, 92, 1, 1, 255, 255, 255, 255, 2, 0, 242, 5, 42, 1, 0, 0, 0, 25, 118, 169, 20, 207, 18, 219, 192, 75, 176, 222, 111, 182, 168, 122, 90, 235, 75, 46, 116, 201, 112, 6, 178, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 38, 106, 36, 170, 33, 169, 237, 226, 246, 28, 63, 113, 209, 222, 253, 63, 169, 153, 223, 163, 105, 83, 117, 92, 105, 6, 137, 121, 153, 98, 180, 139, 235, 216, 54, 151, 78, 140, 249, 1, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },"sender_id": [3, 131, 26, 105, 184, 0, 152, 51, 171, 91, 3, 38, 1, 46, 175, 72, 155, 254, 163, 90, 115, 33, 177, 202, 21, 177, 29, 136, 19, 20, 35, 250, 252]}"#;
         let message = serde_json::from_str::<Message>(message_str).unwrap();
 
@@ -434,7 +467,7 @@ mod tests {
             broadcast_s.send(message).unwrap();
         });
         let arc_block = safety_error("invalid block!".to_string());
-        let (stop_signal, bloadcaster) = setup_node(spy, arc_block);
+        let (_node, stop_signal, bloadcaster) = setup_node(spy, arc_block);
         let message_str = r#"{"message_type": {"Candidateblock": [0, 0, 0, 32, 237, 101, 140, 196, 6, 112, 204, 237, 162, 59, 176, 182, 20, 130, 31, 230, 212, 138, 65, 209, 7, 209, 159, 63, 58, 86, 8, 173, 61, 72, 48, 146, 177, 81, 22, 10, 183, 17, 51, 180, 40, 225, 246, 46, 174, 181, 152, 174, 133, 143, 246, 96, 23, 201, 150, 1, 242, 144, 136, 183, 198, 74, 72, 29, 98, 132, 225, 69, 210, 155, 112, 191, 84, 57, 45, 41, 112, 16, 49, 210, 175, 159, 237, 95, 155, 178, 31, 187, 40, 79, 167, 28, 235, 35, 143, 105, 166, 212, 9, 93, 0, 1, 2, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 3, 92, 1, 1, 255, 255, 255, 255, 2, 0, 242, 5, 42, 1, 0, 0, 0, 25, 118, 169, 20, 207, 18, 219, 192, 75, 176, 222, 111, 182, 168, 122, 90, 235, 75, 46, 116, 201, 112, 6, 178, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 38, 106, 36, 170, 33, 169, 237, 226, 246, 28, 63, 113, 209, 222, 253, 63, 169, 153, 223, 163, 105, 83, 117, 92, 105, 6, 137, 121, 153, 98, 180, 139, 235, 216, 54, 151, 78, 140, 249, 1, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },"sender_id": [3, 131, 26, 105, 184, 0, 152, 51, 171, 91, 3, 38, 1, 46, 175, 72, 155, 254, 163, 90, 115, 33, 177, 202, 21, 177, 29, 136, 19, 20, 35, 250, 252]}"#;
         let message = serde_json::from_str::<Message>(message_str).unwrap();
 
@@ -467,6 +500,31 @@ mod tests {
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
         let _next_state = node.process_candidateblock(&sender_id, &get_block(0));
         assert_eq!(node.master_index, 4);
+
+        node.round_timer.stop();
+    }
+
+    #[test]
+    fn test_timeout_roundrobin() {
+        let closure: SpyMethod = Box::new(move |_message: Arc<Message>| {});
+        let initial_state = NodeState::Member;
+        let arc_block = safety(get_block(0));
+        let rpc = MockRpc { return_block: arc_block.clone() };
+        let (mut node, _broadcaster) = create_node_with_closure_publishcount(initial_state, rpc, closure, 0);
+
+        let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
+        node.stop_handler(stop_handler);
+        node.params.master_flag = false;
+
+        assert_eq!(node.master_index, 0 as usize);
+        let ss = stop_signal.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_secs(3));
+            ss.send(1).unwrap();
+        });
+        node.start();
+
+        assert_eq!(node.master_index, 1 as usize);
     }
 
     /// 3 of 5 multisig
@@ -493,7 +551,7 @@ mod tests {
                 NodeState::Master { signature_map: ref sigs, .. } => {
                     assert_eq!(sigs.len(), 2);
                 }
-                ref state => panic!("{:?}", state),
+                ref state => panic!("Should be Master node, but: {:?}", state),
             }
 
             node.current_state = next_state;
