@@ -1,14 +1,15 @@
-extern crate tapyrus_siner;
+extern crate tapyrus_signer;
 extern crate bitcoin;
 extern crate log;
+extern crate env_logger;
 extern crate redis;
 extern crate clap;
 
 use clap::{App, Arg, Values, ArgMatches};
 use bitcoin::{PrivateKey, PublicKey};
-use tapyrus_siner::signer_node::{NodeParameters, SignerNode};
+use tapyrus_signer::signer_node::{NodeParameters, SignerNode};
 use std::str::FromStr;
-use tapyrus_siner::net::RedisManager;
+use tapyrus_signer::net::RedisManager;
 
 pub const OPTION_NAME_PUBLIC_KEY: &str = "publickey";
 pub const OPTION_NAME_PRIVATE_KEY: &str = "privatekey";
@@ -24,9 +25,12 @@ pub const OPTION_NAME_REDIS_PORT: &str = "redis_port";
 
 /// This command is for launch tapyrus-signer-node.
 /// command example:
-/// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e --privatekey=cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA -t 2 --master
+/// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e -p=02d111519ba1f3013a7a613ecdcc17f4d53fbcb558b70404b5fb0c84ebb90a8d3c -p=02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506 --privatekey=cTRkG8i8PP7imvryqQwcYm787WHRdMmUqBvi1Z456gHvVoKnJ9TK -t 3 --rpcport=12381 --rpcuser=user --rpcpass=pass --master
 fn main() {
     let options = get_options();
+
+//    std::env::set_var("RUST_LOG", "debug");
+    env_logger::init();
 
     // 引数を解析
     let pubkey_values = options.values_of(OPTION_NAME_PUBLIC_KEY).unwrap(); // required
@@ -43,7 +47,7 @@ fn main() {
         let user = options.value_of(OPTION_NAME_RPC_ENDPOINT_USER).map(|v|v.to_string());
         let pass = options.value_of(OPTION_NAME_RPC_ENDPOINT_PASS).map(|v|v.to_string());
 
-        tapyrus_siner::rpc::Rpc::new(format!("http://{}:{}", host, port), user, pass)
+        tapyrus_signer::rpc::Rpc::new(format!("http://{}:{}", host, port), user, pass)
     };
     let params = NodeParameters::new(pubkey_list,  private_key, threshold, rpc, options.is_present(OPTION_NAME_MASTER_FLAG));
     let con = {
@@ -120,11 +124,11 @@ fn get_public_keys_from_options(keyargs: Values) -> Result<Vec<PublicKey>, bitco
     }).collect()
 }
 
-fn validate_options(public_keys: &Vec<PublicKey>, private_key: &PrivateKey, threshold: &u8) -> Result<(), tapyrus_siner::errors::Error> {
+fn validate_options(public_keys: &Vec<PublicKey>, private_key: &PrivateKey, threshold: &u8) -> Result<(), tapyrus_signer::errors::Error> {
     if public_keys.len() < *threshold as usize {
         let error_msg = format!("Not enough number of public keys. publicKeys.len: {}, threshold: {}",
                                 public_keys.len(), threshold);
-        return Err(tapyrus_siner::errors::Error::InvalidArgs(error_msg));
+        return Err(tapyrus_signer::errors::Error::InvalidArgs(error_msg));
     }
     let pubkey_from_private = private_key.public_key(&secp256k1::Secp256k1::new());
     match public_keys.iter().find(|&&p| p == pubkey_from_private) {
@@ -132,7 +136,7 @@ fn validate_options(public_keys: &Vec<PublicKey>, private_key: &PrivateKey, thre
             ()
         }
         None => {
-            return Err(tapyrus_siner::errors::Error::InvalidArgs(
+            return Err(tapyrus_signer::errors::Error::InvalidArgs(
                 "Private key is not pair of any one of Public key list.".to_string()));
         }
     }
