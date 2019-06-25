@@ -29,7 +29,7 @@ pub const OPTION_NAME_REDIS_PORT: &str = "redis_port";
 fn main() {
     let options = get_options();
 
-//    std::env::set_var("RUST_LOG", "debug");
+    std::env::set_var("RUST_LOG", "tapyrus_signer=info");
     env_logger::init();
 
     // 引数を解析

@@ -44,7 +44,8 @@ fn sender_index(sender_id: &SignerID, pubkey_list: &[PublicKey]) -> usize {
 }
 
 impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
-    pub fn new(connection_manager: C, params: NodeParameters<T>) -> SignerNode<T, C> {
+    pub fn new(connection_manager: C, params: NodeParameters<T>) -> Self
+    where Self: Sized {
         let timer_limit = params.round_duration + ROUND_TIMELIMIT_DELTA;
         SignerNode {
             connection_manager,
@@ -66,7 +67,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             match sender.send(message) {
                 Ok(_) => ControlFlow::Continue,
                 Err(error) => {
-                    println!("Happened error!: {:?}", error);
+                    log::warn!("Happened error!: {:?}", error);
                     ControlFlow::Break(())
                 }
             }
@@ -79,7 +80,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         } else {
             NodeState::Member
         };
-        println!("node start. NodeState: {:?}, node_index: {}", &self.current_state, &self.params.self_node_index);
+        log::info!("node start. NodeState: {:?}, node_index: {}, master_index: {}", &self.current_state, &self.params.self_node_index, &self.master_index);
 
         // Roundのtimeoutを監視するthreadを開始
         self.round_timer.start().unwrap();
@@ -91,7 +92,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             match &self.stop_signal {
                 Some(ref r) => match r.try_recv() {
                     Ok(_) => {
-                        println!("Stop by Terminate Signal.");
+                        log::warn!("Stop by Terminate Signal.");
                         self.round_timer.stop();
                         break;
                     }
@@ -175,7 +176,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         self.round_timer.restart().unwrap();
                     }
                     Err(_e) => {
-                        println!("Received Invalid candidate block!!: sender: {:?}", sender_id);
+                        log::warn!("Received Invalid candidate block!!: sender: {:?}", sender_id);
                     }
                 }
             }
@@ -229,7 +230,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         }
                     }
                     Err(e) => {
-                        println!("Invalid Signature!: sender={:?}, error={:?}", &sender_id, e);
+                        log::warn!("Invalid Signature!: sender={:?}, error={:?}", &sender_id, e);
                         self.current_state.clone()
                     }
                 }
@@ -250,7 +251,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         } else {
             NodeState::Member
         };
-        println!("Round Robin: Next State {:?}, node_index: {}, master_inde: {}", next_state, self.params.self_node_index, self.master_index);
+        log::info!("Round Robin: Next State {:?}, node_index: {}, master_inde: {}", next_state, self.params.self_node_index, self.master_index);
         next_state
     }
     fn process_completedblock(&mut self, sender_id: &SignerID, _block: &Block) -> NodeState {
@@ -349,10 +350,10 @@ mod tests {
             for _count in 0..self.receive_count {
                 match self.receiver.recv() {
                     Ok(message) => {
-                        println!("Test message receiving!! {:?}", message.message_type);
+                        log::debug!("Test message receiving!! {:?}", message.message_type);
                         message_processor(message);
                     }
-                    Err(e) => println!("happend receiver error: {:?}", e),
+                    Err(e) => log::warn!("happend receiver error: {:?}", e),
                 }
             }
             thread::Builder::new().name("TestConnectionManager start Thread".to_string()).spawn(|| {
@@ -523,7 +524,7 @@ mod tests {
         assert_eq!(node.master_index, 0 as usize);
         let ss = stop_signal.clone();
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(3));
+            thread::sleep(Duration::from_secs(6));
             ss.send(1).unwrap();
         });
         node.start();
