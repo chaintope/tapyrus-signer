@@ -13,7 +13,7 @@ use crate::timer::RoundTimeOutObserver;
 /// Round interval.
 static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
 /// Round time limit delta. Round timeout timer should be little longer than `ROUND_INTERVAL_DEFAULT_SECS`.
-static ROUND_TIMELIMIT_DELTA: u64 = 2;
+static ROUND_TIMELIMIT_DELTA: u64 = 5;
 
 pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     connection_manager: C,
@@ -102,7 +102,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 }
                 None => {}
             }
-            match receiver.recv_timeout(Duration::from_millis(300)) {
+            // Receiving message.
+            match receiver.try_recv() {
                 Ok(msg) => {
                     let next = self.process_message(msg);
                     self.current_state = next;
@@ -118,10 +119,14 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 }
                 Err(_e) => {} // nothing to do.
             }
+            // wait loop
+            std::thread::sleep(Duration::from_millis(300));
         }
     }
 
     pub fn start_new_round(&self) -> NodeState {
+        std::thread::sleep(Duration::from_secs(self.params.round_duration));
+
         let block = self.params.rpc.getnewblock(&self.params.address).unwrap();
         self.connection_manager.broadcast_message(Message {
             message_type: MessageType::Candidateblock(block.clone()),
@@ -215,7 +220,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                                 message_type: MessageType::Completedblock(completed_block),
                                 sender_id: self.params.signer_id.clone(),
                             };
-                            std::thread::sleep(Duration::from_secs(self.params.round_duration));
                             self.connection_manager.broadcast_message(message);
 
                             // start round robin.
@@ -563,7 +567,7 @@ mod tests {
         {
             { // guard context. lock is only enable in this block.
                 let mut guard_block = arc_block.try_lock().unwrap();
-                std::mem::replace(&mut *guard_block, Ok(get_block(1)));
+                std::mem::replace(&mut *guard_block, Ok(get_block(1))).unwrap();
             }
             let private_key = TestKeys::new().key[2];
             let sender_id = SignerID::new(TestKeys::new().pubkeys()[2]);
