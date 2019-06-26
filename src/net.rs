@@ -111,7 +111,7 @@ impl RedisManager {
     {
         let client = Arc::clone(&self.client);
 
-        thread::spawn(move || {
+        thread::Builder::new().name("RedisManagerThread".to_string()).spawn(move || {
             let mut conn = client.get_connection().unwrap();
 
             conn.subscribe(&["tapyrus-signer"], |msg| {
@@ -121,8 +121,8 @@ impl RedisManager {
 
                 let message: Message = serde_json::from_str(&payload).unwrap();
                 message_processor(message)
-            }).unwrap();
-        })
+            }).expect("Failed subscribe to redis!");
+        }).expect("Failed create RedisManagerThread.")
     }
 }
 
