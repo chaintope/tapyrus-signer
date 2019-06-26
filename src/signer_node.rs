@@ -11,7 +11,7 @@ use std::time::Duration;
 use crate::timer::RoundTimeOutObserver;
 
 /// Round interval.
-static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
+pub static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
 /// Round time limit delta. Round timeout timer should be little longer than `ROUND_INTERVAL_DEFAULT_SECS`.
 static ROUND_TIMELIMIT_DELTA: u64 = 5;
 
@@ -281,7 +281,7 @@ pub struct NodeParameters<T: TapyrusApi> {
 }
 
 impl<T: TapyrusApi> NodeParameters<T> {
-    pub fn new(pubkey_list: Vec<PublicKey>, private_key: PrivateKey, threshold: u8, rpc: T, master_flag: bool) -> NodeParameters<T> {
+    pub fn new(pubkey_list: Vec<PublicKey>, private_key: PrivateKey, threshold: u8, rpc: T, master_flag: bool, round_duration: u64) -> NodeParameters<T> {
         let secp = secp256k1::Secp256k1::new();
         let self_pubkey = private_key.public_key(&secp);
         let address = Address::p2pkh(&self_pubkey, private_key.network);
@@ -300,7 +300,7 @@ impl<T: TapyrusApi> NodeParameters<T> {
             signer_id,
             master_flag,
             self_node_index,
-            round_duration: ROUND_INTERVAL_DEFAULT_SECS,
+            round_duration,
         }
     }
 }
@@ -375,7 +375,7 @@ mod tests {
         let threshold = 3;
         let private_key = testkeys.key[0];
 
-        let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, true);
+        let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, true, 0);
         params.round_duration = 0;
         let con = TestConnectionManager::new(publish_count, spy);
         let broadcaster = con.sender.clone();
@@ -396,7 +396,7 @@ mod tests {
         let broadcaster = con.sender.clone();
 
         let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
-        let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, false);
+        let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, false, 0);
         params.round_duration = 0;
         let arc_node = Arc::new(Mutex::new(SignerNode::new(con, params)));
         let node = arc_node.clone();
@@ -441,7 +441,7 @@ mod tests {
             ];
         let threshold = 3;
         let private_key = testkeys.key[0];
-        let params = NodeParameters::new(pubkey_list.clone(), private_key, threshold, MockRpc { return_block: safety_error("Not set block.".to_string()) }, true);
+        let params = NodeParameters::new(pubkey_list.clone(), private_key, threshold, MockRpc { return_block: safety_error("Not set block.".to_string()) }, true, 0);
 
         assert_ne!(params.pubkey_list[0], pubkey_list[0]);
         assert_eq!(params.pubkey_list[1], pubkey_list[4]);
