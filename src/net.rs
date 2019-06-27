@@ -19,7 +19,7 @@ pub struct SignerID {
 }
 
 impl SignerID {
-    pub fn new(pubkey: PublicKey) -> SignerID {
+    pub fn new(pubkey: PublicKey) -> Self {
         SignerID {
             pubkey
         }
@@ -101,7 +101,7 @@ pub struct RedisManager {
 }
 
 impl RedisManager {
-    pub fn new(host: String, port: String) -> RedisManager {
+    pub fn new(host: String, port: String) -> Self {
         let url: &str = &format!("redis://{}:{}", host, port);
         let client = Arc::new(Client::open(url).unwrap());
         RedisManager { client }
@@ -111,18 +111,18 @@ impl RedisManager {
     {
         let client = Arc::clone(&self.client);
 
-        thread::spawn(move || {
+        thread::Builder::new().name("RedisManagerThread".to_string()).spawn(move || {
             let mut conn = client.get_connection().unwrap();
 
             conn.subscribe(&["tapyrus-signer"], |msg| {
                 let _ch = msg.get_channel_name();
                 let payload: String = msg.get_payload().unwrap();
-                println!("receive message. payload: {}", payload);
+                log::trace!("receive message. payload: {}", payload);
 
                 let message: Message = serde_json::from_str(&payload).unwrap();
                 message_processor(message)
-            }).unwrap();
-        })
+            }).expect("Failed subscribe to redis!");
+        }).expect("Failed create RedisManagerThread.")
     }
 }
 
@@ -134,7 +134,7 @@ impl ConnectionManager for RedisManager {
             let conn = client.get_connection().unwrap();
             thread::sleep(Duration::from_millis(500));
 
-            println!("Publish {} to tapyrus-signer channel.", message_in_thread);
+            log::trace!("Publish {} to tapyrus-signer channel.", message_in_thread);
 
             let _: () = conn.publish("tapyrus-signer", message_in_thread).unwrap();
         }).join().unwrap();

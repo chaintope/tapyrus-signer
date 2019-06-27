@@ -11,7 +11,7 @@ use std::time::Duration;
 use crate::timer::RoundTimeOutObserver;
 
 /// Round interval.
-static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
+pub static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
 /// Round time limit delta. Round timeout timer should be little longer than `ROUND_INTERVAL_DEFAULT_SECS`.
 static ROUND_TIMELIMIT_DELTA: u64 = 5;
 
@@ -44,7 +44,8 @@ fn sender_index(sender_id: &SignerID, pubkey_list: &[PublicKey]) -> usize {
 }
 
 impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
-    pub fn new(connection_manager: C, params: NodeParameters<T>) -> SignerNode<T, C> {
+    pub fn new(connection_manager: C, params: NodeParameters<T>) -> Self
+    where Self: Sized {
         let timer_limit = params.round_duration + ROUND_TIMELIMIT_DELTA;
         SignerNode {
             connection_manager,
@@ -66,7 +67,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             match sender.send(message) {
                 Ok(_) => ControlFlow::Continue,
                 Err(error) => {
-                    println!("Happened error!: {:?}", error);
+                    log::warn!("Happened error!: {:?}", error);
                     ControlFlow::Break(())
                 }
             }
@@ -79,7 +80,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         } else {
             NodeState::Member
         };
-        println!("node start. NodeState: {:?}, node_index: {}", &self.current_state, &self.params.self_node_index);
+        log::info!("node start. NodeState: {:?}, node_index: {}, master_index: {}", &self.current_state, &self.params.self_node_index, &self.master_index);
 
         // Roundのtimeoutを監視するthreadを開始
         self.round_timer.start().unwrap();
@@ -91,7 +92,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             match &self.stop_signal {
                 Some(ref r) => match r.try_recv() {
                     Ok(_) => {
-                        println!("Stop by Terminate Signal.");
+                        log::warn!("Stop by Terminate Signal.");
                         self.round_timer.stop();
                         break;
                     }
@@ -175,7 +176,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         self.round_timer.restart().unwrap();
                     }
                     Err(_e) => {
-                        println!("Received Invalid candidate block!!: sender: {:?}", sender_id);
+                        log::warn!("Received Invalid candidate block!!: sender: {:?}", sender_id);
                     }
                 }
             }
@@ -229,7 +230,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         }
                     }
                     Err(e) => {
-                        println!("Invalid Signature!: sender={:?}, error={:?}", &sender_id, e);
+                        log::warn!("Invalid Signature!: sender={:?}, error={:?}", &sender_id, e);
                         self.current_state.clone()
                     }
                 }
@@ -250,7 +251,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         } else {
             NodeState::Member
         };
-        println!("Round Robin: Next State {:?}, node_index: {}, master_inde: {}", next_state, self.params.self_node_index, self.master_index);
+        log::info!("Round Robin: Next State {:?}, node_index: {}, master_inde: {}", next_state, self.params.self_node_index, self.master_index);
         next_state
     }
     fn process_completedblock(&mut self, sender_id: &SignerID, _block: &Block) -> NodeState {
@@ -280,7 +281,7 @@ pub struct NodeParameters<T: TapyrusApi> {
 }
 
 impl<T: TapyrusApi> NodeParameters<T> {
-    pub fn new(pubkey_list: Vec<PublicKey>, private_key: PrivateKey, threshold: u8, rpc: T, master_flag: bool) -> NodeParameters<T> {
+    pub fn new(pubkey_list: Vec<PublicKey>, private_key: PrivateKey, threshold: u8, rpc: T, master_flag: bool, round_duration: u64) -> NodeParameters<T> {
         let secp = secp256k1::Secp256k1::new();
         let self_pubkey = private_key.public_key(&secp);
         let address = Address::p2pkh(&self_pubkey, private_key.network);
@@ -299,7 +300,7 @@ impl<T: TapyrusApi> NodeParameters<T> {
             signer_id,
             master_flag,
             self_node_index,
-            round_duration: ROUND_INTERVAL_DEFAULT_SECS,
+            round_duration,
         }
     }
 }
@@ -349,10 +350,10 @@ mod tests {
             for _count in 0..self.receive_count {
                 match self.receiver.recv() {
                     Ok(message) => {
-                        println!("Test message receiving!! {:?}", message.message_type);
+                        log::debug!("Test message receiving!! {:?}", message.message_type);
                         message_processor(message);
                     }
-                    Err(e) => println!("happend receiver error: {:?}", e),
+                    Err(e) => log::warn!("happend receiver error: {:?}", e),
                 }
             }
             thread::Builder::new().name("TestConnectionManager start Thread".to_string()).spawn(|| {
@@ -374,7 +375,7 @@ mod tests {
         let threshold = 3;
         let private_key = testkeys.key[0];
 
-        let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, true);
+        let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, true, 0);
         params.round_duration = 0;
         let con = TestConnectionManager::new(publish_count, spy);
         let broadcaster = con.sender.clone();
@@ -395,7 +396,7 @@ mod tests {
         let broadcaster = con.sender.clone();
 
         let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
-        let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, false);
+        let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, false, 0);
         params.round_duration = 0;
         let arc_node = Arc::new(Mutex::new(SignerNode::new(con, params)));
         let node = arc_node.clone();
@@ -440,7 +441,7 @@ mod tests {
             ];
         let threshold = 3;
         let private_key = testkeys.key[0];
-        let params = NodeParameters::new(pubkey_list.clone(), private_key, threshold, MockRpc { return_block: safety_error("Not set block.".to_string()) }, true);
+        let params = NodeParameters::new(pubkey_list.clone(), private_key, threshold, MockRpc { return_block: safety_error("Not set block.".to_string()) }, true, 0);
 
         assert_ne!(params.pubkey_list[0], pubkey_list[0]);
         assert_eq!(params.pubkey_list[1], pubkey_list[4]);
@@ -523,7 +524,7 @@ mod tests {
         assert_eq!(node.master_index, 0 as usize);
         let ss = stop_signal.clone();
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(3));
+            thread::sleep(Duration::from_secs(6));
             ss.send(1).unwrap();
         });
         node.start();

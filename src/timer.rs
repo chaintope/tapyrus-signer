@@ -31,7 +31,7 @@ pub struct State {
 }
 
 impl RoundTimeOutObserver {
-    pub fn new(timelimit_secs: u64) -> RoundTimeOutObserver {
+    pub fn new(timelimit_secs: u64) -> Self {
         let (sender, receiver): (Sender<()>, Receiver<()>) = channel();
         let (command_sender, command_receiver): (SyncSender<Command>, Receiver<Command>) = sync_channel(1);
         RoundTimeOutObserver {
@@ -78,11 +78,11 @@ impl RoundTimeOutObserver {
                     .expect("Command_receiver can not have lock.");
                 match receiver.recv_timeout(timelimit) {
                     Ok(Command::Stop) => {
-                        println!("Command::Stop received.");
+                        log::debug!("Command::Stop received.");
                         stop();
                     }
                     Err(_e) => {
-                        println!("Timelimit reached!");
+                        log::warn!("Timelimit reached!");
                         stop();
                         // time out, send timeout signal.
                         match sender.send(()) {
@@ -91,7 +91,7 @@ impl RoundTimeOutObserver {
                         };
                     }
                 }
-                println!("RoundTimeoutObserverThread finished.");
+                log::debug!("RoundTimeoutObserverThread finished.");
             }).unwrap();
         self.thread = Some(handler);
         Ok(())
@@ -108,7 +108,6 @@ impl RoundTimeOutObserver {
                     }
                 }
                 Err(e) => {
-                    println!("happend send error: {:?}", e);
                     warn!("RoundTimeoutObserver thread maybe already dead. error:{:?}", e);
                 }
             }
