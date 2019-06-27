@@ -2,7 +2,7 @@
 /// メッセージの処理は、メッセージの種類とラウンドの状態に依存する。
 /// ラウンドの状態は 誰が master であるか（自身がmaster であるか）。ラウンドが実行中であるか、開始待ちであるか。などで変わる
 use std::sync::Arc;
-use redis::{Client, Commands, ControlFlow, PubSubCommands};
+use redis::{Client, Commands, ControlFlow, PubSubCommands, RedisError};
 use std::thread;
 use std::time::Duration;
 use serde::{Deserialize, Serialize, Serializer, Deserializer};
@@ -10,6 +10,7 @@ use bitcoin::PublicKey;
 use crate::serialize::ByteBufVisitor;
 use crate::blockdata::Block;
 use std::thread::JoinHandle;
+use std::sync::mpsc::{Sender, Receiver, channel};
 
 
 /// Signerの識別子。公開鍵を識別子にする。
@@ -92,41 +93,94 @@ impl<'de> Deserialize<'de> for Signature {
 
 
 pub trait ConnectionManager {
+    type ERROR: std::error::Error;
     fn broadcast_message(&self, message: Message);
     fn start(&self, message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static) -> JoinHandle<()>;
+    fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<Self::ERROR>>>;
+}
+
+#[derive(Debug)]
+pub struct ConnectionManagerError<E: std::error::Error> {
+    description: String,
+    cause: Option<E>,
+}
+
+impl<E: std::error::Error> std::fmt::Display for ConnectionManagerError<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl<E: std::error::Error> std::error::Error for ConnectionManagerError<E> {
+    fn description(&self) -> &str {
+        &self.description
+    }
+
+    fn cause(&self) -> Option<&std::error::Error> {
+        match self.cause {
+            Some(ref e) => Some(e),
+            None => None,
+        }
+    }
+}
+
+impl From<RedisError> for ConnectionManagerError<RedisError> {
+    fn from(cause: RedisError) -> ConnectionManagerError<RedisError> {
+        ConnectionManagerError {
+            description: format!("{:?}", cause),
+            cause: Some(cause),
+        }
+    }
 }
 
 pub struct RedisManager {
     pub client: Arc<Client>,
+    error_sender: Sender<ConnectionManagerError<RedisError>>,
+    pub error_receiver: Option<Receiver<ConnectionManagerError<RedisError>>>,
 }
 
 impl RedisManager {
     pub fn new(host: String, port: String) -> Self {
         let url: &str = &format!("redis://{}:{}", host, port);
         let client = Arc::new(Client::open(url).unwrap());
-        RedisManager { client }
+        let (s, r): (Sender<ConnectionManagerError<RedisError>>, Receiver<ConnectionManagerError<RedisError>>) = channel();
+        RedisManager {
+            client,
+            error_sender: s,
+            error_receiver: Some(r),
+        }
     }
 
-    fn subscribe(&self, mut message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static) -> thread::JoinHandle<()>
+    fn subscribe<F>(&self, message_processor: F) -> thread::JoinHandle<()>
+        where F: FnMut(Message) -> ControlFlow<()> + Send + 'static
     {
         let client = Arc::clone(&self.client);
-
+        let error_sender = self.error_sender.clone();
         thread::Builder::new().name("RedisManagerThread".to_string()).spawn(move || {
-            let mut conn = client.get_connection().unwrap();
+            fn inner_subscribe<F2>(client: Arc<Client>, mut message_processor: F2) -> Result<(), ConnectionManagerError<RedisError>>
+                where F2: FnMut(Message) -> ControlFlow<()> + Send + 'static
+            {
+                let mut conn = client.get_connection()?;
+                conn.subscribe(&["tapyrus-signer"], |msg| {
+                    let _ch = msg.get_channel_name();
+                    let payload: String = msg.get_payload().unwrap();
+                    log::trace!("receive message. payload: {}", payload);
 
-            conn.subscribe(&["tapyrus-signer"], |msg| {
-                let _ch = msg.get_channel_name();
-                let payload: String = msg.get_payload().unwrap();
-                log::trace!("receive message. payload: {}", payload);
-
-                let message: Message = serde_json::from_str(&payload).unwrap();
-                message_processor(message)
-            }).expect("Failed subscribe to redis!");
+                    let message: Message = serde_json::from_str(&payload).unwrap();
+                    message_processor(message)
+                })?;
+                Ok(())
+            }
+            match inner_subscribe(client, message_processor) {
+                Ok(()) => {}
+                Err(e) => error_sender.send(e).expect("Can't notify RedisManager connection error"),
+            };
         }).expect("Failed create RedisManagerThread.")
     }
 }
 
 impl ConnectionManager for RedisManager {
+    type ERROR = RedisError;
     fn broadcast_message(&self, message: Message) {
         let client = Arc::clone(&self.client);
         let message_in_thread = serde_json::to_string(&message).unwrap();
@@ -143,6 +197,11 @@ impl ConnectionManager for RedisManager {
     fn start(&self, message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static) -> JoinHandle<()>
     {
         self.subscribe(message_processor)
+    }
+
+    fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<Self::ERROR>>>
+    {
+        self.error_receiver.take()
     }
 }
 
