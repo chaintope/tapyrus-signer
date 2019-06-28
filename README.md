@@ -144,3 +144,12 @@ Each round need to finish in 65 secs, otherwise the round was fail and start
 next round. This mechanism is for availability. Because of timeout, Signer
 Network can continue if some signer node stoped.
 
+## Now is alpha version
+
+Current implementation is not stable. So it has some problems.
+
+### Multi masters in a round appear
+
+Depending on the starting timing some nodes, there are multi master nodes
+appear. To avoid this problem, you should use odd number as signer count.
+
