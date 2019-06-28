@@ -66,3 +66,81 @@ Example for If launch as master node.
 And helpful comment is in `src/test_helper.rs`.
 
 You can find all command options in `src/bin/node.rs`.
+
+# Signer Network Specification
+
+Describe about how the signer node communicate with other node.
+
+## SignerID and Signer Index
+
+Each signer nodes are identified by each public keys. And also each nodes
+have index. The index is assigned by public keys dictionary order index.
+Round master which is describing follow section is decided accoding to
+Signer Index.
+
+## Message Types
+
+The communication among each node is perform on passing Message which is
+boradcasted on Redis pub/sub.
+
+All messages has signer id field which is specify by signer public key.
+
+Name | payload | Description
+-----|--------|------------
+candidateblock | Block | Round master publish candidate block.
+signature | Signature | Each signer publish signature.
+completedblock | Block | Round master node publishes completed block.
+roundfailure |  | Round master notify the round is failure and go next round.
+
+## Round
+
+Signer Network has round. Before start the round, a signer node is elected
+round-robin as round master. The master start new round. A round produce
+one block if it is succeed.
+
+In following section, it describe communication flow for each master
+and member node.
+
+### Round Master Flow
+
+1. Start Next Round
+     * Sleep 60 secs.
+2. Produce a candidate block
+     * Call getnewblock
+          * In getnewblock RPC, it test block validity, so we no longer call testproposedblock RPC.
+     * Publish new block to all other signers via Redis pub/sub
+3. Collect signatures
+     * Create own signature for the candidate block.
+     * Collect valid signatures form other members via signatures message.
+     * If threshold is met, go through next step.
+     * If 10sec passed or NG message count is over the signers count minus threshold(that is never met the threshold), publish failureround message and finish this round.
+4. Submit Block
+     * Call combineblocksigs RPC
+     * Call submitblock RPC
+     * Publish completed block to completedblock message.
+5. Decide Next Master
+     * Decide next master node accoding to signer's public keys dictionary order.
+     * Start next round as member.
+
+### Round Member Flow
+
+1. Start Next Round
+     * Wait for candidateblock message.
+2. Check & Sign block
+     * If the node receives candidateblock message, start to progress.
+     * Call testproposedblock RPC
+     * If the block is NG, logs warning.
+     * If the block is OK, create signature.
+3. Publish signature
+     * Publish signature using signature message.
+     * Wait for completedblock message.
+4. Decide Next Master
+     * When receive completedblock message, decide next master node same way as master flow.
+     * Start next round as decided role.
+
+### About Timeout
+
+Each round need to finish in 65 secs, otherwise the round was fail and start
+next round. This mechanism is for availability. Because of timeout, Signer
+Network can continue if some signer node stoped.
+
