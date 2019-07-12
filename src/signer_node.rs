@@ -1,13 +1,15 @@
-use crate::net::{ConnectionManager, Message, MessageType, SignerID, Signature};
-use redis::ControlFlow;
-use bitcoin::{PublicKey, PrivateKey, Address};
-use crate::rpc::TapyrusApi;
-use std::sync::mpsc::{channel, Sender, Receiver};
-use crate::blockdata::Block;
-use crate::sign::sign;
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
+
+use bitcoin::{Address, PrivateKey, PublicKey};
+use redis::ControlFlow;
+
+use crate::blockdata::Block;
+use crate::net::{ConnectionManager, Message, MessageType, Signature, SignerID};
+use crate::rpc::TapyrusApi;
+use crate::sign::sign;
 use crate::timer::RoundTimeOutObserver;
 
 /// Round interval.
@@ -73,7 +75,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             }
         };
 
-        // Rpcとの通信を行うthreadを開始
+        // redisとの通信を行うthreadを開始
         let _handler = self.connection_manager.start(closure);
         self.current_state = if self.params.master_flag {
             self.start_new_round()
@@ -84,6 +86,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
         // Roundのtimeoutを監視するthreadを開始
         self.round_timer.start().unwrap();
+        // get error_handler that is for catch error within connection_manager.
+        let connection_manager_error_handler = self.connection_manager.error_handler();
         loop {
             // After process when received message. Get message from receiver,
             // then change that state in main thread side.
@@ -119,6 +123,21 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     self.round_timer.restart().unwrap();
                 }
                 Err(_e) => {} // nothing to do.
+            }
+            // Should be panic, if happened error in connection_manager.
+            match connection_manager_error_handler {
+                Some(ref receiver) => {
+                    match receiver.try_recv() {
+                        Ok(e) => {
+                            self.round_timer.stop();
+                            panic!(e.to_string());
+                        },
+                        Err(_e) => {},
+                    }
+                },
+                None => {
+                    log::warn!("Failed to get error_handler of connection_manager!");
+                }
             }
             // wait loop
             std::thread::sleep(Duration::from_millis(300));
@@ -307,18 +326,20 @@ impl<T: TapyrusApi> NodeParameters<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::signer_node::{NodeParameters, SignerNode, NodeState};
-    use crate::net::{ConnectionManager, Message, SignerID, Signature};
-    use crate::test_helper::{TestKeys, get_block};
-    use std::thread;
-    use std::sync::mpsc::{Sender, Receiver, channel};
-    use redis::ControlFlow;
-    use std::thread::JoinHandle;
-    use std::sync::{Arc, Mutex};
-    use crate::sign::sign;
-    use crate::rpc::tests::{MockRpc, safety, SafetyBlock, safety_error};
     use std::collections::HashMap;
+    use std::sync::{Arc, Mutex};
+    use std::sync::mpsc::{channel, Receiver, Sender};
+    use std::thread;
+    use std::thread::JoinHandle;
     use std::time::Duration;
+
+    use redis::ControlFlow;
+
+    use crate::net::{ConnectionManager, Message, Signature, SignerID, ConnectionManagerError};
+    use crate::rpc::tests::{MockRpc, safety, safety_error, SafetyBlock};
+    use crate::sign::sign;
+    use crate::signer_node::{NodeParameters, NodeState, SignerNode};
+    use crate::test_helper::{get_block, TestKeys};
 
     type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
     pub struct TestConnectionManager {
@@ -329,7 +350,7 @@ mod tests {
     }
 
     impl TestConnectionManager {
-        pub fn new(receive_count: u32, broadcast_assert: SpyMethod) -> TestConnectionManager {
+        pub fn new(receive_count: u32, broadcast_assert: SpyMethod) -> Self {
             let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
             TestConnectionManager {
                 receive_count,
@@ -341,6 +362,7 @@ mod tests {
     }
 
     impl ConnectionManager for TestConnectionManager {
+        type ERROR = crate::errors::Error;
         fn broadcast_message(&self, message: Message) {
             let rc_message = Arc::new(message);
             (self.broadcast_assert)(rc_message.clone());
@@ -359,6 +381,10 @@ mod tests {
             thread::Builder::new().name("TestConnectionManager start Thread".to_string()).spawn(|| {
                 thread::sleep(Duration::from_millis(300));
             }).unwrap()
+        }
+
+        fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<crate::errors::Error>>> {
+            None::<Receiver<ConnectionManagerError<crate::errors::Error>>>
         }
     }
 
