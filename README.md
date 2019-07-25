@@ -104,7 +104,7 @@ and member node.
 ### Round Master Flow
 
 1. Start Next Round
-     * Sleep 60 secs.
+     * Sleep 60 secs. (This is default value. It can be changed by --duration option.)
 2. Produce a candidate block
      * Call getnewblock
           * In getnewblock RPC, it test block validity, so we no longer call testproposedblock RPC.
@@ -113,11 +113,11 @@ and member node.
      * Create own signature for the candidate block.
      * Collect valid signatures form other members via signatures message.
      * If threshold is met, go through next step.
-     * If 10sec passed or NG message count is over the signers count minus threshold(that is never met the threshold), publish failureround message and finish this round.
+     * If 65sec passed from this round was started, node selects next master according to public keys dictionary order and start next round.
 4. Submit Block
      * Call combineblocksigs RPC
      * Call submitblock RPC
-     * Publish completed block to completedblock message.
+     * Publish completed block with completedblock message.
 5. Decide Next Master
      * Decide next master node accoding to signer's public keys dictionary order.
      * Start next round as member.
@@ -143,6 +143,10 @@ and member node.
 Each round need to finish in 65 secs, otherwise the round was fail and start
 next round. This mechanism is for availability. Because of timeout, Signer
 Network can continue if some signer node stoped.
+
+65 secs is consisted of round duration and actually time limit for round process.
+Round duration can be set by `--duration` option. Default is 60 secs.
+Time limit is fixed as 5 secs.
 
 ## Now is alpha version
 
