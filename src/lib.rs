@@ -6,6 +6,7 @@ extern crate byteorder;
 extern crate base64;
 extern crate redis;
 
+pub mod command_args;
 pub mod blockdata;
 pub mod rpc;
 pub mod sign;

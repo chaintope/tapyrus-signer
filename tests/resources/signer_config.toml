@@ -1,0 +1,56 @@
+[signer]
+# `publickeys` is specify that Public keys of all nodes that participate this signer network.
+# this is require and public key format is hex string without `0x` prefix.
+publickeys = [
+"033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8",
+"020464074b94702e9b07803d247021943bdcc1f8700b92b66defb7fadd76e80acf",
+"02cbe0ad70ffe110d097db648fda20bef14dc72b5c9979c137c451820c176ac23f"
+]
+
+# `privatekey` is The PrivateKey of this signer node.
+# this is require, and specified WIF format.
+privatekey = "cMtJPWz8D1KmTseJa778nWTS93uePrrN5FtUARUZHu7RsjuSTjGX"
+
+# `threshold` is The threshold of enough signer. it must be less than specified public keys.
+# this is require, and specify number due 1 to 15.
+threshold = 2
+
+[rpc]
+# TapyrusCore RPC endpoint host name.
+rpc_endpoint_host = "localhost"
+
+# The `rpc_endpoint_port` is TapyrusCore RPC endpoint port number.
+# These are TapyrusCore default port,
+# mainnet: 2377, testnet: 12377, regtest: 12381.
+# this is optional, default is 2377(mainnet).
+rpc_endpoint_port = 12381
+
+# `rpc_endpoint_user` is TapyrusCore RPC user name for authentication.
+# require if you set username to your TapyrusCore RPC Server.
+rpc_endpoint_user = "user"
+
+# `rpc_endpoint_pass" is TapyrusCore RPC password for authentication.
+# require if you set password to your TapyrusCore RPC Server.
+rpc_endpoint_pass = "pass"
+
+[redis]
+# `redis_host` is Redis Server host name or IP Address.
+redis_host = "127.0.0.1"
+
+# `redis_port` is Redis Server port number. default is 6379.
+redis_port =  6379
+
+[general]
+# `round_duration` is round robin duration time(sec).
+# this is optional, default duration is 60 sec.
+# if you want more slowly or quickly block creation, then set more big/small duration time.
+round_duration = 60 # uint64
+
+# `log_quiet` is setted `true` to silent of log report.
+# this is optional, default false
+log_quiet = false
+
+# `log_level` is Log Level.
+# selectable values are `trace`, `debug`, `info`, `warn` or `error`.
+# this is optional, default vlue `info`.
+log_level = "debug"
