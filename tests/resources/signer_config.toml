@@ -35,22 +35,24 @@ rpc_endpoint_pass = "pass"
 
 [redis]
 # `redis_host` is Redis Server host name or IP Address.
-redis_host = "127.0.0.1"
+redis_host = "192.168.0.63"
 
 # `redis_port` is Redis Server port number. default is 6379.
-redis_port =  6379
+redis_port =  16379
 
 [general]
 # `round_duration` is round robin duration time(sec).
 # this is optional, default duration is 60 sec.
 # if you want more slowly or quickly block creation, then set more big/small duration time.
-round_duration = 60 # uint64
+round_duration = 5 # uint64
 
 # `log_quiet` is setted `true` to silent of log report.
 # this is optional, default false
-log_quiet = false
+log_quiet = true
 
 # `log_level` is Log Level.
 # selectable values are `trace`, `debug`, `info`, `warn` or `error`.
 # this is optional, default vlue `info`.
 log_level = "debug"
+
+master = true
