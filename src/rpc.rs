@@ -197,6 +197,7 @@ pub mod tests {
 
     /// TODO: use rpc mock. Now this test needs tapyrus node process.
     #[test]
+    #[ignore]
     fn test_getnewblock() {
         let result = call_getnewblock();
         assert!(result.is_ok());
@@ -205,6 +206,7 @@ pub mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_testproposedblock() {
         let block = call_getnewblock().unwrap();
         let rpc = get_rpc_client();
@@ -215,6 +217,7 @@ pub mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_combineblocksigs() {
         let block = get_block(0);
         let block_hash = block.hash().unwrap();
@@ -230,6 +233,7 @@ pub mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_submitblock() {
         let rpc = get_rpc_client();
 
