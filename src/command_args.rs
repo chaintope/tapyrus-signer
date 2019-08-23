@@ -66,26 +66,13 @@ struct GeneralToml {
     master: Option<bool>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 struct ConfigToml {
     signer: Option<SignerToml>,
     rpc: Option<RpcToml>,
     redis: Option<RedisToml>,
     general: Option<GeneralToml>,
 }
-
-impl Default for ConfigToml {
-    fn default() -> Self {
-        ConfigToml {
-            signer: None,
-            rpc: None,
-            redis: None,
-            general: None,
-        }
-    }
-}
-
-fn flatter<T>(o: T) -> T { o }
 
 pub struct CommandArgs<'a> {
     matches: clap::ArgMatches<'a>,
@@ -105,7 +92,7 @@ pub struct SignerConfig<'a> {
 
 impl<'a> SignerConfig<'a> {
     pub fn public_keys(&self) -> Vec<PublicKey> {
-        let vec_string: Option<&Vec<String>> = self.toml_config.map(|config| config.publickeys.as_ref()).and_then(flatter);
+        let vec_string: Option<&Vec<String>> = self.toml_config.and_then(|config| config.publickeys.as_ref());
         let pubkeys_within_config: Option<Vec<&str>> = vec_string.map(|v| v.iter().map(|s| &s as &str).collect());
         // TODO: maybe panic is not suitable? should be return result<vec, error> ?
         let specified = self.command_args.public_keys.as_ref().or(pubkeys_within_config.as_ref()).expect("Must be specified public_keys.");
@@ -126,17 +113,20 @@ impl<'a> SignerConfig<'a> {
 
     pub fn threshold(&self) -> u8 {
         // TODO: should be retrn Result<u8, Error>?
-        self.command_args.threshold.or(self.toml_config.map(|config| config.threshold).and_then(flatter)).expect("Must be specified threshold.")
+        self.command_args.threshold
+            .or(self.toml_config.and_then(|config| config.threshold))
+            .expect("Must be specified threshold.")
     }
 
     pub fn private_key(&self) -> PrivateKey {
         let private_key_within_config: Option<&str> = self.toml_config
-            .map(|config| config.privatekey.as_ref()).and_then(flatter)
+            .and_then(|config| config.privatekey.as_ref())
             .map(|p| p as &str);
-        self.command_args.private_key.or(private_key_within_config).and_then(|s| match PrivateKey::from_str(s) {
-            Ok(p) => Some(p),
-            Err(e) => panic!(format!("'{}' is invalid WIF format!. error msg: {:?}", s, e.description())),
-        })
+        self.command_args.private_key.or(private_key_within_config)
+            .and_then(|s| match PrivateKey::from_str(s) {
+                Ok(p) => Some(p),
+                Err(e) => panic!(format!("'{}' is invalid WIF format!. error msg: {:?}", s, e.description())),
+            })
             .expect("Must be specified private_key.")
     }
 }
@@ -155,24 +145,26 @@ pub struct RpcConfig<'a> {
 
 impl<'a> RpcConfig<'a> {
     pub fn host(&'a self) -> &'a str {
-        let toml_value = self.toml_config.map(|config| config.rpc_endpoint_host.as_ref())
-            .and_then(flatter).map(|s| s as &str);
+        let toml_value = self.toml_config
+            .and_then(|config| config.rpc_endpoint_host.as_ref())
+            .map(|s| s as &str);
         self.command_args.host.or(toml_value).unwrap_or(DEFAULT_RPC_HOST)
     }
     pub fn port(&'a self) -> u32 {
-        let toml_value = self.toml_config.map(|config| config.rpc_endpoint_port)
-            .and_then(flatter);
+        let toml_value = self.toml_config.and_then(|config| config.rpc_endpoint_port);
         self.command_args.port.and_then(|s| s.parse::<u32>().ok())
             .or(toml_value).unwrap_or(DEFAULT_RPC_PORT.parse().unwrap_or_default())
     }
     pub fn user_name(&'a self) -> Option<&'a str> {
-        let toml_value = self.toml_config.map(|config| config.rpc_endpoint_user.as_ref())
-            .and_then(flatter).map(|s| s as &str);
+        let toml_value = self.toml_config
+            .and_then(|config| config.rpc_endpoint_user.as_ref())
+            .map(|s| s as &str);
         self.command_args.username.or(toml_value)
     }
     pub fn password(&'a self) -> Option<&'a str> {
-        let toml_value = self.toml_config.map(|config| config.rpc_endpoint_pass.as_ref())
-            .and_then(flatter).map(|s| s as &str);
+        let toml_value = self.toml_config
+            .and_then(|config| config.rpc_endpoint_pass.as_ref())
+            .map(|s| s as &str);
         self.command_args.password.or(toml_value)
     }
 }
@@ -189,13 +181,13 @@ pub struct RedisConfig<'a> {
 
 impl<'a> RedisConfig<'a> {
     pub fn host(&'a self) -> &'a str {
-        let toml_value = self.toml_config.map(|config| config.redis_host.as_ref())
-            .and_then(flatter).map(|s| s as &str);
+        let toml_value = self.toml_config
+            .and_then(|config| config.redis_host.as_ref())
+            .map(|s| s as &str);
         self.command_args.host.or(toml_value).unwrap_or(DEFAULT_REDIS_HOST)
     }
     pub fn port(&'a self) -> u32 {
-        let toml_value = self.toml_config.map(|config| config.redis_port)
-            .and_then(flatter);
+        let toml_value = self.toml_config.and_then(|config| config.redis_port);
         self.command_args.port.and_then(|s| s.parse::<u32>().ok())
             .or(toml_value).unwrap_or(DEFAULT_REDIS_PORT.parse().unwrap_or_default())
     }
@@ -216,10 +208,13 @@ pub struct GeneralConfig<'a> {
 impl<'a> GeneralConfig<'a> {
     pub fn round_duration(&'a self) -> u64 {
         let toml_value = self.toml_config.and_then(|config| config.round_duration);
-        self.command_args.round_duration.and_then(|d| d.parse().ok()).or(toml_value).unwrap_or(ROUND_INTERVAL_DEFAULT_SECS)
+        self.command_args.round_duration
+            .and_then(|d| d.parse().ok()).or(toml_value)
+            .unwrap_or(ROUND_INTERVAL_DEFAULT_SECS)
     }
     pub fn log_level(&'a self) -> &'a str {
-        let toml_value = self.toml_config.and_then(|config| config.log_level.as_ref())
+        let toml_value = self.toml_config
+            .and_then(|config| config.log_level.as_ref())
             .map(|s| s as &str);
         self.command_args.log_level.or(toml_value).unwrap_or(DEFAULT_LOG_LEVEL)
     }
@@ -251,14 +246,14 @@ impl<'a> CommandArgs<'a> {
 
     fn signer_config(&self) -> SignerConfig {
         let threshold_args = self.matches.value_of(OPTION_NAME_THRESHOLD);
-        let num: Option<u8> = threshold_args.map(|s| s.parse().ok()).and_then(flatter);
+        let num: Option<u8> = threshold_args.and_then(|s| s.parse().ok());
         SignerConfig {
             command_args: SignerCommandArgs {
                 public_keys: self.matches.values_of(OPTION_NAME_PUBLIC_KEY).map(|vs| vs.collect()),
                 private_key: self.matches.value_of(OPTION_NAME_PRIVATE_KEY),
                 threshold: num,
             },
-            toml_config: self.config.as_ref().map(|c| c.signer.as_ref()).and_then(flatter),
+            toml_config: self.config.as_ref().and_then(|c| c.signer.as_ref()),
         }
     }
 
@@ -270,7 +265,7 @@ impl<'a> CommandArgs<'a> {
                 username: self.matches.value_of(OPTION_NAME_RPC_ENDPOINT_USER),
                 password: self.matches.value_of(OPTION_NAME_RPC_ENDPOINT_PASS),
             },
-            toml_config: self.config.as_ref().map(|c| c.rpc.as_ref()).and_then(flatter),
+            toml_config: self.config.as_ref().and_then(|c| c.rpc.as_ref()),
         }
     }
 
@@ -280,7 +275,7 @@ impl<'a> CommandArgs<'a> {
                 host: self.matches.value_of(OPTION_NAME_REDIS_HOST),
                 port: self.matches.value_of(OPTION_NAME_REDIS_PORT),
             },
-            toml_config: self.config.as_ref().map(|c| c.redis.as_ref()).and_then(flatter),
+            toml_config: self.config.as_ref().and_then(|c| c.redis.as_ref()),
         }
     }
     fn general_config(&self) -> GeneralConfig {
@@ -378,7 +373,7 @@ pub fn get_options(duration_default: &str) -> clap::App {
 #[test]
 fn test_load() {
     let matches = get_options("60")
-        .get_matches_from(vec!["node", "-c=tests/resources/signer_config.toml"]);
+        .get_matches_from(vec!["node", "-c=tests/resources/signer_config_sample.toml"]);
     let args = CommandArgs::load(matches);
     assert!(args.is_ok());
     assert!(args.unwrap().config.is_some());
@@ -404,7 +399,7 @@ fn test_invalid_format_config_file() {
 #[test]
 fn test_load_from_file() {
     let matches = get_options("60")
-        .get_matches_from(vec!["node", "-c=tests/resources/signer_config.toml"]);
+        .get_matches_from(vec!["node", "-c=tests/resources/signer_config_sample.toml"]);
     let args = CommandArgs::load(matches).unwrap();
     let pubkeys = args.signer_config().public_keys();
     assert_eq!(pubkeys.len(), 3);
