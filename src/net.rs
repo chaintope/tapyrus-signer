@@ -184,14 +184,14 @@ impl ConnectionManager for RedisManager {
     fn broadcast_message(&self, message: Message) {
         let client = Arc::clone(&self.client);
         let message_in_thread = serde_json::to_string(&message).unwrap();
-        thread::spawn(move || {
+        thread::Builder::new().name("RedisBroadcastThread".to_string()).spawn(move || {
             let conn = client.get_connection().unwrap();
             thread::sleep(Duration::from_millis(500));
 
             log::trace!("Publish {} to tapyrus-signer channel.", message_in_thread);
 
             let _: () = conn.publish("tapyrus-signer", message_in_thread).unwrap();
-        }).join().unwrap();
+        }).unwrap().join().expect("Can't connect to Redis Server.");
     }
 
     fn start(&self, message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static) -> JoinHandle<()>
