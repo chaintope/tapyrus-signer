@@ -230,7 +230,19 @@ impl<'a> GeneralConfig<'a> {
     }
 }
 
+/// command example:
+/// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e --privatekey=cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA -t 2 --master
 impl<'a> CommandArgs<'a> {
+    /// constructor.
+    /// Basically, search config file as file name `signer_config.toml` in current dir.
+    /// If not exists config file then, require mandatory params in command args.
+    /// When raise error if mandatory params missed or toml config is invalid format if exists it.
+    pub fn new() -> Result<CommandArgs<'static>, crate::errors::Error> {
+        CommandArgs::load(get_options().get_matches())
+    }
+
+    /// constructor.
+    /// create CommandArgs by using specified ArgMatches.
     pub fn load(matches: clap::ArgMatches) -> Result<CommandArgs, crate::errors::Error> {
         // load from config file if exists.
         let config_file = matches.value_of(OPTION_NAME_CONFIG).unwrap();
@@ -244,7 +256,7 @@ impl<'a> CommandArgs<'a> {
         }
     }
 
-    fn signer_config(&self) -> SignerConfig {
+    pub fn signer_config(&self) -> SignerConfig {
         let threshold_args = self.matches.value_of(OPTION_NAME_THRESHOLD);
         let num: Option<u8> = threshold_args.and_then(|s| s.parse().ok());
         SignerConfig {
@@ -257,7 +269,7 @@ impl<'a> CommandArgs<'a> {
         }
     }
 
-    fn rpc_config(&self) -> RpcConfig {
+    pub fn rpc_config(&self) -> RpcConfig {
         RpcConfig {
             command_args: RpcCommandArgs {
                 host: self.matches.value_of(OPTION_NAME_RPC_ENDPOINT_HOST),
@@ -269,7 +281,7 @@ impl<'a> CommandArgs<'a> {
         }
     }
 
-    fn redis_config(&self) -> RedisConfig {
+    pub fn redis_config(&self) -> RedisConfig {
         RedisConfig {
             command_args: RedisCommandArgs {
                 host: self.matches.value_of(OPTION_NAME_REDIS_HOST),
@@ -278,7 +290,7 @@ impl<'a> CommandArgs<'a> {
             toml_config: self.config.as_ref().and_then(|c| c.redis.as_ref()),
         }
     }
-    fn general_config(&self) -> GeneralConfig {
+    pub fn general_config(&self) -> GeneralConfig {
         GeneralConfig {
             command_args: GeneralCommandArgs {
                 round_duration: self.matches.value_of(OPTION_NAME_REDIS_HOST),
@@ -299,7 +311,7 @@ fn read_config(file_path: &str) -> Result<ConfigToml, crate::errors::Error> {
 
 /// command example:
 /// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e --privatekey=cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA -t 2 --master
-pub fn get_options(duration_default: &str) -> clap::App {
+pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
     App::new("node")
         .about("Tapyrus siner node")
         .arg(Arg::with_name(OPTION_NAME_CONFIG)
@@ -366,13 +378,12 @@ pub fn get_options(duration_default: &str) -> clap::App {
             .short("d")
             .takes_value(true)
             .value_name("SECs")
-            .default_value(duration_default)
             .help("Round interval times(sec)."))
 }
 
 #[test]
 fn test_load() {
-    let matches = get_options("60")
+    let matches = get_options()
         .get_matches_from(vec!["node", "-c=tests/resources/signer_config_sample.toml"]);
     let args = CommandArgs::load(matches);
     assert!(args.is_ok());
@@ -381,7 +392,7 @@ fn test_load() {
 
 #[test]
 fn test_allow_no_exists_config_file() {
-    let matches = get_options("60")
+    let matches = get_options()
         .get_matches_from(vec!["node", "-c=hoge.toml"]);
     let args = CommandArgs::load(matches);
     assert!(args.is_ok());
@@ -391,14 +402,14 @@ fn test_allow_no_exists_config_file() {
 #[test]
 #[should_panic(expected = "InvalidTomlFormat")]
 fn test_invalid_format_config_file() {
-    let matches = get_options("60")
+    let matches = get_options()
         .get_matches_from(vec!["node", "-c=tests/resources/invalid_format.toml"]);
     let _args = CommandArgs::load(matches).unwrap();
 }
 
 #[test]
 fn test_load_from_file() {
-    let matches = get_options("60")
+    let matches = get_options()
         .get_matches_from(vec!["node", "-c=tests/resources/signer_config_sample.toml"]);
     let args = CommandArgs::load(matches).unwrap();
     let pubkeys = args.signer_config().public_keys();
@@ -432,7 +443,7 @@ fn test_load_from_file() {
 
 #[test]
 fn test_priority_commandline() {
-    let matches = get_options("60")
+    let matches = get_options()
         .get_matches_from(vec!["node", "-c=tests/resources/signer_config.toml",
                                "-p=020464074b94702e9b07803d247021943bdcc1f8700b92b66defb7fadd76e80acf",
                                "-p=033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8",
@@ -470,7 +481,7 @@ fn test_priority_commandline() {
 #[test]
 #[should_panic(expected = "\\'aaaa\\' is invalid public key format.\\n\\'bbbb\\' is invalid public key format.\\n")]
 fn test_invid_pubkeys() {
-    let matches = get_options("60")
+    let matches = get_options()
         .get_matches_from(vec!["node", "-c=tests/resources/signer_config.toml",
                                "-p=aaaa",
                                "-p=bbbb"]);
@@ -481,7 +492,7 @@ fn test_invid_pubkeys() {
 #[test]
 #[should_panic(expected = "Must be specified public_keys.")]
 fn test_no_pubkeys() {
-    let matches = get_options("60")
+    let matches = get_options()
         .get_matches_from(vec!["node"]);
     let args = CommandArgs {
         matches,
@@ -493,7 +504,7 @@ fn test_no_pubkeys() {
 #[test]
 #[should_panic(expected = "Must be specified threshold.")]
 fn test_no_thrshold() {
-    let matches = get_options("60")
+    let matches = get_options()
         .get_matches_from(vec!["node"]);
     let args = CommandArgs {
         matches,
@@ -505,7 +516,7 @@ fn test_no_thrshold() {
 #[test]
 #[should_panic(expected = "Must be specified private_key.")]
 fn test_no_private_key() {
-    let matches = get_options("60")
+    let matches = get_options()
         .get_matches_from(vec!["node"]);
     let args = CommandArgs {
         matches,
@@ -517,7 +528,7 @@ fn test_no_private_key() {
 #[test]
 #[should_panic(expected = "'aabbccdd' is invalid WIF format!. error msg:")]
 fn test_invalid_private_key() {
-    let matches = get_options("60")
+    let matches = get_options()
         .get_matches_from(vec!["node"]);
     let args = CommandArgs {
         matches,
