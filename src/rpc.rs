@@ -19,6 +19,16 @@ struct CombineBlockSigsResult {
     complete: bool,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct GetBlockchainInfoResult {
+    chain: String,
+    blocks: u64,
+    headers: u64,
+    bestblockhash: String,
+    mediantime: u64,
+    initialblockdownload: bool,
+}
+
 pub struct Rpc {
     client: jsonrpc::client::Client,
 }
@@ -32,6 +42,8 @@ pub trait TapyrusApi {
     fn combineblocksigs(&self, block: &Block, signatures: &Vec<Signature>) -> Result<Block, Error>;
     /// Broadcast new block include enough proof.
     fn submitblock(&self, block: &Block) -> Result<(), Error>;
+    /// Get block chain info
+    fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error>;
 }
 
 impl Rpc {
@@ -55,6 +67,13 @@ impl Rpc {
         }
 
         Ok(resp?)
+    }
+
+    pub fn test_connection(&self) -> Result<(), Error>{
+        match self.getblockchaininfo() {
+            Ok(r) => Ok(()),
+            Err(e) => Err(e)
+        }
     }
 }
 
@@ -111,6 +130,14 @@ impl TapyrusApi for Rpc {
             Ok(jsonrpc::Response { result: None, .. }) => Ok(()),
             Ok(_) => Err(Error::InvalidRequest),
             Err(e) => Err(e),
+        }
+    }
+
+    fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error> {
+        let resp = self.call("getblockchaininfo", &[]);
+        match resp?.result::<GetBlockchainInfoResult>() {
+            Ok(r) =>  Ok(r),
+            Err(e) => Err(Error::JsonRpc(e)),
         }
     }
 }
@@ -197,6 +224,17 @@ pub mod tests {
             let _block = self.result()?;
             Ok(())
         }
+
+        fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error> {
+            Ok(GetBlockchainInfoResult {
+                chain: "regtest".to_string(),
+                blocks: 0,
+                headers: 0,
+                bestblockhash: "xxx".to_string(),
+                mediantime: 0,
+                initialblockdownload: false,
+            })
+        }
     }
 
     /// TODO: use rpc mock. Now this test needs tapyrus node process.
@@ -256,5 +294,14 @@ pub mod tests {
         // when invalid block.(cannot connect on the tip)
         let block = get_block(0);
         assert!(rpc.submitblock(&block).is_err());
+    }
+
+    #[test]
+    #[ignore]
+    fn test_getblockchaininfo() {
+        let rpc = get_rpc_client();
+        let result = rpc.getblockchaininfo();
+        println!("{:?}", result);
+        assert!(result.is_ok());
     }
 }
