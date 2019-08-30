@@ -14,7 +14,7 @@ use bitcoin::{PrivateKey, PublicKey};
 use tapyrus_signer::command_args::{CommandArgs, RpcConfig, RedisConfig};
 use tapyrus_signer::net::{RedisManager, ConnectionManager};
 use tapyrus_signer::signer_node::{NodeParameters, SignerNode};
-use tapyrus_signer::rpc::Rpc;
+use tapyrus_signer::rpc::{Rpc, TapyrusApi, GetBlockchainInfoResult};
 
 /// This command is for launch tapyrus-signer-node.
 /// command example:
@@ -27,9 +27,10 @@ fn main() {
     let is_quiet = general_config.log_quiet();
     let round_duration = general_config.round_duration();
     let is_master = general_config.master();
+    let skip_waiting_ibd = general_config.skip_waiting_ibd();
 
     if !is_quiet {
-        let env_value = format!("tapyrus_signer={}", log_level);
+        let env_value = format!("tapyrus_signer={},node={}", log_level, log_level);
         std::env::set_var("RUST_LOG", env_value);
         env_logger::init();
     }
@@ -37,14 +38,17 @@ fn main() {
     let signer_config = configs.signer_config();
     validate_options(&signer_config.public_keys(), &signer_config.private_key(), &signer_config.threshold()).unwrap();
 
+    let con = connect_signer_network(configs.redis_config());
     let rpc = connect_rpc(configs.rpc_config());
+
+    if !skip_waiting_ibd {
+        wait_for_ibd_finish(&rpc);
+    }
 
     let params = NodeParameters::new(signer_config.public_keys(),
                                      signer_config.private_key(),
                                      signer_config.threshold(),
                                      rpc, is_master, round_duration);
-    let con = connect_signer_network(configs.redis_config());
-
     let node = &mut SignerNode::new(con, params);
     node.start();
 }
@@ -82,6 +86,28 @@ fn connect_signer_network(rc: RedisConfig) -> impl ConnectionManager {
     let redis_manager= RedisManager::new(rc.host().to_string(), rc.port().to_string());
     redis_manager.test_connection().expect("Failed to connect redis. Please confirm redis connection info");
     redis_manager
+}
+
+fn wait_for_ibd_finish(rpc: &Rpc) {
+    log::info!("Waiting finish Initial Block Download ...");
+    log::info!("If you start right away, you can set `--skip-waiting-ibd` option. ");
+
+    let interval = std::time::Duration::from_secs(10);
+
+    loop {
+        match rpc.getblockchaininfo().expect("RPC connection failed") {
+            GetBlockchainInfoResult { initialblockdownload: false, .. } => {
+                break;
+            }
+            GetBlockchainInfoResult {
+                initialblockdownload: true,
+                blocks: height,
+                bestblockhash: hash,  ..} => {
+                log::info!("current block height: {}, current best hash: {}", height, hash);
+            }
+        }
+        std::thread::sleep(interval);
+    }
 }
 
 #[test]

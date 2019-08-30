@@ -21,12 +21,12 @@ struct CombineBlockSigsResult {
 
 #[derive(Debug, Deserialize)]
 pub struct GetBlockchainInfoResult {
-    chain: String,
-    blocks: u64,
-    headers: u64,
-    bestblockhash: String,
-    mediantime: u64,
-    initialblockdownload: bool,
+    pub chain: String,
+    pub blocks: u64,
+    pub headers: u64,
+    pub bestblockhash: String,
+    pub mediantime: u64,
+    pub initialblockdownload: bool,
 }
 
 pub struct Rpc {
