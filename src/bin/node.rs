@@ -11,8 +11,8 @@ extern crate tapyrus_signer;
 
 use bitcoin::{PrivateKey, PublicKey};
 
-use tapyrus_signer::command_args::{CommandArgs, RpcConfig, RpcCommandArgs};
-use tapyrus_signer::net::RedisManager;
+use tapyrus_signer::command_args::{CommandArgs, RpcConfig, RedisConfig};
+use tapyrus_signer::net::{RedisManager, ConnectionManager};
 use tapyrus_signer::signer_node::{NodeParameters, SignerNode};
 use tapyrus_signer::rpc::Rpc;
 
@@ -43,10 +43,7 @@ fn main() {
                                      signer_config.private_key(),
                                      signer_config.threshold(),
                                      rpc, is_master, round_duration);
-    let con = {
-        let rc = configs.redis_config();
-        RedisManager::new(rc.host().to_string(), rc.port().to_string())
-    };
+    let con = connect_signer_network(configs.redis_config());
 
     let node = &mut SignerNode::new(con, params);
     node.start();
@@ -79,6 +76,12 @@ fn connect_rpc(rpc_config: RpcConfig) -> Rpc {
     rpc.test_connection()
         .expect(&format!("RPC connect failed. Please confirm RPC connection info. url: {}, user: '{}' ,", url, user.unwrap_or("".to_string())));
     rpc
+}
+
+fn connect_signer_network(rc: RedisConfig) -> impl ConnectionManager {
+    let redis_manager= RedisManager::new(rc.host().to_string(), rc.port().to_string());
+    redis_manager.test_connection().expect("Failed to connect redis. Please confirm redis connection info");
+    redis_manager
 }
 
 #[test]
@@ -120,4 +123,15 @@ fn test_connect_rpc() {
         None);
 
     connect_rpc(config);
+}
+
+#[test]
+#[should_panic(expected = "Failed to connect redis. Please confirm redis connection info")]
+fn test_connect_signer_network() {
+    // face redis config
+    let config = RedisConfig::new(
+        Some("127.0.0.1"),
+        Some("9999"));
+
+    connect_signer_network(config);
 }

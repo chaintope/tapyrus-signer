@@ -198,6 +198,18 @@ pub struct RedisConfig<'a> {
 }
 
 impl<'a> RedisConfig<'a> {
+    pub fn new(
+        host: Option<&'a str>,
+        port: Option<&'a str>,
+    ) -> RedisConfig<'a> {
+        let arg = RedisCommandArgs { host, port };
+
+        RedisConfig {
+            command_args: arg,
+            toml_config: None
+        }
+    }
+
     pub fn host(&'a self) -> &'a str {
         let toml_value = self.toml_config
             .and_then(|config| config.redis_host.as_ref())

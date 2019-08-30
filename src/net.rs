@@ -15,6 +15,7 @@ use crate::serialize::ByteBufVisitor;
 use crate::blockdata::Block;
 use std::thread::JoinHandle;
 use std::sync::mpsc::{Sender, Receiver, channel};
+use crate::errors;
 
 
 /// Signerの識別子。公開鍵を識別子にする。
@@ -120,7 +121,7 @@ impl<E: std::error::Error> std::error::Error for ConnectionManagerError<E> {
         &self.description
     }
 
-    fn cause(&self) -> Option<&std::error::Error> {
+    fn cause(&self) -> Option<&dyn std::error::Error> {
         match self.cause {
             Some(ref e) => Some(e),
             None => None,
@@ -152,6 +153,13 @@ impl RedisManager {
             client,
             error_sender: s,
             error_receiver: Some(r),
+        }
+    }
+
+    pub fn test_connection(&self) -> Result<(), errors::Error> {
+        match self.client.get_connection() {
+            Ok(_) => Ok(()),
+            Err(e) => Err(errors::Error::from(e))
         }
     }
 

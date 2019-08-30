@@ -19,6 +19,7 @@ pub enum Error {
     InvalidTomlFormat(toml::de::Error),
     ConfigFileIOError(std::io::Error),
     InvalidPublicKeyFormat(String),
+    RedisError(RedisError),
 }
 
 
@@ -57,4 +58,8 @@ impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Error {
         Error::ConfigFileIOError(e)
     }
+}
+
+impl From<RedisError> for Error {
+    fn from(e: RedisError) -> Error { Error::RedisError(e) }
 }
