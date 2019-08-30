@@ -71,7 +71,7 @@ impl Rpc {
 
     pub fn test_connection(&self) -> Result<(), Error>{
         match self.getblockchaininfo() {
-            Ok(r) => Ok(()),
+            Ok(_) => Ok(()),
             Err(e) => Err(e)
         }
     }

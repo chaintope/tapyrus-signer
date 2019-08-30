@@ -11,9 +11,10 @@ extern crate tapyrus_signer;
 
 use bitcoin::{PrivateKey, PublicKey};
 
-use tapyrus_signer::command_args::CommandArgs;
+use tapyrus_signer::command_args::{CommandArgs, RpcConfig, RpcCommandArgs};
 use tapyrus_signer::net::RedisManager;
 use tapyrus_signer::signer_node::{NodeParameters, SignerNode};
+use tapyrus_signer::rpc::Rpc;
 
 /// This command is for launch tapyrus-signer-node.
 /// command example:
@@ -35,12 +36,9 @@ fn main() {
 
     let signer_config = configs.signer_config();
     validate_options(&signer_config.public_keys(), &signer_config.private_key(), &signer_config.threshold()).unwrap();
-    let rpc = {
-        let rpc_config = configs.rpc_config();
-        tapyrus_signer::rpc::Rpc::new(format!("http://{}:{}", rpc_config.host(), rpc_config.port()),
-                                      rpc_config.user_name().map(str::to_string),
-                                      rpc_config.password().map(str::to_string))
-    };
+
+    let rpc = connect_rpc(configs.rpc_config());
+
     let params = NodeParameters::new(signer_config.public_keys(),
                                      signer_config.private_key(),
                                      signer_config.threshold(),
@@ -73,6 +71,16 @@ fn validate_options(public_keys: &Vec<PublicKey>, private_key: &PrivateKey, thre
     Ok(())
 }
 
+fn connect_rpc(rpc_config: RpcConfig) -> Rpc {
+    let url = format!("http://{}:{}", rpc_config.host(), rpc_config.port());
+    let user = rpc_config.user_name().map(str::to_string);
+    let pass = rpc_config.password().map(str::to_string);
+    let rpc = tapyrus_signer::rpc::Rpc::new(url.clone(), user.clone(), pass);
+    rpc.test_connection()
+        .expect(&format!("RPC connect failed. Please confirm RPC connection info. url: {}, user: '{}' ,", url, user.unwrap_or("".to_string())));
+    rpc
+}
+
 #[test]
 #[should_panic(expected = "Not enough number of public keys. publicKeys.len:")]
 fn test_validate_options_less_threshold() {
@@ -100,4 +108,16 @@ fn test_validate_options_no_pair() {
     let private_key = PrivateKey::from_wif("cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA").unwrap();
 
     validate_options(&pubkey_list, &private_key, &threshold).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "RPC connect failed. Please confirm RPC connection info. url: http://127.0.0.1:9999, user: '' ")]
+fn test_connect_rpc() {
+    let config = RpcConfig::new(
+        Some("127.0.0.1"),
+        Some("9999"),
+        None,
+        None);
+
+    connect_rpc(config);
 }

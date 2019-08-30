@@ -148,6 +148,20 @@ pub struct RpcConfig<'a> {
 }
 
 impl<'a> RpcConfig<'a> {
+    pub fn new(
+        host: Option<&'a str>,
+        port: Option<&'a str>,
+        username: Option<&'a str>,
+        password: Option<&'a str>
+    ) -> RpcConfig<'a> {
+        let arg = RpcCommandArgs { host, port, username, password };
+
+        RpcConfig {
+            command_args: arg,
+            toml_config: None
+        }
+    }
+
     pub fn host(&'a self) -> &'a str {
         let toml_value = self.toml_config
             .and_then(|config| config.rpc_endpoint_host.as_ref())
