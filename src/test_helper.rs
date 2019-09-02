@@ -8,6 +8,16 @@ use crate::blockdata::Block;
 use crate::net;
 use crate::net::{Message, SignerID, MessageType};
 
+pub fn enable_log(log_level: Option<log::Level>) {
+    if let Some(level) = log_level {
+        std::env::set_var("RUST_LOG", level.to_string());
+    } else {
+        std::env::set_var("RUST_LOG", "TRACE");
+    }
+
+    let _ = env_logger::builder().is_test(true).try_init();
+}
+
 pub fn create_message() -> Message {
     let signer_id = SignerID::new(TestKeys::new().pubkeys()[0]);
     let sig = secp256k1::Signature::from_der(&base64::decode("MEUCIQDRTksobD+H7H46+EXJhsZ7CWSIZcqohndyAFYkEe6YvgIgWwzqhQr/IHrX+RU+CliF35tFzasfaXINrhWfdqErOok=").unwrap()).unwrap();

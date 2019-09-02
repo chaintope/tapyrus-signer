@@ -4,6 +4,7 @@
 
 extern crate bitcoin;
 extern crate secp256k1;
+#[macro_use]
 extern crate log;
 extern crate hex;
 extern crate byteorder;

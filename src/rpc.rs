@@ -60,7 +60,11 @@ impl Rpc {
 
         trace!("JSON-RPC request: {}", serde_json::to_string(&req).unwrap());
 
-        let resp = self.client.send_request(&req).map_err(Error::from);
+        let resp = self.client.send_request(&req).map_err(|e| {
+            error!("Error occurs with Tapyrus Core RPC: {:?}", e);
+            Error::from(e)
+        });
+
         if log_enabled!(Trace) && resp.is_ok() {
             let resp = resp.as_ref().unwrap();
             trace!("JSON-RPC response: {}", serde_json::to_string(resp).unwrap());
