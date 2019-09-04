@@ -12,7 +12,7 @@ pub enum Error {
     InvalidArgs(String),
     BitcoinConsensusEncodeError(bitcoin::consensus::encode::Error),
     /// Errors cause sender side matter, like parameter was wrong.
-    InvalidRequest,
+    InvalidRequest(jsonrpc::error::RpcError),
     DuplicatedMessage,
     InvalidSignature(secp256k1::Error),
     TimerAlreadyStarted,
