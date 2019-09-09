@@ -234,9 +234,10 @@ impl<'a> GeneralConfig<'a> {
 /// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e --privatekey=cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA -t 2 --master
 impl<'a> CommandArgs<'a> {
     /// constructor.
-    /// Basically, search config file as file name `signer_config.toml` in current dir.
-    /// If not exists config file then, require mandatory params in command args.
-    /// When raise error if mandatory params missed or toml config is invalid format if exists it.
+    /// Basically, search config file as file name signer_config.toml in current dir.
+    /// These options can be set by both of from file and command args.
+    /// If an option is set by both, then take command args.
+    /// If there is not a config file, mandatory params should be passed as command line arguments.
     pub fn new() -> Result<CommandArgs<'static>, crate::errors::Error> {
         CommandArgs::load(get_options().get_matches())
     }
