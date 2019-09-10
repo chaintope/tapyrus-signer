@@ -10,6 +10,9 @@ pub enum Error {
     DuplicatedMessage,
     InvalidSignature(secp256k1::Error),
     TimerAlreadyStarted,
+    InvalidTomlFormat(toml::de::Error),
+    ConfigFileIOError(std::io::Error),
+    InvalidPublicKeyFormat(String),
 }
 
 
@@ -19,8 +22,7 @@ impl std::fmt::Display for Error {
     }
 }
 
-impl std::error::Error for Error {
-}
+impl std::error::Error for Error {}
 
 impl From<jsonrpc::error::Error> for Error {
     fn from(e: jsonrpc::error::Error) -> Error {
@@ -37,5 +39,16 @@ impl From<serde_json::error::Error> for Error {
 impl From<secp256k1::Error> for Error {
     fn from(e: secp256k1::Error) -> Error {
         Error::InvalidSignature(e)
+    }
+}
+
+impl From<toml::de::Error> for Error {
+    fn from(e: toml::de::Error) -> Error {
+        Error::InvalidTomlFormat(e)
+    }
+}
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Error {
+        Error::ConfigFileIOError(e)
     }
 }
