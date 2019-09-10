@@ -12,7 +12,7 @@ use redis::ControlFlow;
 
 use crate::blockdata::Block;
 use crate::net::{ConnectionManager, Message, MessageType, Signature, SignerID};
-use crate::rpc::TapyrusApi;
+use crate::rpc::{TapyrusApi, GetBlockchainInfoResult};
 use crate::sign::sign;
 use crate::timer::RoundTimeOutObserver;
 
@@ -68,6 +68,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     }
 
     pub fn start(&mut self) {
+        if !self.params.skip_waiting_ibd {
+            self.wait_for_ibd_finish();
+        }
+
         let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
         let closure = move |message: Message| {
             match sender.send(message) {
@@ -145,6 +149,29 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             }
             // wait loop
             std::thread::sleep(Duration::from_millis(300));
+        }
+    }
+
+    /// Signer Node waits for connected Tapyrus Core Node complete IBD(Initial Block Download).
+    fn wait_for_ibd_finish(&self) {
+        log::info!("Waiting finish Initial Block Download ...");
+        log::info!("If you start right away, you can set `--skip-waiting-ibd` option. ");
+
+        let interval = std::time::Duration::from_secs(10);
+
+        loop {
+            match self.params.rpc.getblockchaininfo().expect("RPC connection failed") {
+                GetBlockchainInfoResult { initialblockdownload: false, .. } => {
+                    break;
+                }
+                GetBlockchainInfoResult {
+                    initialblockdownload: true,
+                    blocks: height,
+                    bestblockhash: hash,  ..} => {
+                    log::info!("Waiting for finish Initial Block Download. Current block height: {}, current best hash: {}", height, hash);
+                }
+            }
+            std::thread::sleep(interval);
         }
     }
 
@@ -301,10 +328,18 @@ pub struct NodeParameters<T: TapyrusApi> {
     pub master_flag: bool,
     pub self_node_index: usize,
     pub round_duration: u64,
+    pub skip_waiting_ibd: bool,
 }
 
 impl<T: TapyrusApi> NodeParameters<T> {
-    pub fn new(pubkey_list: Vec<PublicKey>, private_key: PrivateKey, threshold: u8, rpc: T, master_flag: bool, round_duration: u64) -> NodeParameters<T> {
+    pub fn new(pubkey_list: Vec<PublicKey>,
+               private_key: PrivateKey,
+               threshold: u8,
+               rpc: T,
+               master_flag: bool,
+               round_duration: u64,
+               skip_waiting_ibd: bool
+    ) -> NodeParameters<T> {
         let secp = secp256k1::Secp256k1::new();
         let self_pubkey = private_key.public_key(&secp);
         let address = Address::p2pkh(&self_pubkey, private_key.network);
@@ -324,6 +359,7 @@ impl<T: TapyrusApi> NodeParameters<T> {
             master_flag,
             self_node_index,
             round_duration,
+            skip_waiting_ibd,
         }
     }
 }
@@ -405,7 +441,7 @@ mod tests {
         let threshold = 3;
         let private_key = testkeys.key[0];
 
-        let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, true, 0);
+        let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, true, 0, true);
         params.round_duration = 0;
         let con = TestConnectionManager::new(publish_count, spy);
         let broadcaster = con.sender.clone();
@@ -426,7 +462,7 @@ mod tests {
         let broadcaster = con.sender.clone();
 
         let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
-        let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, false, 0);
+        let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, false, 0, true);
         params.round_duration = 0;
         let arc_node = Arc::new(Mutex::new(SignerNode::new(con, params)));
         let node = arc_node.clone();
@@ -471,7 +507,7 @@ mod tests {
             ];
         let threshold = 3;
         let private_key = testkeys.key[0];
-        let params = NodeParameters::new(pubkey_list.clone(), private_key, threshold, MockRpc { return_block: safety_error("Not set block.".to_string()) }, true, 0);
+        let params = NodeParameters::new(pubkey_list.clone(), private_key, threshold, MockRpc { return_block: safety_error("Not set block.".to_string()) }, true, 0, true);
 
         assert_ne!(params.pubkey_list[0], pubkey_list[0]);
         assert_eq!(params.pubkey_list[1], pubkey_list[4]);
