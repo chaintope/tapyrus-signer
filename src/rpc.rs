@@ -19,7 +19,7 @@ struct CombineBlockSigsResult {
     complete: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct GetBlockchainInfoResult {
     pub chain: String,
     pub blocks: u64,

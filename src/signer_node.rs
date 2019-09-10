@@ -69,7 +69,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     pub fn start(&mut self) {
         if !self.params.skip_waiting_ibd {
-            self.wait_for_ibd_finish();
+            self.wait_for_ibd_finish(std::time::Duration::from_secs(10));
         }
 
         let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
@@ -153,11 +153,9 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     }
 
     /// Signer Node waits for connected Tapyrus Core Node complete IBD(Initial Block Download).
-    fn wait_for_ibd_finish(&self) {
+    fn wait_for_ibd_finish(&self, interval: Duration) {
         log::info!("Waiting finish Initial Block Download ...");
         log::info!("If you start right away, you can set `--skip-waiting-ibd` option. ");
-
-        let interval = std::time::Duration::from_secs(10);
 
         loop {
             match self.params.rpc.getblockchaininfo().expect("RPC connection failed") {
@@ -380,12 +378,19 @@ mod tests {
     use crate::sign::sign;
     use crate::signer_node::{NodeParameters, NodeState, SignerNode};
     use crate::test_helper::{get_block, TestKeys};
+    use crate::rpc::TapyrusApi;
 
     type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
+
+    /// ConnectionManager for testing.
     pub struct TestConnectionManager {
+        /// This is count of messages. TestConnectionManager waits for receiving the number of message.
         pub receive_count: u32,
+        /// sender of message
         pub sender: Sender<Message>,
+        /// receiver of message
         pub receiver: Receiver<Message>,
+        /// A function which is called when the node try to broadcast messages.
         pub broadcast_assert: SpyMethod,
     }
 
@@ -428,14 +433,18 @@ mod tests {
         }
     }
 
-    fn create_node(current_state: NodeState, rpc: MockRpc) -> SignerNode<MockRpc, TestConnectionManager> {
+    fn create_node<T: TapyrusApi>(current_state: NodeState, rpc: T) -> SignerNode<T, TestConnectionManager> {
         let closure: SpyMethod = Box::new(move |_message: Arc<Message>| {});
-        let(node, _) = create_node_with_closure_publishcount(current_state, rpc, closure, 1);
+        let(node, _) = create_node_with_closure_and_publish_count(current_state, rpc, closure, 1);
         node
     }
 
-    fn create_node_with_closure_publishcount(current_state: NodeState, rpc: MockRpc, spy: SpyMethod, publish_count: u32)
-                    -> (SignerNode<MockRpc, TestConnectionManager>, Sender<Message>) {
+    fn create_node_with_closure_and_publish_count<T: TapyrusApi>(
+        current_state: NodeState,
+        rpc: T,
+        spy: SpyMethod,
+        publish_count: u32
+    ) -> (SignerNode<T, TestConnectionManager>, Sender<Message>) {
         let testkeys = TestKeys::new();
         let pubkey_list = testkeys.pubkeys();
         let threshold = 3;
@@ -450,6 +459,7 @@ mod tests {
         (node, broadcaster)
     }
 
+    /// Run node on other thread.
     pub fn setup_node(spy: SpyMethod, arc_block: SafetyBlock)
                       -> (Arc<Mutex<SignerNode<MockRpc, TestConnectionManager>>>, Sender<u32>, Sender<Message>) {
         let testkeys = TestKeys::new();
@@ -581,7 +591,7 @@ mod tests {
         let initial_state = NodeState::Member;
         let arc_block = safety(get_block(0));
         let rpc = MockRpc { return_block: arc_block.clone() };
-        let (mut node, _broadcaster) = create_node_with_closure_publishcount(initial_state, rpc, closure, 0);
+        let (mut node, _broadcaster) = create_node_with_closure_and_publish_count(initial_state, rpc, closure, 0);
 
         let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
         node.stop_handler(stop_handler);
@@ -770,6 +780,58 @@ mod tests {
         match next_state {
             NodeState::Member => assert!(true),
             n => panic!("Should be Member, but state:{:?}", n),
+        }
+    }
+
+    mod test_for_waiting_ibd_finish {
+        use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
+        use bitcoin::Address;
+        use crate::blockdata::Block;
+        use crate::errors::Error;
+        use std::cell::Cell;
+        use crate::signer_node::NodeState;
+        use crate::signer_node::tests::create_node;
+        use secp256k1::Signature;
+
+        struct MockRpc {
+            pub results: [GetBlockchainInfoResult; 2],
+            pub call_count: Cell<usize>
+        }
+
+        impl TapyrusApi for MockRpc {
+            fn getnewblock(&self, address: &Address) -> Result<Block, Error> { unimplemented!() }
+            fn testproposedblock(&self, block: &Block) -> Result<(), Error> { unimplemented!() }
+            fn combineblocksigs(&self, block: &Block, signatures: &Vec<Signature>) -> Result<Block, Error> { unimplemented!() }
+            fn submitblock(&self, block: &Block) -> Result<(), Error> { unimplemented!() }
+
+            fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error> {
+                let result = self.results[self.call_count.get()].clone();
+
+                self.call_count.set(self.call_count.get() + 1);
+
+                Ok(result)
+            }
+        }
+
+        #[test]
+        fn test_wait_for_ibd_finish() {
+            let json = serde_json::from_str("{\"chain\": \"test\", \"blocks\": 26826, \"headers\": 26826, \"bestblockhash\": \"7303687fb5d80781bd9fece466e76d97a94613d409d127030ff7f34081a899f7\", \"mediantime\": 1568103315, \"verificationprogress\": 1, \"initialblockdownload\": false, \"size_on_disk\": 11669126,  \"pruned\": false,  \"bip9_softforks\": {    \"csv\": {      \"status\": \"failed\",      \"startTime\": 1456790400, \"timeout\": 1493596800, \"since\": 2016 }, \"segwit\": { \"status\": \"failed\", \"startTime\": 1462060800, \"timeout\": 1493596800, \"since\": 2016 }},  \"warnings\": \"\"}").unwrap();
+            let mut result1 = serde_json::from_value::<GetBlockchainInfoResult>(json).unwrap();
+            result1.initialblockdownload = true;
+            let mut result2 = result1.clone();
+            result2.initialblockdownload = false;
+
+            let rpc = MockRpc {
+                results: [result1, result2],
+                call_count: Cell::new(0)
+            };
+
+            let node = create_node(NodeState::Member, rpc);
+
+            node.wait_for_ibd_finish(std::time::Duration::from_millis(1));
+
+            let rpc = node.params.rpc.clone();
+            assert_eq!(rpc.call_count.get(), 2);
         }
     }
 }
