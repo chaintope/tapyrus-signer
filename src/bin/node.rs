@@ -11,7 +11,7 @@ extern crate tapyrus_signer;
 
 use bitcoin::{PrivateKey, PublicKey};
 
-use tapyrus_signer::command_args::{CommandArgs, RpcConfig, RedisConfig};
+use tapyrus_signer::command_args::{CommandArgs, RpcConfig, RedisConfig, RpcCommandArgs, RedisCommandArgs};
 use tapyrus_signer::net::{RedisManager, ConnectionManager};
 use tapyrus_signer::signer_node::{NodeParameters, SignerNode};
 use tapyrus_signer::rpc::Rpc;
@@ -120,11 +120,16 @@ fn test_validate_options_no_pair() {
 #[test]
 #[should_panic(expected = "RPC connect failed. Please confirm RPC connection info. url: http://127.0.0.1:9999, user: '' ")]
 fn test_connect_rpc() {
-    let config = RpcConfig::new(
-        Some("127.0.0.1"),
-        Some("9999"),
-        None,
-        None);
+    let config = RpcConfig {
+        command_args: RpcCommandArgs {
+            host: Some("127.0.0.1"),
+            port: Some("9999"),
+            username: None,
+            password: None
+        },
+        toml_config: None
+    };
+
 
     connect_rpc(config);
 }
@@ -133,9 +138,13 @@ fn test_connect_rpc() {
 #[should_panic(expected = "Failed to connect redis. Please confirm redis connection info")]
 fn test_connect_signer_network() {
     // face redis config
-    let config = RedisConfig::new(
-        Some("127.0.0.1"),
-        Some("9999"));
+    let config = RedisConfig {
+        command_args: RedisCommandArgs {
+            host: Some("127.0.0.1"),
+            port: Some("9999")
+        },
+        toml_config: None
+    };
 
     connect_signer_network(config);
 }

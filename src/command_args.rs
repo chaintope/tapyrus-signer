@@ -51,7 +51,7 @@ struct SignerToml {
 }
 
 #[derive(Debug, Deserialize)]
-struct RpcToml {
+pub struct RpcToml {
     rpc_endpoint_host: Option<String>,
     rpc_endpoint_port: Option<u32>,
     rpc_endpoint_user: Option<String>,
@@ -59,13 +59,13 @@ struct RpcToml {
 }
 
 #[derive(Debug, Deserialize)]
-struct RedisToml {
+pub struct RedisToml {
     redis_host: Option<String>,
     redis_port: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
-struct GeneralToml {
+pub struct GeneralToml {
     round_duration: Option<u64>,
     log_level: Option<String>,
     log_quiet: Option<bool>,
@@ -139,32 +139,18 @@ impl<'a> SignerConfig<'a> {
 }
 
 pub struct RpcCommandArgs<'a> {
-    host: Option<&'a str>,
-    port: Option<&'a str>,
-    username: Option<&'a str>,
-    password: Option<&'a str>,
+    pub host: Option<&'a str>,
+    pub port: Option<&'a str>,
+    pub username: Option<&'a str>,
+    pub password: Option<&'a str>,
 }
 
 pub struct RpcConfig<'a> {
-    command_args: RpcCommandArgs<'a>,
-    toml_config: Option<&'a RpcToml>,
+    pub command_args: RpcCommandArgs<'a>,
+    pub toml_config: Option<&'a RpcToml>,
 }
 
 impl<'a> RpcConfig<'a> {
-    pub fn new(
-        host: Option<&'a str>,
-        port: Option<&'a str>,
-        username: Option<&'a str>,
-        password: Option<&'a str>
-    ) -> RpcConfig<'a> {
-        let arg = RpcCommandArgs { host, port, username, password };
-
-        RpcConfig {
-            command_args: arg,
-            toml_config: None
-        }
-    }
-
     pub fn host(&'a self) -> &'a str {
         let toml_value = self.toml_config
             .and_then(|config| config.rpc_endpoint_host.as_ref())
@@ -191,28 +177,16 @@ impl<'a> RpcConfig<'a> {
 }
 
 pub struct RedisCommandArgs<'a> {
-    host: Option<&'a str>,
-    port: Option<&'a str>,
+    pub host: Option<&'a str>,
+    pub port: Option<&'a str>,
 }
 
 pub struct RedisConfig<'a> {
-    command_args: RedisCommandArgs<'a>,
-    toml_config: Option<&'a RedisToml>,
+    pub command_args: RedisCommandArgs<'a>,
+    pub toml_config: Option<&'a RedisToml>,
 }
 
 impl<'a> RedisConfig<'a> {
-    pub fn new(
-        host: Option<&'a str>,
-        port: Option<&'a str>,
-    ) -> RedisConfig<'a> {
-        let arg = RedisCommandArgs { host, port };
-
-        RedisConfig {
-            command_args: arg,
-            toml_config: None
-        }
-    }
-
     pub fn host(&'a self) -> &'a str {
         let toml_value = self.toml_config
             .and_then(|config| config.redis_host.as_ref())
