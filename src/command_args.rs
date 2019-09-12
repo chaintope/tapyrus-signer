@@ -396,7 +396,7 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
             .help("Round interval times(sec)."))
         .arg(Arg::with_name(OPTION_NAME_SKIP_WAITING_IBD)
             .long("skip-waiting-ibd")
-            .help("This flag make signer node don't waiting connected Tapyrus full node finishes Initial Block Download when signer node started."))
+            .help("This flag make signer node don't waiting connected Tapyrus full node finishes Initial Block Download when signer node started. When block creation stopped much time, The status of Tapyrus full node changes to progressing Initial Block Download. In this case, block creation is never resume, because signer node waits the status is back to non-IBD. So you can use this flag to start signer node with ignore tapyrus full node status."))
 }
 
 #[test]
