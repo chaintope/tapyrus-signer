@@ -7,8 +7,8 @@ edition = "2018"
 
 [dependencies]
 http = "0.1.17"
-bitcoin = "0.17.0"
-secp256k1 = "0.12.2"
+bitcoin = "0.20.0"
+secp256k1 = "0.15.3"
 log = "0.4.6"
 env_logger = "0.6.1"
 serde = { version = "1.0", features = ["derive"] }
@@ -21,3 +21,5 @@ base64 = "0.10.1"
 redis = "0.10.0"
 clap = "2.33.0"
 toml = "0.5"
+multi-party-schnorr = { git = "https://github.com/KZen-networks/multi-party-schnorr", tag = "v0.3.0" }
+curv = { git = "https://github.com/KZen-networks/curv" , tag = "v0.2.0", features =  ["ec_secp256k1"]}
