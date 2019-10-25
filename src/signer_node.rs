@@ -1140,13 +1140,7 @@ mod tests {
             fn testproposedblock(&self, _block: &Block) -> Result<bool, Error> {
                 unimplemented!()
             }
-            fn combineblocksigs(
-                &self,
-                _block: &Block,
-                _signatures: &Vec<Signature>,
-            ) -> Result<Block, Error> {
-                unimplemented!()
-            }
+
             fn submitblock(&self, _block: &Block) -> Result<(), Error> {
                 unimplemented!()
             }
