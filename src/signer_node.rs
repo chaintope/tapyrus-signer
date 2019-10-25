@@ -86,7 +86,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         };
 
         // redisとの通信を行うthreadを開始
-        let _handler = self.connection_manager.start(closure);
+        let id = self.params.signer_id;
+        let _handler = self.connection_manager.start(closure, id);
         self.current_state = if self.params.master_flag {
             self.start_new_round()
         } else {
@@ -195,6 +196,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         self.connection_manager.broadcast_message(Message {
             message_type: MessageType::Candidateblock(block.clone()),
             sender_id: self.params.signer_id,
+            receiver_id: None,
         });
 
         let sig = sign(&self.params.private_key, &block.hash().unwrap());
@@ -230,6 +232,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         self.connection_manager.broadcast_message(Message {
                             message_type: MessageType::Signature(crate::net::Signature(sig)),
                             sender_id: self.params.signer_id,
+                            receiver_id: None,
                         });
                         // TODO: Errorを処理する必要あるかな？
                         self.round_timer.restart().unwrap();
@@ -291,6 +294,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                             let message = Message {
                                 message_type: MessageType::Completedblock(completed_block),
                                 sender_id: self.params.signer_id.clone(),
+                                receiver_id: None,
                             };
                             self.connection_manager.broadcast_message(message);
 
@@ -446,9 +450,15 @@ mod tests {
             (self.broadcast_assert)(rc_message.clone());
         }
 
+        fn send_message(&self, message: Message) {
+            let rc_message = Arc::new(message);
+            (self.broadcast_assert)(rc_message.clone());
+        }
+
         fn start(
             &self,
             mut message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
+            _id: SignerID,
         ) -> JoinHandle<()> {
             for _count in 0..self.receive_count {
                 match self.receiver.recv() {

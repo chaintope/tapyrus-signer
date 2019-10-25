@@ -67,6 +67,7 @@ pub enum MessageType {
 pub struct Message {
     pub message_type: MessageType,
     pub sender_id: SignerID,
+    pub receiver_id: Option<SignerID>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -98,9 +99,11 @@ impl<'de> Deserialize<'de> for Signature {
 pub trait ConnectionManager {
     type ERROR: std::error::Error;
     fn broadcast_message(&self, message: Message);
+    fn send_message(&self, message: Message);
     fn start(
         &self,
         message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
+        id: SignerID,
     ) -> JoinHandle<()>;
     fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<Self::ERROR>>>;
 }
@@ -167,24 +170,26 @@ impl RedisManager {
         }
     }
 
-    fn subscribe<F>(&self, message_processor: F) -> thread::JoinHandle<()>
+    fn subscribe<F>(&self, message_processor: F, id: SignerID) -> thread::JoinHandle<()>
     where
         F: FnMut(Message) -> ControlFlow<()> + Send + 'static,
     {
         let client = Arc::clone(&self.client);
         let error_sender = self.error_sender.clone();
+        let channel_name = format!("tapyrus-signer-{}", id.pubkey.key);
         thread::Builder::new()
             .name("RedisManagerThread".to_string())
             .spawn(move || {
                 fn inner_subscribe<F2>(
                     client: Arc<Client>,
                     mut message_processor: F2,
+                    channel_name: &str,
                 ) -> Result<(), ConnectionManagerError<RedisError>>
                 where
                     F2: FnMut(Message) -> ControlFlow<()> + Send + 'static,
                 {
                     let mut conn = client.get_connection()?;
-                    conn.subscribe(&["tapyrus-signer"], |msg| {
+                    conn.subscribe(&["tapyrus-signer", channel_name], |msg| {
                         let _ch = msg.get_channel_name();
                         let payload: String = msg.get_payload().unwrap();
                         log::trace!("receive message. payload: {}", payload);
@@ -194,7 +199,7 @@ impl RedisManager {
                     })?;
                     Ok(())
                 }
-                match inner_subscribe(client, message_processor) {
+                match inner_subscribe(client, message_processor, &channel_name) {
                     Ok(()) => {}
                     Err(e) => error_sender
                         .send(e)
@@ -203,11 +208,8 @@ impl RedisManager {
             })
             .expect("Failed create RedisManagerThread.")
     }
-}
 
-impl ConnectionManager for RedisManager {
-    type ERROR = RedisError;
-    fn broadcast_message(&self, message: Message) {
+    fn process_message(&self, message: Message, to: String) {
         let client = Arc::clone(&self.client);
         let message_in_thread = serde_json::to_string(&message).unwrap();
         thread::Builder::new()
@@ -218,18 +220,37 @@ impl ConnectionManager for RedisManager {
 
                 log::trace!("Publish {} to tapyrus-signer channel.", message_in_thread);
 
-                let _: () = conn.publish("tapyrus-signer", message_in_thread).unwrap();
+                let _: () = conn.publish(to, message_in_thread).unwrap();
             })
             .unwrap()
             .join()
             .expect("Can't connect to Redis Server.");
     }
+}
+
+impl ConnectionManager for RedisManager {
+    type ERROR = RedisError;
+
+    fn broadcast_message(&self, message: Message) {
+        assert!(message.receiver_id.is_none());
+        log::debug!("broadcast_message {:?} ", message);
+        let channel_name = "tapyrus-signer".to_string();
+        self.process_message(message, channel_name);
+    }
+
+    fn send_message(&self, message: Message) {
+        assert!(message.receiver_id.is_some());
+        log::debug!("send_message {:?} ", message);
+        let channel_name = format!("tapyrus-signer-{}", message.receiver_id.unwrap().pubkey.key);
+        self.process_message(message, channel_name);
+    }
 
     fn start(
         &self,
         message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
+        id: SignerID,
     ) -> JoinHandle<()> {
-        self.subscribe(message_processor)
+        self.subscribe(message_processor, id)
     }
 
     fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<Self::ERROR>>> {
@@ -258,11 +279,12 @@ mod test {
             ControlFlow::Break(())
         };
 
-        let subscriber = connection_manager.subscribe(message_processor);
+        let subscriber = connection_manager.subscribe(message_processor, sender_id);
 
         let message = Message {
             message_type: MessageType::Roundfailure,
             sender_id,
+            receiver_id: None,
         };
         connection_manager.broadcast_message(message);
 
@@ -294,7 +316,7 @@ mod test {
         let serialized = serde_json::to_string(&message).unwrap();
 
         // check serialize
-        let expected_serialized_message = r#"{"message_type":{"Signature":[48,69,2,33,0,209,78,75,40,108,63,135,236,126,58,248,69,201,134,198,123,9,100,136,101,202,168,134,119,114,0,86,36,17,238,152,190,2,32,91,12,234,133,10,255,32,122,215,249,21,62,10,88,133,223,155,69,205,171,31,105,114,13,174,21,159,118,161,43,58,137]},"sender_id":[3,131,26,105,184,0,152,51,171,91,3,38,1,46,175,72,155,254,163,90,115,33,177,202,21,177,29,136,19,20,35,250,252]}"#;
+        let expected_serialized_message = r#"{"message_type":{"Signature":[48,69,2,33,0,209,78,75,40,108,63,135,236,126,58,248,69,201,134,198,123,9,100,136,101,202,168,134,119,114,0,86,36,17,238,152,190,2,32,91,12,234,133,10,255,32,122,215,249,21,62,10,88,133,223,155,69,205,171,31,105,114,13,174,21,159,118,161,43,58,137]},"sender_id":[3,131,26,105,184,0,152,51,171,91,3,38,1,46,175,72,155,254,163,90,115,33,177,202,21,177,29,136,19,20,35,250,252],"receiver_id":null}"#;
         assert_eq!(expected_serialized_message, serialized);
 
         // check deserialize

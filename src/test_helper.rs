@@ -24,6 +24,7 @@ pub fn create_message() -> Message {
     Message {
         message_type: MessageType::Signature(net::Signature(sig)),
         sender_id: signer_id,
+        receiver_id: None,
     }
 }
 
