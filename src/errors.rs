@@ -14,6 +14,8 @@ pub enum Error {
     /// Errors cause sender side matter, like parameter was wrong.
     InvalidRequest(jsonrpc::error::RpcError),
     DuplicatedMessage,
+    InvalidLocalSignature,
+    InvalidAggregatedSignature,
     InvalidSignature(secp256k1::Error),
     TimerAlreadyStarted,
     InvalidTomlFormat(toml::de::Error),

@@ -146,7 +146,6 @@ impl TapyrusApi for Rpc {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::sign::sign;
     use crate::test_helper::{get_block, TestKeys};
     use secp256k1::Secp256k1;
 

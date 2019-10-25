@@ -2,15 +2,15 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+use std::collections::HashMap;
+
 use crate::blockdata::BlockHash;
-use bitcoin::PrivateKey;
 use curv::arithmetic::traits::*;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::*;
 use curv::{BigInt, FE, GE};
 use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
 use multi_party_schnorr::Error::InvalidSS;
-use secp256k1::{Message, Secp256k1, Signature};
 
 use crate::errors::Error;
 use crate::signer_node::SharedSecretMap;
@@ -21,6 +21,26 @@ use crate::util::*;
 pub struct Sign;
 
 impl Sign {
+    pub fn private_key_to_big_int(key: secp256k1::SecretKey) -> Option<BigInt> {
+        let value = format!("{}", key);
+        let n = BigInt::from_hex(&value);
+        Some(n)
+    }
+
+    pub fn create_key(index: usize, pk: Option<BigInt>) -> Keys {
+        let u: FE = match pk {
+            Some(i) => ECScalar::from(&i),
+            None => ECScalar::new_random(),
+        };
+        let y = &ECPoint::generator() * &u;
+
+        Keys {
+            u_i: u,
+            y_i: y,
+            party_index: index.clone(),
+        }
+    }
+
     /// return SharedKeys { y, x_i },
     /// where y is a aggregated public key and x_i is a share of player i.
     pub fn verify_vss_and_construct_key(
@@ -32,7 +52,7 @@ impl Sign {
 
         let correct_ss = secret_shares
             .values()
-            .map(|v| v.vss.validate_share(&v.share, *index))
+            .map(|v| v.vss.validate_share(&v.secret_share, *index))
             .all(|result| result.is_ok());
         let y_vec: Vec<GE> = secret_shares
             .to_vss()
@@ -51,35 +71,24 @@ impl Sign {
             false => Err(InvalidSS),
         }
     }
-}
 
-pub fn sign(private_key: &PrivateKey, hash: &BlockHash) -> Signature {
-    let sign = Secp256k1::signing_only();
-    let message = Message::from_slice(&(hash.borrow_inner())[..]).unwrap();
-    sign.sign(&message, &(private_key.key))
-}
+    pub fn sign(
+        eph_shared_keys: &SharedKeys,
+        priv_shared_keys: &SharedKeys,
+        message: BlockHash,
+    ) -> Result<LocalSig, Error> {
+        let message_slice = message.borrow_inner();
+        let local_sig =
+            LocalSig::compute(&message_slice.clone(), &eph_shared_keys, &priv_shared_keys);
+        Ok(local_sig)
+    }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::test_helper::{get_block, TestKeys};
-    use base64;
-
-    #[test]
-    fn sign_test() {
-        let private_key = TestKeys::new().key[0];
-        let block = get_block(0);
-        let block_hash = block.hash().unwrap();
-
-        let sig = sign(&private_key, &block_hash);
-
-        assert_eq!("MEQCIDAL9iCj1rcP+pkj04erS31tGOtpOSKbCsNmG2796U+9AiADPTOWf1PxAhaaX+cZHW1ZAaJNNwoTBwqDM3V4Xz3j3g==",
-                   base64::encode(&sig.serialize_der()));
-
-        // check verifiable
-        let secp = Secp256k1::new();
-        let message = Message::from_slice(&(block_hash.borrow_inner())[..]).unwrap();
-        let public_key = private_key.public_key(&secp).key;
-        assert!(&secp.verify(&message, &sig, &public_key).is_ok());
+    pub fn aggregate(
+        vss_sum: &VerifiableSS,
+        local_sigs: &Vec<LocalSig>,
+        parties: &[usize],
+        v: GE,
+    ) -> Signature {
+        Signature::generate(vss_sum, local_sigs, parties, v)
     }
 }

@@ -10,7 +10,6 @@ use std::time::Duration;
 use std::{thread, time};
 
 use bitcoin::{Address, PrivateKey, PublicKey};
-use curv::arithmetic::traits::*;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::*;
 use curv::{BigInt, FE, GE};
@@ -20,8 +19,9 @@ use redis::ControlFlow;
 use crate::blockdata::Block;
 use crate::net::{ConnectionManager, Message, MessageType, SignerID};
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
-use crate::sign::sign;
+use crate::sign::Sign;
 use crate::timer::RoundTimeOutObserver;
+use crate::util::*;
 
 /// Round interval.
 pub static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
@@ -39,24 +39,29 @@ pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     shared_secrets: SharedSecretMap,
 }
 
-/// Signature HashMap type alias.
-type SignatureMap = HashMap<SignerID, secp256k1::Signature>;
 #[derive(Clone, Debug, PartialEq)]
 pub struct SharedSecret {
     pub vss: VerifiableSS,
-    pub share: FE,
+    pub secret_share: FE,
 }
 
-type SharedSecretMap = HashMap<SignerID, SharedSecret>;
+pub type SharedSecretMap = HashMap<SignerID, SharedSecret>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeState {
     Joining,
     Master {
-        signature_map: SignatureMap,
+        block_key: Option<FE>,
+        shared_block_secrets: SharedSecretMap,
+        block_shared_keys: Option<(FE, GE)>,
         candidate_block: Block,
+        signatures: BTreeMap<SignerID, (FE, FE)>,
     },
-    Member,
+    Member {
+        block_key: Option<FE>,
+        shared_block_secrets: SharedSecretMap,
+        block_shared_keys: Option<(FE, GE)>,
+    },
 }
 
 fn sender_index(sender_id: &SignerID, pubkey_list: &[PublicKey]) -> usize {
@@ -111,7 +116,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         self.current_state = if self.params.master_flag {
             self.start_new_round()
         } else {
-            NodeState::Member
+            NodeState::Member {
+                block_key: None,
+                block_shared_keys: None,
+                shared_block_secrets: BTreeMap::new(),
+            }
         };
         log::info!(
             "node start. NodeState: {:?}, node_index: {}, master_index: {}",
@@ -219,12 +228,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             receiver_id: None,
         });
 
-        let sig = sign(&self.params.private_key, &block.hash().unwrap());
-        let mut signature_map: SignatureMap = HashMap::new();
-        signature_map.insert(self.params.signer_id, sig);
         NodeState::Master {
+            block_key: None,
+            block_shared_keys: None,
+            shared_block_secrets: BTreeMap::new(),
             candidate_block: block,
-            signature_map,
+            signatures: BTreeMap::new(),
         }
     }
 
@@ -239,34 +248,67 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             MessageType::Nodevss(vss, secret_share) => {
                 self.process_nodevss(vss, secret_share, message.sender_id)
             }
+            MessageType::Blockvss(block, vss, secret_share) => {
+                self.process_blockvss(block, vss, secret_share, message.sender_id)
+            }
+            MessageType::Blocksig(block, gamma_i, e) => {
+                self.process_blocksig(block, gamma_i, e, message.sender_id)
+            }
             MessageType::Roundfailure => self.process_roundfailure(&message.sender_id),
         }
     }
 
     fn process_candidateblock(&mut self, sender_id: &SignerID, block: &Block) -> NodeState {
-        match self.current_state {
-            NodeState::Member => {
+        match &self.current_state {
+            NodeState::Member {
+                shared_block_secrets,
+                block_shared_keys,
+                ..
+            } => {
                 match self.params.rpc.testproposedblock(&block) {
                     Ok(_) => {
                         self.master_index = sender_index(sender_id, &self.params.pubkey_list);
-                        let _block_hash = block.hash().unwrap();
-                        // TODO: create and send vss.
+                        let key = self.create_block_vss(block.clone());
                         // TODO: Errorを処理する必要あるかな？
                         self.round_timer.restart().unwrap();
+                        NodeState::Member {
+                            block_key: Some(key.u_i),
+                            shared_block_secrets: shared_block_secrets.clone(),
+                            block_shared_keys: block_shared_keys.clone(),
+                        }
                     }
                     Err(_e) => {
                         log::warn!(
                             "Received Invalid candidate block!!: sender: {:?}",
                             sender_id
                         );
+                        NodeState::Member {
+                            block_key: None,
+                            shared_block_secrets: shared_block_secrets.clone(),
+                            block_shared_keys: block_shared_keys.clone(),
+                        }
                     }
                 }
             }
-            _ => {}
-        };
-
-        self.current_state.clone()
+            NodeState::Master {
+                block_shared_keys,
+                shared_block_secrets,
+                signatures,
+                ..
+            } => {
+                let key = self.create_block_vss(block.clone());
+                NodeState::Master {
+                    block_key: Some(key.u_i),
+                    block_shared_keys: block_shared_keys.clone(),
+                    shared_block_secrets: shared_block_secrets.clone(),
+                    candidate_block: block.clone(),
+                    signatures: signatures.clone(),
+                }
+            }
+            _ => self.current_state.clone(),
+        }
     }
+
     /// Master role pass to the node of next index.
     fn round_robin_master(&mut self) -> NodeState {
         let next_index = (self.master_index + 1) % self.params.pubkey_list.len();
@@ -275,7 +317,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             // self node is master.
             self.start_new_round()
         } else {
-            NodeState::Member
+            NodeState::Member {
+                block_key: None,
+                block_shared_keys: None,
+                shared_block_secrets: SharedSecretMap::new(),
+            }
         };
         log::info!(
             "Round Robin: Next State {:?}, node_index: {}, master_inde: {}",
@@ -295,14 +341,19 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         self.current_state.clone()
     }
 
-    fn process_nodevss(&mut self, vss: VerifiableSS, share: FE, from: SignerID) -> NodeState {
-        let params = self.create_params();
+    fn process_nodevss(
+        &mut self,
+        vss: VerifiableSS,
+        secret_share: FE,
+        from: SignerID,
+    ) -> NodeState {
+        let params = self.sharing_params();
 
         self.shared_secrets.insert(
             from,
             SharedSecret {
                 vss: vss.clone(),
-                share,
+                secret_share,
             },
         );
 
@@ -324,6 +375,238 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         self.current_state.clone()
     }
 
+    fn process_blockvss_inner(
+        &self,
+        _vss: &VerifiableSS,
+        block: &Block,
+        _block_key: &Option<FE>,
+        shared_block_secrets: &SharedSecretMap,
+    ) -> Option<SharedKeys> {
+        let params = self.sharing_params();
+        log::trace!(
+            "number of shared_block_secrets: {:?}",
+            shared_block_secrets.len()
+        );
+        if shared_block_secrets.len() == self.params.pubkey_list.len() {
+            let shared_keys = Sign::verify_vss_and_construct_key(
+                &params,
+                &shared_block_secrets,
+                &(self.params.self_node_index + 1),
+            )
+            .expect("invalid vss");
+
+            log::trace!(
+                "block shared keys is: {:?}, {:?}",
+                shared_keys.x_i,
+                shared_keys.y
+            );
+
+            let result = Sign::sign(
+                &shared_keys,
+                &self.priv_shared_keys.clone().unwrap(),
+                block.hash().unwrap(),
+            );
+
+            match result {
+                Ok(local_sig) => {
+                    self.connection_manager.broadcast_message(Message {
+                        message_type: MessageType::Blocksig(
+                            block.clone(),
+                            local_sig.gamma_i,
+                            local_sig.e,
+                        ),
+                        sender_id: self.params.signer_id,
+                        receiver_id: None,
+                    });
+                }
+                Err(_) => (),
+            }
+            return Some(shared_keys);
+        } else {
+            return None;
+        }
+    }
+    fn process_blockvss(
+        &mut self,
+        block: Block,
+        vss: VerifiableSS,
+        secret_share: FE,
+        from: SignerID,
+    ) -> NodeState {
+        match &self.current_state {
+            NodeState::Master {
+                block_key,
+                shared_block_secrets,
+                candidate_block,
+                signatures,
+                ..
+            } => {
+                let mut new_shared_block_secrets = shared_block_secrets.clone();
+                new_shared_block_secrets.insert(
+                    from,
+                    SharedSecret {
+                        vss: vss.clone(),
+                        secret_share,
+                    },
+                );
+                let shared_keys = self.process_blockvss_inner(
+                    &vss,
+                    &block,
+                    &block_key,
+                    &new_shared_block_secrets,
+                );
+
+                match shared_keys {
+                    Some(keys) => NodeState::Master {
+                        block_key: block_key.clone(),
+                        shared_block_secrets: new_shared_block_secrets,
+                        block_shared_keys: Some((keys.x_i, keys.y)),
+                        candidate_block: candidate_block.clone(),
+                        signatures: signatures.clone(),
+                    },
+                    None => NodeState::Master {
+                        block_key: block_key.clone(),
+                        shared_block_secrets: new_shared_block_secrets,
+                        block_shared_keys: None,
+                        candidate_block: candidate_block.clone(),
+                        signatures: signatures.clone(),
+                    },
+                }
+            }
+            NodeState::Member {
+                block_key,
+                shared_block_secrets,
+                ..
+            } => {
+                let mut new_shared_block_secrets = shared_block_secrets.clone();
+                new_shared_block_secrets.insert(
+                    from,
+                    SharedSecret {
+                        vss: vss.clone(),
+                        secret_share,
+                    },
+                );
+                let shared_keys = self.process_blockvss_inner(
+                    &vss,
+                    &block,
+                    &block_key,
+                    &new_shared_block_secrets,
+                );
+                match shared_keys {
+                    Some(keys) => NodeState::Member {
+                        block_key: block_key.clone(),
+                        shared_block_secrets: new_shared_block_secrets,
+                        block_shared_keys: Some((keys.x_i, keys.y)),
+                    },
+                    None => NodeState::Member {
+                        block_key: block_key.clone(),
+                        shared_block_secrets: new_shared_block_secrets,
+                        block_shared_keys: None,
+                    },
+                }
+            }
+            _ => self.current_state.clone(),
+        }
+    }
+
+    fn process_blocksig(&mut self, _block: Block, gamma_i: FE, e: FE, from: SignerID) -> NodeState {
+        match &self.current_state {
+            NodeState::Master {
+                block_key,
+                block_shared_keys,
+                shared_block_secrets,
+                candidate_block,
+                signatures,
+            } => {
+                let mut new_signatures = signatures.clone();
+                new_signatures.insert(from, (gamma_i, e));
+                log::trace!("number of signatures: {:?}", new_signatures.len());
+                if new_signatures.len() >= self.params.pubkey_list.len() {
+                    let local_sigs: Vec<LocalSig> = new_signatures
+                        .values()
+                        .map(|s| LocalSig {
+                            gamma_i: s.0,
+                            e: s.1,
+                        })
+                        .collect();
+                    let parties = (0..self.params.pubkey_list.len()).collect::<Vec<usize>>();
+                    let key_gen_vss_vec: Vec<VerifiableSS> = self.shared_secrets.to_vss();
+                    let eph_vss_vec: Vec<VerifiableSS> = shared_block_secrets.to_vss();
+
+                    let sum_of_local_sigs = LocalSig::verify_local_sigs(
+                        &local_sigs,
+                        &parties[..],
+                        &key_gen_vss_vec,
+                        &eph_vss_vec,
+                    );
+
+                    let verification = match sum_of_local_sigs {
+                        Ok(vss_sum) => {
+                            let signature = Sign::aggregate(
+                                &vss_sum,
+                                &local_sigs,
+                                &parties[..],
+                                block_shared_keys.unwrap().1,
+                            );
+                            let public_key = self.priv_shared_keys.clone().unwrap().y;
+                            let hash = candidate_block.hash().unwrap().into_inner();
+                            match signature.verify(&hash, &public_key) {
+                                Ok(_) => Ok(signature),
+                                Err(e) => Err(e),
+                            }
+                        }
+                        Err(_) => {
+                            return self.round_robin_master();
+                        }
+                    };
+                    let result = match verification {
+                        Ok(signature) => {
+                            let sig_hex = Sign::format_signature(&signature);
+                            let new_block: Block =
+                                candidate_block.add_proof(hex::decode(sig_hex).unwrap());
+                            self.params.rpc.submitblock(&new_block)
+                        }
+                        Err(_) => {
+                            log::error!("signature is invalid");
+                            return self.round_robin_master();
+                        }
+                    };
+                    match result {
+                        Ok(new_block) => {
+                            // send completeblock message
+                            let message = Message {
+                                message_type: MessageType::Completedblock(new_block),
+                                sender_id: self.params.signer_id.clone(),
+                                receiver_id: None,
+                            };
+                            self.connection_manager.broadcast_message(message);
+                        }
+                        Err(_) => {}
+                    }
+                    // start round robin of master node.
+                    return self.round_robin_master();
+                }
+                NodeState::Master {
+                    block_key: block_key.clone(),
+                    block_shared_keys: block_shared_keys.clone(),
+                    shared_block_secrets: shared_block_secrets.clone(),
+                    candidate_block: candidate_block.clone(),
+                    signatures: new_signatures,
+                }
+            }
+            NodeState::Member {
+                block_key,
+                block_shared_keys,
+                shared_block_secrets,
+            } => NodeState::Member {
+                block_key: block_key.clone(),
+                block_shared_keys: block_shared_keys.clone(),
+                shared_block_secrets: shared_block_secrets.clone(),
+            },
+            _ => self.current_state.clone(),
+        }
+    }
+
     fn process_roundfailure(&self, _sender_id: &SignerID) -> NodeState {
         self.current_state.clone()
     }
@@ -332,9 +615,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         //Wait for completing redis connection.
         thread::sleep(time::Duration::from_secs(10));
 
-        let params = self.create_params();
+        let params = self.sharing_params();
 
-        let key = self.create_key(self.params.self_node_index + 1, self.private_key());
+        let key = Sign::create_key(
+            self.params.self_node_index + 1,
+            Sign::private_key_to_big_int(self.params.private_key.key),
+        );
         let y_vec: Vec<GE> = self
             .params
             .pubkey_list
@@ -344,7 +630,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 GE::from_bytes(&bytes[1..]).unwrap()
             })
             .collect::<Vec<GE>>();
-        let _y_sum = self.sum_point(&y_vec);
+        let _y_sum = sum_point(&y_vec);
         let parties = (0..params.share_count)
             .map(|i| i + 1)
             .collect::<Vec<usize>>();
@@ -367,53 +653,43 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
-    fn create_params(&self) -> Parameters {
+    fn create_block_vss(&self, block: Block) -> Keys {
+        let params = self.sharing_params();
+        let key = Sign::create_key(self.params.self_node_index + 1, None);
+
+        let parties = (0..params.share_count)
+            .map(|i| i + 1)
+            .collect::<Vec<usize>>();
+
+        let (vss_scheme, secret_shares) = VerifiableSS::share_at_indices(
+            params.threshold,
+            params.share_count,
+            &key.u_i,
+            &parties,
+        );
+        for i in 0..self.params.pubkey_list.len() {
+            self.connection_manager.send_message(Message {
+                message_type: MessageType::Blockvss(
+                    block.clone(),
+                    vss_scheme.clone(),
+                    secret_shares[i],
+                ),
+                sender_id: self.params.signer_id,
+                receiver_id: Some(SignerID {
+                    pubkey: self.params.pubkey_list[i],
+                }),
+            });
+        }
+        key
+    }
+
+    fn sharing_params(&self) -> Parameters {
         let t = (self.params.threshold - 1 as u8).try_into().unwrap();
         let n: usize = (self.params.pubkey_list.len() as u8).try_into().unwrap();
         Parameters {
             threshold: t,
             share_count: n.clone(),
         }
-    }
-
-    fn private_key(&self) -> Option<BigInt> {
-        let value = format!("{}", self.params.private_key.key);
-        let n = BigInt::from_hex(&value);
-        Some(n)
-    }
-
-    fn create_key(&self, index: usize, pk: Option<BigInt>) -> Keys {
-        let u: FE = match pk {
-            Some(i) => ECScalar::from(&i),
-            None => ECScalar::new_random(),
-        };
-        let y = &ECPoint::generator() * &u;
-
-        Keys {
-            u_i: u,
-            y_i: y,
-            party_index: index.clone(),
-        }
-    }
-
-    fn sort_value_by_signer_id<S>(&self, map: HashMap<SignerID, S>) -> Vec<S> {
-        let mut array = Vec::new();
-        for a in map {
-            array.push(a);
-        }
-        array.sort_by(|a, b| a.0.pubkey.partial_cmp(&b.0.pubkey).unwrap());
-        let mut values: Vec<S> = Vec::new();
-        for e in array {
-            values.push(e.1);
-        }
-        values
-    }
-
-    fn sum_point(&self, points: &Vec<GE>) -> GE {
-        let mut iter = points.iter();
-        let head = iter.next().unwrap();
-        let tail = iter;
-        tail.fold(head.clone(), |acc, x| acc + x)
     }
 }
 
@@ -479,7 +755,7 @@ mod tests {
     use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
     use crate::rpc::tests::{safety, safety_error, MockRpc, SafetyBlock};
     use crate::rpc::TapyrusApi;
-    use crate::signer_node::{NodeParameters, NodeState, SignerNode};
+    use crate::signer_node::{NodeParameters, NodeState, SharedSecretMap, SignerNode};
     use crate::test_helper::{get_block, TestKeys};
 
     type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
@@ -707,7 +983,11 @@ mod tests {
 
     #[test]
     fn test_modify_master_index() {
-        let initial_state = NodeState::Member;
+        let initial_state = NodeState::Member {
+            block_key: None,
+            block_shared_keys: None,
+            shared_block_secrets: SharedSecretMap::new(),
+        };
         let arc_block = safety(get_block(0));
         let rpc = MockRpc {
             return_block: arc_block.clone(),
@@ -735,7 +1015,11 @@ mod tests {
     #[test]
     fn test_timeout_roundrobin() {
         let closure: SpyMethod = Box::new(move |_message: Arc<Message>| {});
-        let initial_state = NodeState::Member;
+        let initial_state = NodeState::Member {
+            block_key: None,
+            block_shared_keys: None,
+            shared_block_secrets: SharedSecretMap::new(),
+        };
         let arc_block = safety(get_block(0));
         let rpc = MockRpc {
             return_block: arc_block.clone(),
@@ -760,7 +1044,11 @@ mod tests {
 
     #[test]
     fn test_process_completedblock() {
-        let initial_state = NodeState::Member;
+        let initial_state = NodeState::Member {
+            block_key: None,
+            block_shared_keys: None,
+            shared_block_secrets: SharedSecretMap::new(),
+        };
         let arc_block = safety(get_block(0));
         let rpc = MockRpc {
             return_block: arc_block.clone(),
@@ -778,7 +1066,7 @@ mod tests {
         let next_state = node.process_completedblock(&sender_id, &get_block(0));
         assert_eq!(node.master_index, 1); // should incremented.
         match next_state {
-            NodeState::Member => assert!(true),
+            NodeState::Member { .. } => assert!(true),
             n => panic!("Should be Member, but state:{:?}", n),
         }
 
@@ -787,7 +1075,7 @@ mod tests {
         let next_state = node.process_completedblock(&sender_id, &get_block(0));
         assert_eq!(node.master_index, 0); // wrap back to 0.
         match next_state {
-            NodeState::Member => assert!(true),
+            NodeState::Member { .. } => assert!(true),
             n => panic!("Should be Member, but state:{:?}", n),
         }
 
@@ -796,16 +1084,18 @@ mod tests {
         let next_state = node.process_completedblock(&sender_id, &get_block(0));
         assert_eq!(node.master_index, 4); // wrap back to 0.
         match next_state {
-            NodeState::Master { signature_map, .. } => {
-                assert_eq!(signature_map.len(), 1); // has self signature at start.
-            }
+            NodeState::Master { .. } => {}
             n => panic!("Should be Master, but state:{:?}", n),
         }
     }
 
     #[test]
     fn test_process_completedblock_ignore_different_master() {
-        let initial_state = NodeState::Member;
+        let initial_state = NodeState::Member {
+            block_key: None,
+            block_shared_keys: None,
+            shared_block_secrets: SharedSecretMap::new(),
+        };
         let arc_block = safety(get_block(0));
         let rpc = MockRpc {
             return_block: arc_block.clone(),
@@ -823,7 +1113,7 @@ mod tests {
         let next_state = node.process_completedblock(&sender_id, &get_block(0));
         assert_eq!(node.master_index, 0); // should not incremented if not recorded master.
         match next_state {
-            NodeState::Member => assert!(true),
+            NodeState::Member { .. } => assert!(true),
             n => panic!("Should be Member, but state:{:?}", n),
         }
     }
@@ -833,7 +1123,7 @@ mod tests {
         use crate::errors::Error;
         use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
         use crate::signer_node::tests::create_node;
-        use crate::signer_node::NodeState;
+        use crate::signer_node::{NodeState, SharedSecretMap};
         use bitcoin::Address;
         use secp256k1::Signature;
         use std::cell::Cell;
@@ -883,7 +1173,14 @@ mod tests {
                 call_count: Cell::new(0),
             };
 
-            let node = create_node(NodeState::Member, rpc);
+            let node = create_node(
+                NodeState::Member {
+                    block_key: None,
+                    block_shared_keys: None,
+                    shared_block_secrets: SharedSecretMap::new(),
+                },
+                rpc,
+            );
 
             node.wait_for_ibd_finish(std::time::Duration::from_millis(1));
 

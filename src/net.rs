@@ -8,6 +8,7 @@ use crate::serialize::ByteBufVisitor;
 use bitcoin::PublicKey;
 use redis::{Client, Commands, ControlFlow, PubSubCommands, RedisError};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::cmp::Ordering;
 use std::sync::mpsc::{channel, Receiver, Sender};
 /// メッセージを受け取って、それを処理するためのモジュール
 /// メッセージの処理は、メッセージの種類とラウンドの状態に依存する。
@@ -18,7 +19,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-use curv::{FE, GE};
+use curv::FE;
 
 /// Signerの識別子。公開鍵を識別子にする。
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
@@ -63,6 +64,8 @@ pub enum MessageType {
     Candidateblock(Block),
     Completedblock(Block),
     Nodevss(VerifiableSS, FE),
+    Blockvss(Block, VerifiableSS, FE),
+    Blocksig(Block, FE, FE),
     Roundfailure,
 }
 

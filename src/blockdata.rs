@@ -54,4 +54,9 @@ impl Block {
     pub fn payload(&self) -> &[u8] {
         &self.0
     }
+    pub fn add_proof(&self, proof: Vec<u8>) -> Block {
+        let (header, txs) = self.payload().split_at(104);
+        let new_payload = [header, &proof[..], &txs[1..]].concat();
+        Block(new_payload)
+    }
 }
