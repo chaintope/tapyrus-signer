@@ -17,6 +17,9 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
+use curv::{FE, GE};
+
 /// Signerの識別子。公開鍵を識別子にする。
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub struct SignerID {
@@ -60,6 +63,7 @@ pub enum MessageType {
     Candidateblock(Block),
     Signature(Signature),
     Completedblock(Block),
+    Nodevss(VerifiableSS, FE),
     Roundfailure,
 }
 

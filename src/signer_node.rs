@@ -3,11 +3,18 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::time::Duration;
+use std::{thread, time};
 
 use bitcoin::{Address, PrivateKey, PublicKey};
+use curv::arithmetic::traits::*;
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
+use curv::elliptic::curves::traits::*;
+use curv::{BigInt, FE, GE};
+use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
 use redis::ControlFlow;
 
 use crate::blockdata::Block;
@@ -28,10 +35,19 @@ pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     stop_signal: Option<Receiver<u32>>,
     master_index: usize,
     round_timer: RoundTimeOutObserver,
+    priv_shared_keys: Option<SharedKeys>,
+    shared_secrets: SharedSecretMap,
 }
 
 /// Signature HashMap type alias.
 type SignatureMap = HashMap<SignerID, secp256k1::Signature>;
+#[derive(Clone, Debug, PartialEq)]
+pub struct SharedSecret {
+    pub vss: VerifiableSS,
+    pub share: FE,
+}
+
+type SharedSecretMap = HashMap<SignerID, SharedSecret>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeState {
@@ -64,6 +80,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             stop_signal: None,
             master_index: 0,
             round_timer: RoundTimeOutObserver::new(timer_limit),
+            priv_shared_keys: None,
+            shared_secrets: HashMap::new(),
         }
     }
 
@@ -88,6 +106,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         // redisとの通信を行うthreadを開始
         let id = self.params.signer_id;
         let _handler = self.connection_manager.start(closure, id);
+        self.create_node_share();
+
         self.current_state = if self.params.master_flag {
             self.start_new_round()
         } else {
@@ -189,7 +209,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
-    pub fn start_new_round(&self) -> NodeState {
+    pub fn start_new_round(&mut self) -> NodeState {
         std::thread::sleep(Duration::from_secs(self.params.round_duration));
 
         let block = self.params.rpc.getnewblock(&self.params.address).unwrap();
@@ -216,6 +236,9 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             MessageType::Signature(sig) => self.process_signature(&message.sender_id, &sig),
             MessageType::Completedblock(block) => {
                 self.process_completedblock(&message.sender_id, &block)
+            }
+            MessageType::Nodevss(vss, secret_share) => {
+                self.process_nodevss(vss, secret_share, message.sender_id)
             }
             MessageType::Roundfailure => self.process_roundfailure(&message.sender_id),
         }
@@ -345,8 +368,125 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         self.current_state.clone()
     }
 
+    fn process_nodevss(&mut self, vss: VerifiableSS, share: FE, from: SignerID) -> NodeState {
+        let params = self.create_params();
+
+        self.shared_secrets.insert(
+            from,
+            SharedSecret {
+                vss: vss.clone(),
+                share,
+            },
+        );
+
+        if self.shared_secrets.len() == self.params.pubkey_list.len() {
+            let shared_keys = Sign::verify_vss_and_construct_key(
+                &params,
+                &self.shared_secrets,
+                &(self.params.self_node_index + 1),
+            )
+            .expect("invalid vss");
+
+            self.priv_shared_keys = Some(shared_keys.clone());
+            log::trace!(
+                "node shared keys is stored: {:?}, {:?}",
+                shared_keys.x_i,
+                shared_keys.y
+            );
+        }
+        self.current_state.clone()
+    }
+
     fn process_roundfailure(&self, _sender_id: &SignerID) -> NodeState {
         self.current_state.clone()
+    }
+
+    fn create_node_share(&mut self) {
+        //Wait for completing redis connection.
+        thread::sleep(time::Duration::from_secs(10));
+
+        let params = self.create_params();
+
+        let key = self.create_key(self.params.self_node_index + 1, self.private_key());
+        let y_vec: Vec<GE> = self
+            .params
+            .pubkey_list
+            .iter()
+            .map(|public_key| {
+                let bytes: Vec<u8> = public_key.key.serialize_uncompressed().to_vec();
+                GE::from_bytes(&bytes[1..]).unwrap()
+            })
+            .collect::<Vec<GE>>();
+        let _y_sum = self.sum_point(&y_vec);
+        let parties = (0..params.share_count)
+            .map(|i| i + 1)
+            .collect::<Vec<usize>>();
+
+        let (vss_scheme, secret_shares) = VerifiableSS::share_at_indices(
+            params.threshold,
+            params.share_count,
+            &key.u_i,
+            &parties,
+        );
+
+        for i in 0..self.params.pubkey_list.len() {
+            self.connection_manager.send_message(Message {
+                message_type: MessageType::Nodevss(vss_scheme.clone(), secret_shares[i]),
+                sender_id: self.params.signer_id,
+                receiver_id: Some(SignerID {
+                    pubkey: self.params.pubkey_list[i],
+                }),
+            });
+        }
+    }
+
+    fn create_params(&self) -> Parameters {
+        let t = (self.params.threshold - 1 as u8).try_into().unwrap();
+        let n: usize = (self.params.pubkey_list.len() as u8).try_into().unwrap();
+        Parameters {
+            threshold: t,
+            share_count: n.clone(),
+        }
+    }
+
+    fn private_key(&self) -> Option<BigInt> {
+        let value = format!("{}", self.params.private_key.key);
+        let n = BigInt::from_hex(&value);
+        Some(n)
+    }
+
+    fn create_key(&self, index: usize, pk: Option<BigInt>) -> Keys {
+        let u: FE = match pk {
+            Some(i) => ECScalar::from(&i),
+            None => ECScalar::new_random(),
+        };
+        let y = &ECPoint::generator() * &u;
+
+        Keys {
+            u_i: u,
+            y_i: y,
+            party_index: index.clone(),
+        }
+    }
+
+    fn sort_value_by_signer_id<S>(&self, map: HashMap<SignerID, S>) -> Vec<S> {
+        let mut array = Vec::new();
+        for a in map {
+            array.push(a);
+        }
+        array.sort_by(|a, b| a.0.pubkey.partial_cmp(&b.0.pubkey).unwrap());
+        let mut values: Vec<S> = Vec::new();
+        for e in array {
+            values.push(e.1);
+        }
+        values
+    }
+
+    fn sum_point(&self, points: &Vec<GE>) -> GE {
+        let mut iter = points.iter();
+        let head = iter.next().unwrap();
+        let tail = iter;
+        tail.fold(head.clone(), |acc, x| acc + x)
     }
 }
 
@@ -621,13 +761,21 @@ mod tests {
         });
         let arc_block = safety(get_block(0));
         let (_node, stop_signal, broadcaster) = setup_node(assertion, arc_block);
-        let message_str = r#"{"message_type": {"Candidateblock": [0, 0, 0, 32, 237, 101, 140, 196, 6, 112, 204, 237, 162, 59, 176, 182, 20, 130, 31, 230, 212, 138, 65, 209, 7, 209, 159, 63, 58, 86, 8, 173, 61, 72, 48, 146, 177, 81, 22, 10, 183, 17, 51, 180, 40, 225, 246, 46, 174, 181, 152, 174, 133, 143, 246, 96, 23, 201, 150, 1, 242, 144, 136, 183, 198, 74, 72, 29, 98, 132, 225, 69, 210, 155, 112, 191, 84, 57, 45, 41, 112, 16, 49, 210, 175, 159, 237, 95, 155, 178, 31, 187, 40, 79, 167, 28, 235, 35, 143, 105, 166, 212, 9, 93, 0, 1, 2, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 3, 92, 1, 1, 255, 255, 255, 255, 2, 0, 242, 5, 42, 1, 0, 0, 0, 25, 118, 169, 20, 207, 18, 219, 192, 75, 176, 222, 111, 182, 168, 122, 90, 235, 75, 46, 116, 201, 112, 6, 178, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 38, 106, 36, 170, 33, 169, 237, 226, 246, 28, 63, 113, 209, 222, 253, 63, 169, 153, 223, 163, 105, 83, 117, 92, 105, 6, 137, 121, 153, 98, 180, 139, 235, 216, 54, 151, 78, 140, 249, 1, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },"sender_id": [3, 131, 26, 105, 184, 0, 152, 51, 171, 91, 3, 38, 1, 46, 175, 72, 155, 254, 163, 90, 115, 33, 177, 202, 21, 177, 29, 136, 19, 20, 35, 250, 252]}"#;
+        let message_str = r#"{"message_type": {"Candidateblock": [0, 0, 0, 32, 237, 101, 140, 196, 6, 112, 204, 237, 162, 59, 176, 182, 20, 130, 31, 230, 212, 138, 65, 209, 7, 209, 159, 63, 58, 86, 8, 173, 61, 72, 48, 146, 177, 81, 22, 10, 183, 17, 51, 180, 40, 225, 246, 46, 174, 181, 152, 174, 133, 143, 246, 96, 23, 201, 150, 1, 242, 144, 136, 183, 198, 74, 72, 29, 98, 132, 225, 69, 210, 155, 112, 191, 84, 57, 45, 41, 112, 16, 49, 210, 175, 159, 237, 95, 155, 178, 31, 187, 40, 79, 167, 28, 235, 35, 143, 105, 166, 212, 9, 93, 0, 1, 2, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 3, 92, 1, 1, 255, 255, 255, 255, 2, 0, 242, 5, 42, 1, 0, 0, 0, 25, 118, 169, 20, 207, 18, 219, 192, 75, 176, 222, 111, 182, 168, 122, 90, 235, 75, 46, 116, 201, 112, 6, 178, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 38, 106, 36, 170, 33, 169, 237, 226, 246, 28, 63, 113, 209, 222, 253, 63, 169, 153, 223, 163, 105, 83, 117, 92, 105, 6, 137, 121, 153, 98, 180, 139, 235, 216, 54, 151, 78, 140, 249, 1, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },"sender_id": [3, 131, 26, 105, 184, 0, 152, 51, 171, 91, 3, 38, 1, 46, 175, 72, 155, 254, 163, 90, 115, 33, 177, 202, 21, 177, 29, 136, 19, 20, 35, 250, 252],"receiver_id": null}"#;
         let message = serde_json::from_str::<Message>(message_str).unwrap();
 
         broadcaster.send(message).unwrap();
+        //first, node receives 5 Nodevss messages.
+        for _ in 0..5 {
+            let broadcast_message1 = broadcast_r.recv().unwrap();
+            let actual1 = format!("{:?}", &broadcast_message1.message_type);
+            assert!(actual1.starts_with("Nodevss"));
+        }
+        //then, it receives Signature message.
         let broadcast_message = broadcast_r.recv().unwrap();
         let actual = format!("{:?}", &broadcast_message.message_type);
         assert!(actual.starts_with("Signature(Signature"));
+
         stop_signal.send(1).unwrap(); // this line not necessary, but for manners.
     }
 
@@ -639,7 +787,7 @@ mod tests {
         });
         let arc_block = safety_error("invalid block!".to_string());
         let (_node, stop_signal, bloadcaster) = setup_node(spy, arc_block);
-        let message_str = r#"{"message_type": {"Candidateblock": [0, 0, 0, 32, 237, 101, 140, 196, 6, 112, 204, 237, 162, 59, 176, 182, 20, 130, 31, 230, 212, 138, 65, 209, 7, 209, 159, 63, 58, 86, 8, 173, 61, 72, 48, 146, 177, 81, 22, 10, 183, 17, 51, 180, 40, 225, 246, 46, 174, 181, 152, 174, 133, 143, 246, 96, 23, 201, 150, 1, 242, 144, 136, 183, 198, 74, 72, 29, 98, 132, 225, 69, 210, 155, 112, 191, 84, 57, 45, 41, 112, 16, 49, 210, 175, 159, 237, 95, 155, 178, 31, 187, 40, 79, 167, 28, 235, 35, 143, 105, 166, 212, 9, 93, 0, 1, 2, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 3, 92, 1, 1, 255, 255, 255, 255, 2, 0, 242, 5, 42, 1, 0, 0, 0, 25, 118, 169, 20, 207, 18, 219, 192, 75, 176, 222, 111, 182, 168, 122, 90, 235, 75, 46, 116, 201, 112, 6, 178, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 38, 106, 36, 170, 33, 169, 237, 226, 246, 28, 63, 113, 209, 222, 253, 63, 169, 153, 223, 163, 105, 83, 117, 92, 105, 6, 137, 121, 153, 98, 180, 139, 235, 216, 54, 151, 78, 140, 249, 1, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },"sender_id": [3, 131, 26, 105, 184, 0, 152, 51, 171, 91, 3, 38, 1, 46, 175, 72, 155, 254, 163, 90, 115, 33, 177, 202, 21, 177, 29, 136, 19, 20, 35, 250, 252]}"#;
+        let message_str = r#"{"message_type": {"Candidateblock": [0, 0, 0, 32, 237, 101, 140, 196, 6, 112, 204, 237, 162, 59, 176, 182, 20, 130, 31, 230, 212, 138, 65, 209, 7, 209, 159, 63, 58, 86, 8, 173, 61, 72, 48, 146, 177, 81, 22, 10, 183, 17, 51, 180, 40, 225, 246, 46, 174, 181, 152, 174, 133, 143, 246, 96, 23, 201, 150, 1, 242, 144, 136, 183, 198, 74, 72, 29, 98, 132, 225, 69, 210, 155, 112, 191, 84, 57, 45, 41, 112, 16, 49, 210, 175, 159, 237, 95, 155, 178, 31, 187, 40, 79, 167, 28, 235, 35, 143, 105, 166, 212, 9, 93, 0, 1, 2, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 3, 92, 1, 1, 255, 255, 255, 255, 2, 0, 242, 5, 42, 1, 0, 0, 0, 25, 118, 169, 20, 207, 18, 219, 192, 75, 176, 222, 111, 182, 168, 122, 90, 235, 75, 46, 116, 201, 112, 6, 178, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 38, 106, 36, 170, 33, 169, 237, 226, 246, 28, 63, 113, 209, 222, 253, 63, 169, 153, 223, 163, 105, 83, 117, 92, 105, 6, 137, 121, 153, 98, 180, 139, 235, 216, 54, 151, 78, 140, 249, 1, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },"sender_id": [3, 131, 26, 105, 184, 0, 152, 51, 171, 91, 3, 38, 1, 46, 175, 72, 155, 254, 163, 90, 115, 33, 177, 202, 21, 177, 29, 136, 19, 20, 35, 250, 252],"receiver_id": null}"#;
         let message = serde_json::from_str::<Message>(message_str).unwrap();
 
         bloadcaster.send(message).unwrap();
@@ -695,7 +843,7 @@ mod tests {
         assert_eq!(node.master_index, 0 as usize);
         let ss = stop_signal.clone();
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(6));
+            thread::sleep(Duration::from_secs(16));
             ss.send(1).unwrap();
         });
         node.start();

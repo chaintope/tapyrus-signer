@@ -4,7 +4,54 @@
 
 use crate::blockdata::BlockHash;
 use bitcoin::PrivateKey;
+use curv::arithmetic::traits::*;
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
+use curv::elliptic::curves::traits::*;
+use curv::{BigInt, FE, GE};
+use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
+use multi_party_schnorr::Error::InvalidSS;
 use secp256k1::{Message, Secp256k1, Signature};
+
+use crate::errors::Error;
+use crate::signer_node::SharedSecretMap;
+use crate::signer_node::ToShares;
+use crate::signer_node::ToVerifiableSS;
+use crate::util::*;
+
+pub struct Sign;
+
+impl Sign {
+    /// return SharedKeys { y, x_i },
+    /// where y is a aggregated public key and x_i is a share of player i.
+    pub fn verify_vss_and_construct_key(
+        params: &Parameters,
+        secret_shares: &SharedSecretMap,
+        index: &usize,
+    ) -> Result<SharedKeys, multi_party_schnorr::Error> {
+        assert_eq!(secret_shares.len(), params.share_count);
+
+        let correct_ss = secret_shares
+            .values()
+            .map(|v| v.vss.validate_share(&v.share, *index))
+            .all(|result| result.is_ok());
+        let y_vec: Vec<GE> = secret_shares
+            .to_vss()
+            .iter()
+            .map(|vss| vss.commitments[0])
+            .collect();
+        match correct_ss {
+            true => {
+                let y = sum_point(&y_vec);
+                let x_i = secret_shares
+                    .to_shares()
+                    .iter()
+                    .fold(FE::zero(), |acc, x| acc + x);
+                Ok(SharedKeys { y, x_i })
+            }
+            false => Err(InvalidSS),
+        }
+    }
+}
 
 pub fn sign(private_key: &PrivateKey, hash: &BlockHash) -> Signature {
     let sign = Secp256k1::signing_only();
