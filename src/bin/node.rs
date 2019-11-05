@@ -1,3 +1,7 @@
+// Copyright (c) 2019 Chaintope Inc.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 extern crate bitcoin;
 extern crate clap;
 extern crate env_logger;

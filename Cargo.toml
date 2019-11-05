@@ -2,7 +2,7 @@
 [package]
 name = "tapyrus_signer"
 version = "0.1.0"
-authors = ["Kohei Taniguchi <kohei@chaintope.com>"]
+authors = ["Kohei Taniguchi <kohei@chaintope.com>", "Yukishige Nakajo <nakajo@chaintope.com>"]
 edition = "2018"
 
 [dependencies]
