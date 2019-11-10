@@ -22,7 +22,7 @@ use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::FE;
 
 /// Signerの識別子。公開鍵を識別子にする。
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+#[derive(Debug, Eq, Hash, Copy, Clone)]
 pub struct SignerID {
     pub pubkey: PublicKey,
 }
@@ -30,6 +30,24 @@ pub struct SignerID {
 impl SignerID {
     pub fn new(pubkey: PublicKey) -> Self {
         SignerID { pubkey }
+    }
+}
+
+impl PartialEq for SignerID {
+    fn eq(&self, other: &Self) -> bool {
+        self.pubkey.to_bytes().eq(&other.pubkey.to_bytes())
+    }
+}
+
+impl PartialOrd for SignerID {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.pubkey.to_bytes().partial_cmp(&other.pubkey.to_bytes())
+    }
+}
+
+impl Ord for SignerID {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.pubkey.to_bytes().cmp(&other.pubkey.to_bytes())
     }
 }
 
@@ -268,6 +286,8 @@ impl ConnectionManager for RedisManager {
 mod test {
     use super::*;
     use crate::test_helper::TestKeys;
+    use std::collections::BTreeMap;
+    use std::str::FromStr;
 
     #[test]
     #[ignore]
@@ -313,5 +333,38 @@ mod test {
         let pubkey = TestKeys::new().pubkeys()[0];
         let expected: SignerID = SignerID { pubkey };
         assert_eq!(expected, signer_id);
+    }
+
+    #[test]
+    fn test_sort_signer_id() {
+        let alice = SignerID::new(
+            PublicKey::from_str(
+                "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
+            )
+            .unwrap(),
+        );
+        let bob = SignerID::new(
+            PublicKey::from_str(
+                "02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900",
+            )
+            .unwrap(),
+        );
+        let carol = SignerID::new(
+            PublicKey::from_str(
+                "02a85a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e",
+            )
+            .unwrap(),
+        );
+
+        assert!(alice > bob);
+        assert!(bob > carol);
+
+        //Sort key in BTreeMap.
+        let mut map: BTreeMap<SignerID, &str> = BTreeMap::new();
+        map.insert(alice, "a");
+        map.insert(bob, "b");
+        map.insert(carol, "c");
+        let values: Vec<&str> = map.values().cloned().collect();
+        assert_eq!(values, vec!["c", "b", "a"]);
     }
 }

@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::blockdata::BlockHash;
 use curv::arithmetic::traits::*;
@@ -90,5 +90,18 @@ impl Sign {
         v: GE,
     ) -> Signature {
         Signature::generate(vss_sum, local_sigs, parties, v)
+    }
+
+    pub fn format_signature(signature: &Signature) -> String {
+        let mut array: Vec<u8> = Vec::new();
+        let v_as_int = signature.v.x_coor().unwrap();
+        array.extend(curv::arithmetic::traits::Converter::to_vec(&v_as_int));
+        let s_as_int = signature.sigma.to_big_int();
+        array.extend(curv::arithmetic::traits::Converter::to_vec(&s_as_int));
+        let as_str = array
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>();
+        format!("{:x}{}", array.len(), as_str)
     }
 }

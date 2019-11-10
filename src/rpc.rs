@@ -5,9 +5,7 @@
 use bitcoin::Address;
 use log::Level::Trace;
 use log::{log_enabled, trace};
-use secp256k1::Signature;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde::Deserialize;
 
 use crate::blockdata::Block;
 use crate::errors::Error;

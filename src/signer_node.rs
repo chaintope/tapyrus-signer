@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
@@ -12,7 +12,7 @@ use std::{thread, time};
 use bitcoin::{Address, PrivateKey, PublicKey};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::*;
-use curv::{BigInt, FE, GE};
+use curv::{FE, GE};
 use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
 use redis::ControlFlow;
 
@@ -45,7 +45,7 @@ pub struct SharedSecret {
     pub secret_share: FE,
 }
 
-pub type SharedSecretMap = HashMap<SignerID, SharedSecret>;
+pub type SharedSecretMap = BTreeMap<SignerID, SharedSecret>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeState {
@@ -86,7 +86,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             master_index: 0,
             round_timer: RoundTimeOutObserver::new(timer_limit),
             priv_shared_keys: None,
-            shared_secrets: HashMap::new(),
+            shared_secrets: BTreeMap::new(),
         }
     }
 
@@ -1125,7 +1125,6 @@ mod tests {
         use crate::signer_node::tests::create_node;
         use crate::signer_node::{NodeState, SharedSecretMap};
         use bitcoin::Address;
-        use secp256k1::Signature;
         use std::cell::Cell;
 
         struct MockRpc {
