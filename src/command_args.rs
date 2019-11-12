@@ -31,6 +31,8 @@ pub const OPTION_NAME_ROUND_DURATION: &str = "round_duration";
 pub const OPTION_NAME_LOG_QUIET: &str = "log_quiet";
 pub const OPTION_NAME_LOG_LEVEL: &str = "log_level";
 
+pub const OPTION_NAME_SKIP_WAITING_IBD: &str = "skip_waiting_ibd";
+
 pub const DEFAULT_RPC_HOST: &str = "127.0.0.1";
 pub const DEFAULT_RPC_PORT: &str = "2377";
 pub const DEFAULT_RPC_USERNAME: &str = "";
@@ -49,7 +51,7 @@ struct SignerToml {
 }
 
 #[derive(Debug, Deserialize)]
-struct RpcToml {
+pub struct RpcToml {
     rpc_endpoint_host: Option<String>,
     rpc_endpoint_port: Option<u32>,
     rpc_endpoint_user: Option<String>,
@@ -57,16 +59,17 @@ struct RpcToml {
 }
 
 #[derive(Debug, Deserialize)]
-struct RedisToml {
+pub struct RedisToml {
     redis_host: Option<String>,
     redis_port: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
-struct GeneralToml {
+pub struct GeneralToml {
     round_duration: Option<u64>,
     log_level: Option<String>,
     log_quiet: Option<bool>,
+    skip_waiting_ibd: Option<bool>,
     master: Option<bool>,
 }
 
@@ -136,15 +139,15 @@ impl<'a> SignerConfig<'a> {
 }
 
 pub struct RpcCommandArgs<'a> {
-    host: Option<&'a str>,
-    port: Option<&'a str>,
-    username: Option<&'a str>,
-    password: Option<&'a str>,
+    pub host: Option<&'a str>,
+    pub port: Option<&'a str>,
+    pub username: Option<&'a str>,
+    pub password: Option<&'a str>,
 }
 
 pub struct RpcConfig<'a> {
-    command_args: RpcCommandArgs<'a>,
-    toml_config: Option<&'a RpcToml>,
+    pub command_args: RpcCommandArgs<'a>,
+    pub toml_config: Option<&'a RpcToml>,
 }
 
 impl<'a> RpcConfig<'a> {
@@ -174,13 +177,13 @@ impl<'a> RpcConfig<'a> {
 }
 
 pub struct RedisCommandArgs<'a> {
-    host: Option<&'a str>,
-    port: Option<&'a str>,
+    pub host: Option<&'a str>,
+    pub port: Option<&'a str>,
 }
 
 pub struct RedisConfig<'a> {
-    command_args: RedisCommandArgs<'a>,
-    toml_config: Option<&'a RedisToml>,
+    pub command_args: RedisCommandArgs<'a>,
+    pub toml_config: Option<&'a RedisToml>,
 }
 
 impl<'a> RedisConfig<'a> {
@@ -201,6 +204,7 @@ pub struct GeneralCommandArgs<'a> {
     round_duration: Option<&'a str>,
     log_quiet: bool,
     log_level: Option<&'a str>,
+    skip_waiting_ibd: bool,
     master: bool,
 }
 
@@ -226,6 +230,11 @@ impl<'a> GeneralConfig<'a> {
         let toml_value = self.toml_config.and_then(|config| config.log_quiet)
             .unwrap_or_default();
         self.command_args.log_quiet || toml_value
+    }
+    pub fn skip_waiting_ibd(&'a self) -> bool {
+        let toml_value = self.toml_config.and_then(|config| config.skip_waiting_ibd)
+            .unwrap_or_default();
+        self.command_args.skip_waiting_ibd || toml_value
     }
     pub fn master(&'a self) -> bool {
         let toml_value = self.toml_config.and_then(|config| config.master)
@@ -301,6 +310,7 @@ impl<'a> CommandArgs<'a> {
                 round_duration: self.matches.value_of(OPTION_NAME_REDIS_HOST),
                 log_level: self.matches.value_of(OPTION_NAME_LOG_LEVEL),
                 log_quiet: self.matches.is_present(OPTION_NAME_LOG_QUIET),
+                skip_waiting_ibd: self.matches.is_present(OPTION_NAME_SKIP_WAITING_IBD),
                 master: self.matches.is_present(OPTION_NAME_MASTER_FLAG),
             },
             toml_config: self.config.as_ref().and_then(|c| c.general.as_ref()),
@@ -384,6 +394,9 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
             .takes_value(true)
             .value_name("SECs")
             .help("Round interval times(sec)."))
+        .arg(Arg::with_name(OPTION_NAME_SKIP_WAITING_IBD)
+            .long("skip-waiting-ibd")
+            .help("This flag make signer node don't waiting connected Tapyrus full node finishes Initial Block Download when signer node started. When block creation stopped much time, The status of Tapyrus full node changes to progressing Initial Block Download. In this case, block creation is never resume, because signer node waits the status is back to non-IBD. So you can use this flag to start signer node with ignore tapyrus full node status."))
 }
 
 #[test]

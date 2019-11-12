@@ -19,6 +19,16 @@ struct CombineBlockSigsResult {
     complete: bool,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct GetBlockchainInfoResult {
+    pub chain: String,
+    pub blocks: u64,
+    pub headers: u64,
+    pub bestblockhash: String,
+    pub mediantime: u64,
+    pub initialblockdownload: bool,
+}
+
 pub struct Rpc {
     client: jsonrpc::client::Client,
 }
@@ -32,6 +42,8 @@ pub trait TapyrusApi {
     fn combineblocksigs(&self, block: &Block, signatures: &Vec<Signature>) -> Result<Block, Error>;
     /// Broadcast new block include enough proof.
     fn submitblock(&self, block: &Block) -> Result<(), Error>;
+    /// Get block chain info
+    fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error>;
 }
 
 impl Rpc {
@@ -43,18 +55,38 @@ impl Rpc {
         }
     }
 
-    fn call(&self, name: &str, params: &[serde_json::Value]) -> Result<jsonrpc::Response, Error> {
+    fn call<T>(&self, name: &str, params: &[serde_json::Value]) -> Result<T, Error>
+        where T: serde::de::DeserializeOwned
+    {
         let req = self.client.build_request(name, params);
 
         trace!("JSON-RPC request: {}", serde_json::to_string(&req).unwrap());
 
-        let resp = self.client.send_request(&req).map_err(Error::from);
-        if log_enabled!(Trace) && resp.is_ok() {
-            let resp = resp.as_ref().unwrap();
-            trace!("JSON-RPC response: {}", serde_json::to_string(resp).unwrap());
-        }
+        match self.client.send_request(&req) {
+            Ok(resp) => {
+                if log_enabled!(Trace) {
+                    trace!("JSON-RPC response: {}", serde_json::to_string(&resp).unwrap());
+                }
 
-        Ok(resp?)
+                if let Err(jsonrpc::Error::Rpc(e)) = resp.clone().check_error() {
+                    warn!("RPC Error: {:?}", e);
+                    return Err(Error::InvalidRequest(e));
+                }
+
+                match resp.result::<T>() {
+                    Ok(result) => Ok(result),
+                    Err(e) => Err(Error::JsonRpc(e))
+                }
+            },
+            Err(e) => Err(Error::from(e))
+        }
+    }
+
+    pub fn test_connection(&self) -> Result<(), Error>{
+        match self.getblockchaininfo() {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e)
+        }
     }
 }
 
@@ -62,14 +94,13 @@ impl TapyrusApi for Rpc {
     /// Call getnewblock rpc
     fn getnewblock(&self, address: &Address) -> Result<Block, Error> {
         let args = [address.to_string().into()];
-        let resp = self.call("getnewblock", &args);
+        let resp = self.call::<String>("getnewblock", &args);
 
         match resp {
-            Ok(jsonrpc::Response { result: Some(serde_json::Value::String(v)), .. }) => {
+            Ok(v) => {
                 let raw_block = hex::decode(v).expect("Decoding block hex failed");
                 Ok(Block::new(raw_block))
             }
-            Ok(_) => Err(Error::InvalidRequest),
             Err(e) => Err(e),
         }
     }
@@ -78,40 +109,30 @@ impl TapyrusApi for Rpc {
         let blockhex = serde_json::Value::from(block.hex());
         let acceptnonstdtxn = serde_json::Value::Bool(true);
         let args = [blockhex, acceptnonstdtxn];
-        let resp = self.call("testproposedblock", &args);
-
-        match resp {
-            Ok(jsonrpc::Response { result: Some(serde_json::Value::Bool(true)), .. }) => Ok(()),
-            Ok(_v) => Err(Error::InvalidRequest),
-            Err(error) => Err(error),
-        }
+        self.call::<()>("testproposedblock", &args)
     }
 
     fn combineblocksigs(&self, block: &Block, signatures: &Vec<Signature>) -> Result<Block, Error> {
         let blockhex: Value = block.hex().into();
         let signatures: Value = signatures.iter().map(|sig| { hex::encode(sig.serialize_der()) }).collect();
         let args = [blockhex, signatures];
-        let resp = self.call("combineblocksigs", &args);
+        let resp = self.call::<CombineBlockSigsResult>("combineblocksigs", &args);
 
-        match resp?.result::<CombineBlockSigsResult>() {
+        match resp {
             Ok(CombineBlockSigsResult { hex: v, .. }) => {
                 let raw_block = hex::decode(v).expect("Decoding block hex failed");
                 Ok(Block::new(raw_block))
             }
-            Err(e) => Err(Error::JsonRpc(e)),
+            Err(e) => Err(e),
         }
     }
 
     fn submitblock(&self, block: &Block) -> Result<(), Error> {
-        let blockhex: Value = block.hex().into();
-        let args = [blockhex];
-        let resp = self.call("submitblock", &args);
+        self.call::<()>("submitblock", &[block.hex().into()])
+    }
 
-        match resp {
-            Ok(jsonrpc::Response { result: None, .. }) => Ok(()),
-            Ok(_) => Err(Error::InvalidRequest),
-            Err(e) => Err(e),
-        }
+    fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error> {
+        self.call::<GetBlockchainInfoResult>("getblockchaininfo", &[])
     }
 }
 
@@ -197,6 +218,17 @@ pub mod tests {
             let _block = self.result()?;
             Ok(())
         }
+
+        fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error> {
+            Ok(GetBlockchainInfoResult {
+                chain: "regtest".to_string(),
+                blocks: 0,
+                headers: 0,
+                bestblockhash: "xxx".to_string(),
+                mediantime: 0,
+                initialblockdownload: false,
+            })
+        }
     }
 
     /// TODO: use rpc mock. Now this test needs tapyrus node process.
@@ -256,5 +288,14 @@ pub mod tests {
         // when invalid block.(cannot connect on the tip)
         let block = get_block(0);
         assert!(rpc.submitblock(&block).is_err());
+    }
+
+    #[test]
+    #[ignore]
+    fn test_getblockchaininfo() {
+        let rpc = get_rpc_client();
+        let result = rpc.getblockchaininfo();
+        println!("{:?}", result);
+        assert!(result.is_ok());
     }
 }

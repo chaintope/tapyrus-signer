@@ -12,13 +12,14 @@ pub enum Error {
     InvalidArgs(String),
     BitcoinConsensusEncodeError(bitcoin::consensus::encode::Error),
     /// Errors cause sender side matter, like parameter was wrong.
-    InvalidRequest,
+    InvalidRequest(jsonrpc::error::RpcError),
     DuplicatedMessage,
     InvalidSignature(secp256k1::Error),
     TimerAlreadyStarted,
     InvalidTomlFormat(toml::de::Error),
     ConfigFileIOError(std::io::Error),
     InvalidPublicKeyFormat(String),
+    RedisError(RedisError),
 }
 
 
@@ -57,4 +58,8 @@ impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Error {
         Error::ConfigFileIOError(e)
     }
+}
+
+impl From<RedisError> for Error {
+    fn from(e: RedisError) -> Error { Error::RedisError(e) }
 }

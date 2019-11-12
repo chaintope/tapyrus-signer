@@ -11,9 +11,10 @@ extern crate tapyrus_signer;
 
 use bitcoin::{PrivateKey, PublicKey};
 
-use tapyrus_signer::command_args::CommandArgs;
-use tapyrus_signer::net::RedisManager;
+use tapyrus_signer::command_args::{CommandArgs, RpcConfig, RedisConfig, RpcCommandArgs, RedisCommandArgs};
+use tapyrus_signer::net::{RedisManager, ConnectionManager};
 use tapyrus_signer::signer_node::{NodeParameters, SignerNode};
+use tapyrus_signer::rpc::Rpc;
 
 /// This command is for launch tapyrus-signer-node.
 /// command example:
@@ -28,28 +29,26 @@ fn main() {
     let is_master = general_config.master();
 
     if !is_quiet {
-        let env_value = format!("tapyrus_signer={}", log_level);
+        let env_value = format!("tapyrus_signer={},node={}", log_level, log_level);
         std::env::set_var("RUST_LOG", env_value);
         env_logger::init();
     }
 
     let signer_config = configs.signer_config();
     validate_options(&signer_config.public_keys(), &signer_config.private_key(), &signer_config.threshold()).unwrap();
-    let rpc = {
-        let rpc_config = configs.rpc_config();
-        tapyrus_signer::rpc::Rpc::new(format!("http://{}:{}", rpc_config.host(), rpc_config.port()),
-                                      rpc_config.user_name().map(str::to_string),
-                                      rpc_config.password().map(str::to_string))
-    };
-    let params = NodeParameters::new(signer_config.public_keys(),
-                                     signer_config.private_key(),
-                                     signer_config.threshold(),
-                                     rpc, is_master, round_duration);
-    let con = {
-        let rc = configs.redis_config();
-        RedisManager::new(rc.host().to_string(), rc.port().to_string())
-    };
 
+    let con = connect_signer_network(configs.redis_config());
+    let rpc = connect_rpc(configs.rpc_config());
+
+    let params = NodeParameters::new(
+        signer_config.public_keys(),
+        signer_config.private_key(),
+        signer_config.threshold(),
+        rpc,
+        is_master,
+        round_duration,
+        general_config.skip_waiting_ibd()
+    );
     let node = &mut SignerNode::new(con, params);
     node.start();
 }
@@ -71,6 +70,22 @@ fn validate_options(public_keys: &Vec<PublicKey>, private_key: &PrivateKey, thre
         }
     }
     Ok(())
+}
+
+fn connect_rpc(rpc_config: RpcConfig) -> Rpc {
+    let url = format!("http://{}:{}", rpc_config.host(), rpc_config.port());
+    let user = rpc_config.user_name().map(str::to_string);
+    let pass = rpc_config.password().map(str::to_string);
+    let rpc = tapyrus_signer::rpc::Rpc::new(url.clone(), user.clone(), pass);
+    rpc.test_connection()
+        .expect(&format!("RPC connect failed. Please confirm RPC connection info. url: {}, user: '{}' ,", url, user.unwrap_or("".to_string())));
+    rpc
+}
+
+fn connect_signer_network(rc: RedisConfig) -> impl ConnectionManager {
+    let redis_manager= RedisManager::new(rc.host().to_string(), rc.port().to_string());
+    redis_manager.test_connection().expect("Failed to connect redis. Please confirm redis connection info");
+    redis_manager
 }
 
 #[test]
@@ -100,4 +115,36 @@ fn test_validate_options_no_pair() {
     let private_key = PrivateKey::from_wif("cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA").unwrap();
 
     validate_options(&pubkey_list, &private_key, &threshold).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "RPC connect failed. Please confirm RPC connection info. url: http://127.0.0.1:9999, user: '' ")]
+fn test_connect_rpc() {
+    let config = RpcConfig {
+        command_args: RpcCommandArgs {
+            host: Some("127.0.0.1"),
+            port: Some("9999"),
+            username: None,
+            password: None
+        },
+        toml_config: None
+    };
+
+
+    connect_rpc(config);
+}
+
+#[test]
+#[should_panic(expected = "Failed to connect redis. Please confirm redis connection info")]
+fn test_connect_signer_network() {
+    // face redis config
+    let config = RedisConfig {
+        command_args: RedisCommandArgs {
+            host: Some("127.0.0.1"),
+            port: Some("9999")
+        },
+        toml_config: None
+    };
+
+    connect_signer_network(config);
 }
