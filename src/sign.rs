@@ -2,9 +2,6 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use std::collections::BTreeMap;
-
-use crate::blockdata::BlockHash;
 use curv::arithmetic::traits::*;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::*;

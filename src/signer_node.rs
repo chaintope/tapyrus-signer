@@ -47,6 +47,26 @@ pub struct SharedSecret {
 
 pub type SharedSecretMap = BTreeMap<SignerID, SharedSecret>;
 
+pub trait ToVerifiableSS {
+    fn to_vss(&self) -> Vec<VerifiableSS>;
+}
+
+impl ToVerifiableSS for SharedSecretMap {
+    fn to_vss(&self) -> Vec<VerifiableSS> {
+        self.values().map(|i| i.vss.clone()).collect()
+    }
+}
+
+pub trait ToShares {
+    fn to_shares(&self) -> Vec<FE>;
+}
+
+impl ToShares for SharedSecretMap {
+    fn to_shares(&self) -> Vec<FE> {
+        self.values().map(|i| i.secret_share).collect()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeState {
     Joining,
