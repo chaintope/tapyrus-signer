@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use serde::de::{Visitor, SeqAccess, Error};
+use serde::de::{Error, SeqAccess, Visitor};
 use std::fmt;
 
 pub struct ByteBufVisitor;
@@ -16,8 +16,8 @@ impl<'de> Visitor<'de> for ByteBufVisitor {
     }
 
     fn visit_seq<V>(self, mut visitor: V) -> Result<Self::Value, V::Error>
-        where
-            V: SeqAccess<'de>,
+    where
+        V: SeqAccess<'de>,
     {
         let mut values = Vec::new();
         while let Some(value) = visitor.next_element()? {
@@ -27,29 +27,29 @@ impl<'de> Visitor<'de> for ByteBufVisitor {
     }
 
     fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-        where
-            E: Error,
+    where
+        E: Error,
     {
         Ok(v.to_vec())
     }
 
     fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
-        where
-            E: Error,
+    where
+        E: Error,
     {
         Ok(v)
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-        where
-            E: Error,
+    where
+        E: Error,
     {
         Ok(v.as_bytes().to_vec())
     }
 
     fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-        where
-            E: Error,
+    where
+        E: Error,
     {
         Ok(v.into_bytes())
     }

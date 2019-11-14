@@ -2,39 +2,37 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+use crate::blockdata::Block;
+use crate::errors;
+use crate::serialize::ByteBufVisitor;
+use bitcoin::PublicKey;
+use redis::{Client, Commands, ControlFlow, PubSubCommands, RedisError};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::sync::mpsc::{channel, Receiver, Sender};
 /// メッセージを受け取って、それを処理するためのモジュール
 /// メッセージの処理は、メッセージの種類とラウンドの状態に依存する。
 /// ラウンドの状態は 誰が master であるか（自身がmaster であるか）。ラウンドが実行中であるか、開始待ちであるか。などで変わる
 use std::sync::Arc;
-use redis::{Client, Commands, ControlFlow, PubSubCommands, RedisError};
 use std::thread;
-use std::time::Duration;
-use serde::{Deserialize, Serialize, Serializer, Deserializer};
-use bitcoin::PublicKey;
-use crate::serialize::ByteBufVisitor;
-use crate::blockdata::Block;
 use std::thread::JoinHandle;
-use std::sync::mpsc::{Sender, Receiver, channel};
-use crate::errors;
-
+use std::time::Duration;
 
 /// Signerの識別子。公開鍵を識別子にする。
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub struct SignerID {
-    pub pubkey: PublicKey
+    pub pubkey: PublicKey,
 }
 
 impl SignerID {
     pub fn new(pubkey: PublicKey) -> Self {
-        SignerID {
-            pubkey
-        }
+        SignerID { pubkey }
     }
 }
 
 impl Serialize for SignerID {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         use bitcoin::util::psbt::serialize::Serialize;
 
@@ -45,8 +43,8 @@ impl Serialize for SignerID {
 
 impl<'de> Deserialize<'de> for SignerID {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         let vec = deserializer.deserialize_byte_buf(ByteBufVisitor)?;
 
@@ -76,7 +74,8 @@ pub struct Signature(pub secp256k1::Signature);
 
 impl Serialize for Signature {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         let ser = self.0.serialize_der();
         serializer.serialize_bytes(&ser[..])
@@ -85,8 +84,8 @@ impl Serialize for Signature {
 
 impl<'de> Deserialize<'de> for Signature {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         let vec = deserializer.deserialize_byte_buf(ByteBufVisitor)?;
 
@@ -96,11 +95,13 @@ impl<'de> Deserialize<'de> for Signature {
     }
 }
 
-
 pub trait ConnectionManager {
     type ERROR: std::error::Error;
     fn broadcast_message(&self, message: Message);
-    fn start(&self, message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static) -> JoinHandle<()>;
+    fn start(
+        &self,
+        message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
+    ) -> JoinHandle<()>;
     fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<Self::ERROR>>>;
 }
 
@@ -148,7 +149,10 @@ impl RedisManager {
     pub fn new(host: String, port: String) -> Self {
         let url: &str = &format!("redis://{}:{}", host, port);
         let client = Arc::new(Client::open(url).unwrap());
-        let (s, r): (Sender<ConnectionManagerError<RedisError>>, Receiver<ConnectionManagerError<RedisError>>) = channel();
+        let (s, r): (
+            Sender<ConnectionManagerError<RedisError>>,
+            Receiver<ConnectionManagerError<RedisError>>,
+        ) = channel();
         RedisManager {
             client,
             error_sender: s,
@@ -159,35 +163,45 @@ impl RedisManager {
     pub fn test_connection(&self) -> Result<(), errors::Error> {
         match self.client.get_connection() {
             Ok(_) => Ok(()),
-            Err(e) => Err(errors::Error::from(e))
+            Err(e) => Err(errors::Error::from(e)),
         }
     }
 
     fn subscribe<F>(&self, message_processor: F) -> thread::JoinHandle<()>
-        where F: FnMut(Message) -> ControlFlow<()> + Send + 'static
+    where
+        F: FnMut(Message) -> ControlFlow<()> + Send + 'static,
     {
         let client = Arc::clone(&self.client);
         let error_sender = self.error_sender.clone();
-        thread::Builder::new().name("RedisManagerThread".to_string()).spawn(move || {
-            fn inner_subscribe<F2>(client: Arc<Client>, mut message_processor: F2) -> Result<(), ConnectionManagerError<RedisError>>
-                where F2: FnMut(Message) -> ControlFlow<()> + Send + 'static
-            {
-                let mut conn = client.get_connection()?;
-                conn.subscribe(&["tapyrus-signer"], |msg| {
-                    let _ch = msg.get_channel_name();
-                    let payload: String = msg.get_payload().unwrap();
-                    log::trace!("receive message. payload: {}", payload);
+        thread::Builder::new()
+            .name("RedisManagerThread".to_string())
+            .spawn(move || {
+                fn inner_subscribe<F2>(
+                    client: Arc<Client>,
+                    mut message_processor: F2,
+                ) -> Result<(), ConnectionManagerError<RedisError>>
+                where
+                    F2: FnMut(Message) -> ControlFlow<()> + Send + 'static,
+                {
+                    let mut conn = client.get_connection()?;
+                    conn.subscribe(&["tapyrus-signer"], |msg| {
+                        let _ch = msg.get_channel_name();
+                        let payload: String = msg.get_payload().unwrap();
+                        log::trace!("receive message. payload: {}", payload);
 
-                    let message: Message = serde_json::from_str(&payload).unwrap();
-                    message_processor(message)
-                })?;
-                Ok(())
-            }
-            match inner_subscribe(client, message_processor) {
-                Ok(()) => {}
-                Err(e) => error_sender.send(e).expect("Can't notify RedisManager connection error"),
-            };
-        }).expect("Failed create RedisManagerThread.")
+                        let message: Message = serde_json::from_str(&payload).unwrap();
+                        message_processor(message)
+                    })?;
+                    Ok(())
+                }
+                match inner_subscribe(client, message_processor) {
+                    Ok(()) => {}
+                    Err(e) => error_sender
+                        .send(e)
+                        .expect("Can't notify RedisManager connection error"),
+                };
+            })
+            .expect("Failed create RedisManagerThread.")
     }
 }
 
@@ -196,37 +210,47 @@ impl ConnectionManager for RedisManager {
     fn broadcast_message(&self, message: Message) {
         let client = Arc::clone(&self.client);
         let message_in_thread = serde_json::to_string(&message).unwrap();
-        thread::Builder::new().name("RedisBroadcastThread".to_string()).spawn(move || {
-            let conn = client.get_connection().unwrap();
-            thread::sleep(Duration::from_millis(500));
+        thread::Builder::new()
+            .name("RedisBroadcastThread".to_string())
+            .spawn(move || {
+                let conn = client.get_connection().unwrap();
+                thread::sleep(Duration::from_millis(500));
 
-            log::trace!("Publish {} to tapyrus-signer channel.", message_in_thread);
+                log::trace!("Publish {} to tapyrus-signer channel.", message_in_thread);
 
-            let _: () = conn.publish("tapyrus-signer", message_in_thread).unwrap();
-        }).unwrap().join().expect("Can't connect to Redis Server.");
+                let _: () = conn.publish("tapyrus-signer", message_in_thread).unwrap();
+            })
+            .unwrap()
+            .join()
+            .expect("Can't connect to Redis Server.");
     }
 
-    fn start(&self, message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static) -> JoinHandle<()>
-    {
+    fn start(
+        &self,
+        message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
+    ) -> JoinHandle<()> {
         self.subscribe(message_processor)
     }
 
-    fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<Self::ERROR>>>
-    {
+    fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<Self::ERROR>>> {
         self.error_receiver.take()
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_helper::{TestKeys, create_message};
+    use crate::test_helper::{create_message, TestKeys};
 
     #[test]
     fn redis_connection_test() {
-        let connection_manager = Arc::new(RedisManager::new("localhost".to_string(), "6379".to_string()));
-        let sender_id = SignerID { pubkey: TestKeys::new().pubkeys()[0] };
+        let connection_manager = Arc::new(RedisManager::new(
+            "localhost".to_string(),
+            "6379".to_string(),
+        ));
+        let sender_id = SignerID {
+            pubkey: TestKeys::new().pubkeys()[0],
+        };
 
         let message_processor = move |message: Message| {
             assert_eq!(message.message_type, MessageType::Roundfailure);
@@ -276,6 +300,9 @@ mod test {
         let sig = Signature(secp256k1::Signature::from_der(&base64::decode("MEUCIQDRTksobD+H7H46+EXJhsZ7CWSIZcqohndyAFYkEe6YvgIgWwzqhQr/IHrX+RU+CliF35tFzasfaXINrhWfdqErOok=").unwrap()).unwrap());
         let deserialized = serde_json::from_str::<Message>(expected_serialized_message).unwrap();
         assert_eq!(deserialized.message_type, MessageType::Signature(sig));
-        assert_eq!(deserialized.sender_id, SignerID::new(TestKeys::new().pubkeys()[0]));
+        assert_eq!(
+            deserialized.sender_id,
+            SignerID::new(TestKeys::new().pubkeys()[0])
+        );
     }
 }

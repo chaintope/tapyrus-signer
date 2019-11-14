@@ -6,18 +6,18 @@ extern crate bitcoin;
 extern crate secp256k1;
 #[macro_use]
 extern crate log;
-extern crate hex;
-extern crate byteorder;
 extern crate base64;
+extern crate byteorder;
+extern crate hex;
 extern crate redis;
 
-pub mod command_args;
 pub mod blockdata;
-pub mod rpc;
-pub mod sign;
-pub mod test_helper;
+pub mod command_args;
 pub mod errors;
 pub mod net;
-pub mod signer_node;
+pub mod rpc;
 pub mod serialize;
+pub mod sign;
+pub mod signer_node;
+pub mod test_helper;
 pub mod timer;

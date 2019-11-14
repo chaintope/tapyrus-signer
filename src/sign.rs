@@ -2,9 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use bitcoin::PrivateKey;
-use secp256k1::{Signature, Secp256k1, Message};
 use crate::blockdata::BlockHash;
+use bitcoin::PrivateKey;
+use secp256k1::{Message, Secp256k1, Signature};
 
 pub fn sign(private_key: &PrivateKey, hash: &BlockHash) -> Signature {
     let sign = Secp256k1::signing_only();
@@ -14,9 +14,9 @@ pub fn sign(private_key: &PrivateKey, hash: &BlockHash) -> Signature {
 
 #[cfg(test)]
 mod test {
-    use base64;
-    use crate::test_helper::{TestKeys, get_block};
     use super::*;
+    use crate::test_helper::{get_block, TestKeys};
+    use base64;
 
     #[test]
     fn sign_test() {

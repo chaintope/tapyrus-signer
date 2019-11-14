@@ -2,9 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use serde::{Deserialize, Serialize};
-use bitcoin_hashes::{sha256d, Hash};
 use crate::errors::Error;
+use bitcoin_hashes::{sha256d, Hash};
+use serde::{Deserialize, Serialize};
 
 pub struct BlockHash([u8; 32]);
 
@@ -21,8 +21,12 @@ impl BlockHash {
         }
     }
 
-    pub fn into_inner(self) -> [u8; 32] { self.0 }
-    pub fn borrow_inner(&self) -> &[u8; 32] { &self.0 }
+    pub fn into_inner(self) -> [u8; 32] {
+        self.0
+    }
+    pub fn borrow_inner(&self) -> &[u8; 32] {
+        &self.0
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -33,9 +37,13 @@ impl Block {
         Block(data)
     }
     /// Length of block header without proof is 104 bytes.
-    pub fn get_header_without_proof(&self) -> &[u8] { &self.0[..104] }
+    pub fn get_header_without_proof(&self) -> &[u8] {
+        &self.0[..104]
+    }
 
-    pub fn hex(&self) -> String { hex::encode(&self.0) }
+    pub fn hex(&self) -> String {
+        hex::encode(&self.0)
+    }
 
     pub fn hash(&self) -> Result<BlockHash, Error> {
         let header = self.get_header_without_proof();

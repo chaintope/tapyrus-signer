@@ -3,17 +3,22 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 extern crate tapyrus_signer;
-use bitcoin::{PrivateKey, Address};
-use secp256k1::Secp256k1;
+use bitcoin::{Address, PrivateKey};
 use secp256k1;
+use secp256k1::Secp256k1;
 
 use tapyrus_signer::rpc::{Rpc, TapyrusApi};
 use tapyrus_signer::sign::sign;
 
 pub fn main() {
     // initialize
-    let rpc = Rpc::new("http://127.0.0.1:12381".to_string(), Some("user".to_string()), Some("pass".to_string()));
-    let private_key = PrivateKey::from_wif("cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA").unwrap();
+    let rpc = Rpc::new(
+        "http://127.0.0.1:12381".to_string(),
+        Some("user".to_string()),
+        Some("pass".to_string()),
+    );
+    let private_key =
+        PrivateKey::from_wif("cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA").unwrap();
     // call getnewblock rpc
     let secp = Secp256k1::new();
     let address = Address::p2pkh(&private_key.public_key(&secp), private_key.network);

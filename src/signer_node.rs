@@ -3,8 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
 use std::time::Duration;
 
 use bitcoin::{Address, PrivateKey, PublicKey};
@@ -12,7 +12,7 @@ use redis::ControlFlow;
 
 use crate::blockdata::Block;
 use crate::net::{ConnectionManager, Message, MessageType, Signature, SignerID};
-use crate::rpc::{TapyrusApi, GetBlockchainInfoResult};
+use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use crate::sign::sign;
 use crate::timer::RoundTimeOutObserver;
 
@@ -45,13 +45,17 @@ pub enum NodeState {
 
 fn sender_index(sender_id: &SignerID, pubkey_list: &[PublicKey]) -> usize {
     //Unknown sender is already ignored.
-    pubkey_list.iter()
-        .position(|pk| pk == &sender_id.pubkey).unwrap()
+    pubkey_list
+        .iter()
+        .position(|pk| pk == &sender_id.pubkey)
+        .unwrap()
 }
 
 impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     pub fn new(connection_manager: C, params: NodeParameters<T>) -> Self
-    where Self: Sized {
+    where
+        Self: Sized,
+    {
         let timer_limit = params.round_duration + ROUND_TIMELIMIT_DELTA;
         SignerNode {
             connection_manager,
@@ -73,13 +77,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
 
         let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
-        let closure = move |message: Message| {
-            match sender.send(message) {
-                Ok(_) => ControlFlow::Continue,
-                Err(error) => {
-                    log::warn!("Happened error!: {:?}", error);
-                    ControlFlow::Break(())
-                }
+        let closure = move |message: Message| match sender.send(message) {
+            Ok(_) => ControlFlow::Continue,
+            Err(error) => {
+                log::warn!("Happened error!: {:?}", error);
+                ControlFlow::Break(())
             }
         };
 
@@ -90,7 +92,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         } else {
             NodeState::Member
         };
-        log::info!("node start. NodeState: {:?}, node_index: {}, master_index: {}", &self.current_state, &self.params.self_node_index, &self.master_index);
+        log::info!(
+            "node start. NodeState: {:?}, node_index: {}, master_index: {}",
+            &self.current_state,
+            &self.params.self_node_index,
+            &self.master_index
+        );
 
         // Roundのtimeoutを監視するthreadを開始
         self.round_timer.start().unwrap();
@@ -112,7 +119,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     Err(e) => {
                         panic!("{:?}", e);
                     }
-                }
+                },
                 None => {}
             }
             // Receiving message.
@@ -134,14 +141,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             }
             // Should be panic, if happened error in connection_manager.
             match connection_manager_error_handler {
-                Some(ref receiver) => {
-                    match receiver.try_recv() {
-                        Ok(e) => {
-                            self.round_timer.stop();
-                            panic!(e.to_string());
-                        },
-                        Err(_e) => {},
+                Some(ref receiver) => match receiver.try_recv() {
+                    Ok(e) => {
+                        self.round_timer.stop();
+                        panic!(e.to_string());
                     }
+                    Err(_e) => {}
                 },
                 None => {
                     log::warn!("Failed to get error_handler of connection_manager!");
@@ -158,14 +163,24 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         log::info!("If you start right away, you can set `--skip-waiting-ibd` option. ");
 
         loop {
-            match self.params.rpc.getblockchaininfo().expect("RPC connection failed") {
-                GetBlockchainInfoResult { initialblockdownload: false, .. } => {
+            match self
+                .params
+                .rpc
+                .getblockchaininfo()
+                .expect("RPC connection failed")
+            {
+                GetBlockchainInfoResult {
+                    initialblockdownload: false,
+                    ..
+                } => {
                     break;
                 }
                 GetBlockchainInfoResult {
                     initialblockdownload: true,
                     blocks: height,
-                    bestblockhash: hash,  ..} => {
+                    bestblockhash: hash,
+                    ..
+                } => {
                     log::info!("Waiting for finish Initial Block Download. Current block height: {}, current best hash: {}", height, hash);
                 }
             }
@@ -196,15 +211,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             MessageType::Candidateblock(block) => {
                 self.process_candidateblock(&message.sender_id, &block)
             }
-            MessageType::Signature(sig) => {
-                self.process_signature(&message.sender_id, &sig)
-            }
+            MessageType::Signature(sig) => self.process_signature(&message.sender_id, &sig),
             MessageType::Completedblock(block) => {
                 self.process_completedblock(&message.sender_id, &block)
             }
-            MessageType::Roundfailure => {
-                self.process_roundfailure(&message.sender_id)
-            }
+            MessageType::Roundfailure => self.process_roundfailure(&message.sender_id),
         }
     }
 
@@ -224,7 +235,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         self.round_timer.restart().unwrap();
                     }
                     Err(_e) => {
-                        log::warn!("Received Invalid candidate block!!: sender: {:?}", sender_id);
+                        log::warn!(
+                            "Received Invalid candidate block!!: sender: {:?}",
+                            sender_id
+                        );
                     }
                 }
             }
@@ -234,11 +248,16 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         self.current_state.clone()
     }
 
-
     fn block2message(&self, block: &Block) -> secp256k1::Message {
         secp256k1::Message::from_slice(block.hash().unwrap().borrow_inner()).unwrap()
     }
-    fn verify_signature(&self, signature_map: &SignatureMap, block: &Block, sig: &secp256k1::Signature, sender_id: &SignerID) -> Result<(), crate::errors::Error> {
+    fn verify_signature(
+        &self,
+        signature_map: &SignatureMap,
+        block: &Block,
+        sig: &secp256k1::Signature,
+        sender_id: &SignerID,
+    ) -> Result<(), crate::errors::Error> {
         if signature_map.contains_key(sender_id) {
             Err(crate::errors::Error::DuplicatedMessage)
         } else {
@@ -251,7 +270,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     }
     fn process_signature(&mut self, sender_id: &SignerID, signature: &Signature) -> NodeState {
         match &self.current_state {
-            NodeState::Master { signature_map: ref sig_map, candidate_block: ref block } => {
+            NodeState::Master {
+                signature_map: ref sig_map,
+                candidate_block: ref block,
+            } => {
                 let mut signature_map: SignatureMap = sig_map.clone();
                 match self.verify_signature(&signature_map, &block, &signature.0, &sender_id) {
                     Ok(_) => {
@@ -259,7 +281,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         if signature_map.len() as u8 >= self.params.threshold {
                             // call combineblocksigs
                             let sigs = signature_map.values().map(|v| *v).collect();
-                            let completed_block = self.params.rpc.combineblocksigs(&block, &sigs).unwrap();
+                            let completed_block =
+                                self.params.rpc.combineblocksigs(&block, &sigs).unwrap();
 
                             // call submitblock
                             self.params.rpc.submitblock(&completed_block).unwrap();
@@ -274,7 +297,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                             // start round robin.
                             self.round_robin_master()
                         } else {
-                            NodeState::Master { signature_map, candidate_block: block.clone() }
+                            NodeState::Master {
+                                signature_map,
+                                candidate_block: block.clone(),
+                            }
                         }
                     }
                     Err(e) => {
@@ -283,9 +309,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     }
                 }
             }
-            state => {
-                state.clone()
-            }
+            state => state.clone(),
         }
     }
 
@@ -299,12 +323,18 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         } else {
             NodeState::Member
         };
-        log::info!("Round Robin: Next State {:?}, node_index: {}, master_inde: {}", next_state, self.params.self_node_index, self.master_index);
+        log::info!(
+            "Round Robin: Next State {:?}, node_index: {}, master_inde: {}",
+            next_state,
+            self.params.self_node_index,
+            self.master_index
+        );
         next_state
     }
     fn process_completedblock(&mut self, sender_id: &SignerID, _block: &Block) -> NodeState {
         let index = sender_index(sender_id, &self.params.pubkey_list);
-        if index == self.master_index { // authorization master.
+        if index == self.master_index {
+            // authorization master.
             // start round robin of master node.
             return self.round_robin_master();
         }
@@ -330,18 +360,21 @@ pub struct NodeParameters<T: TapyrusApi> {
 }
 
 impl<T: TapyrusApi> NodeParameters<T> {
-    pub fn new(pubkey_list: Vec<PublicKey>,
-               private_key: PrivateKey,
-               threshold: u8,
-               rpc: T,
-               master_flag: bool,
-               round_duration: u64,
-               skip_waiting_ibd: bool
+    pub fn new(
+        pubkey_list: Vec<PublicKey>,
+        private_key: PrivateKey,
+        threshold: u8,
+        rpc: T,
+        master_flag: bool,
+        round_duration: u64,
+        skip_waiting_ibd: bool,
     ) -> NodeParameters<T> {
         let secp = secp256k1::Secp256k1::new();
         let self_pubkey = private_key.public_key(&secp);
         let address = Address::p2pkh(&self_pubkey, private_key.network);
-        let signer_id = SignerID { pubkey: self_pubkey };
+        let signer_id = SignerID {
+            pubkey: self_pubkey,
+        };
         let master_flag = master_flag;
 
         let mut pubkey_list = pubkey_list;
@@ -365,20 +398,20 @@ impl<T: TapyrusApi> NodeParameters<T> {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::sync::{Arc, Mutex};
     use std::sync::mpsc::{channel, Receiver, Sender};
+    use std::sync::{Arc, Mutex};
     use std::thread;
     use std::thread::JoinHandle;
     use std::time::Duration;
 
     use redis::ControlFlow;
 
-    use crate::net::{ConnectionManager, Message, Signature, SignerID, ConnectionManagerError};
-    use crate::rpc::tests::{MockRpc, safety, safety_error, SafetyBlock};
+    use crate::net::{ConnectionManager, ConnectionManagerError, Message, Signature, SignerID};
+    use crate::rpc::tests::{safety, safety_error, MockRpc, SafetyBlock};
+    use crate::rpc::TapyrusApi;
     use crate::sign::sign;
     use crate::signer_node::{NodeParameters, NodeState, SignerNode};
     use crate::test_helper::{get_block, TestKeys};
-    use crate::rpc::TapyrusApi;
 
     type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
 
@@ -413,7 +446,10 @@ mod tests {
             (self.broadcast_assert)(rc_message.clone());
         }
 
-        fn start(&self, mut message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static) -> JoinHandle<()> {
+        fn start(
+            &self,
+            mut message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
+        ) -> JoinHandle<()> {
             for _count in 0..self.receive_count {
                 match self.receiver.recv() {
                     Ok(message) => {
@@ -423,19 +459,27 @@ mod tests {
                     Err(e) => log::warn!("happend receiver error: {:?}", e),
                 }
             }
-            thread::Builder::new().name("TestConnectionManager start Thread".to_string()).spawn(|| {
-                thread::sleep(Duration::from_millis(300));
-            }).unwrap()
+            thread::Builder::new()
+                .name("TestConnectionManager start Thread".to_string())
+                .spawn(|| {
+                    thread::sleep(Duration::from_millis(300));
+                })
+                .unwrap()
         }
 
-        fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<crate::errors::Error>>> {
+        fn error_handler(
+            &mut self,
+        ) -> Option<Receiver<ConnectionManagerError<crate::errors::Error>>> {
             None::<Receiver<ConnectionManagerError<crate::errors::Error>>>
         }
     }
 
-    fn create_node<T: TapyrusApi>(current_state: NodeState, rpc: T) -> SignerNode<T, TestConnectionManager> {
+    fn create_node<T: TapyrusApi>(
+        current_state: NodeState,
+        rpc: T,
+    ) -> SignerNode<T, TestConnectionManager> {
         let closure: SpyMethod = Box::new(move |_message: Arc<Message>| {});
-        let(node, _) = create_node_with_closure_and_publish_count(current_state, rpc, closure, 1);
+        let (node, _) = create_node_with_closure_and_publish_count(current_state, rpc, closure, 1);
         node
     }
 
@@ -443,14 +487,15 @@ mod tests {
         current_state: NodeState,
         rpc: T,
         spy: SpyMethod,
-        publish_count: u32
+        publish_count: u32,
     ) -> (SignerNode<T, TestConnectionManager>, Sender<Message>) {
         let testkeys = TestKeys::new();
         let pubkey_list = testkeys.pubkeys();
         let threshold = 3;
         let private_key = testkeys.key[0];
 
-        let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, true, 0, true);
+        let mut params =
+            NodeParameters::new(pubkey_list, private_key, threshold, rpc, true, 0, true);
         params.round_duration = 0;
         let con = TestConnectionManager::new(publish_count, spy);
         let broadcaster = con.sender.clone();
@@ -460,28 +505,39 @@ mod tests {
     }
 
     /// Run node on other thread.
-    pub fn setup_node(spy: SpyMethod, arc_block: SafetyBlock)
-                      -> (Arc<Mutex<SignerNode<MockRpc, TestConnectionManager>>>, Sender<u32>, Sender<Message>) {
+    pub fn setup_node(
+        spy: SpyMethod,
+        arc_block: SafetyBlock,
+    ) -> (
+        Arc<Mutex<SignerNode<MockRpc, TestConnectionManager>>>,
+        Sender<u32>,
+        Sender<Message>,
+    ) {
         let testkeys = TestKeys::new();
         let pubkey_list = testkeys.pubkeys();
         let threshold = 2;
         let private_key = testkeys.key[0];
 
         let con = TestConnectionManager::new(1, spy);
-        let rpc = MockRpc { return_block: arc_block.clone() };
+        let rpc = MockRpc {
+            return_block: arc_block.clone(),
+        };
         let broadcaster = con.sender.clone();
 
         let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
-        let mut params = NodeParameters::new(pubkey_list, private_key, threshold, rpc, false, 0, true);
+        let mut params =
+            NodeParameters::new(pubkey_list, private_key, threshold, rpc, false, 0, true);
         params.round_duration = 0;
         let arc_node = Arc::new(Mutex::new(SignerNode::new(con, params)));
         let node = arc_node.clone();
-        let _handle = thread::Builder::new().name("NodeMainThread".to_string()).spawn(move || {
-            let mut node = node.lock().unwrap();
-            node.stop_handler(stop_handler);
-            node.start();
-        }).unwrap();
-
+        let _handle = thread::Builder::new()
+            .name("NodeMainThread".to_string())
+            .spawn(move || {
+                let mut node = node.lock().unwrap();
+                node.stop_handler(stop_handler);
+                node.start();
+            })
+            .unwrap();
 
         (arc_node, stop_signal, broadcaster)
     }
@@ -507,17 +563,41 @@ mod tests {
         use std::str::FromStr;
 
         let testkeys = TestKeys::new();
-        let pubkey_list =
-            vec![
-                PublicKey::from_str("03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc").unwrap(),
-                PublicKey::from_str("02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900").unwrap(),
-                PublicKey::from_str("02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e").unwrap(),
-                PublicKey::from_str("02d111519ba1f3013a7a613ecdcc17f4d53fbcb558b70404b5fb0c84ebb90a8d3c").unwrap(),
-                PublicKey::from_str("02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506").unwrap(),
-            ];
+        let pubkey_list = vec![
+            PublicKey::from_str(
+                "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
+            )
+            .unwrap(),
+            PublicKey::from_str(
+                "02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900",
+            )
+            .unwrap(),
+            PublicKey::from_str(
+                "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e",
+            )
+            .unwrap(),
+            PublicKey::from_str(
+                "02d111519ba1f3013a7a613ecdcc17f4d53fbcb558b70404b5fb0c84ebb90a8d3c",
+            )
+            .unwrap(),
+            PublicKey::from_str(
+                "02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506",
+            )
+            .unwrap(),
+        ];
         let threshold = 3;
         let private_key = testkeys.key[0];
-        let params = NodeParameters::new(pubkey_list.clone(), private_key, threshold, MockRpc { return_block: safety_error("Not set block.".to_string()) }, true, 0, true);
+        let params = NodeParameters::new(
+            pubkey_list.clone(),
+            private_key,
+            threshold,
+            MockRpc {
+                return_block: safety_error("Not set block.".to_string()),
+            },
+            true,
+            0,
+            true,
+        );
 
         assert_ne!(params.pubkey_list[0], pubkey_list[0]);
         assert_eq!(params.pubkey_list[1], pubkey_list[4]);
@@ -564,7 +644,9 @@ mod tests {
     fn test_modify_master_index() {
         let initial_state = NodeState::Member;
         let arc_block = safety(get_block(0));
-        let rpc = MockRpc { return_block: arc_block.clone() };
+        let rpc = MockRpc {
+            return_block: arc_block.clone(),
+        };
         let mut node = create_node(initial_state, rpc);
 
         // pubkeys sorted index map;
@@ -590,8 +672,11 @@ mod tests {
         let closure: SpyMethod = Box::new(move |_message: Arc<Message>| {});
         let initial_state = NodeState::Member;
         let arc_block = safety(get_block(0));
-        let rpc = MockRpc { return_block: arc_block.clone() };
-        let (mut node, _broadcaster) = create_node_with_closure_and_publish_count(initial_state, rpc, closure, 0);
+        let rpc = MockRpc {
+            return_block: arc_block.clone(),
+        };
+        let (mut node, _broadcaster) =
+            create_node_with_closure_and_publish_count(initial_state, rpc, closure, 0);
 
         let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
         node.stop_handler(stop_handler);
@@ -616,7 +701,9 @@ mod tests {
         let initial_state = get_initial_master_state();
 
         let arc_block = safety(get_block(0));
-        let rpc = MockRpc { return_block: arc_block.clone() };
+        let rpc = MockRpc {
+            return_block: arc_block.clone(),
+        };
         let mut node = create_node(initial_state, rpc);
 
         // sign node1
@@ -629,7 +716,10 @@ mod tests {
             let next_state = node.process_signature(&sender_id, &Signature(sig));
 
             match next_state {
-                NodeState::Master { signature_map: ref sigs, .. } => {
+                NodeState::Master {
+                    signature_map: ref sigs,
+                    ..
+                } => {
                     assert_eq!(sigs.len(), 2);
                 }
                 ref state => panic!("Should be Master node, but: {:?}", state),
@@ -642,7 +732,8 @@ mod tests {
         // After node2 send signature, threshold is going to be met. So, signatures vector is
         // cleared and the block state object has is renewed.
         {
-            { // guard context. lock is only enable in this block.
+            {
+                // guard context. lock is only enable in this block.
                 let mut guard_block = arc_block.try_lock().unwrap();
                 std::mem::replace(&mut *guard_block, Ok(get_block(1))).unwrap();
             }
@@ -665,7 +756,9 @@ mod tests {
         let initial_state = get_initial_master_state();
 
         let arc_block = safety(get_block(0));
-        let rpc = MockRpc { return_block: arc_block.clone() };
+        let rpc = MockRpc {
+            return_block: arc_block.clone(),
+        };
         let mut node = create_node(initial_state, rpc);
 
         // sign node1
@@ -677,7 +770,10 @@ mod tests {
             let next_state = node.process_signature(&sender_id, &Signature(sig));
 
             match next_state {
-                NodeState::Master { signature_map: ref sigs, .. } => {
+                NodeState::Master {
+                    signature_map: ref sigs,
+                    ..
+                } => {
                     assert_eq!(sigs.len(), 1); // invalid signature do not include.
                 }
                 ref state => panic!("{:?}", state),
@@ -692,7 +788,9 @@ mod tests {
         let initial_state = get_initial_master_state();
 
         let arc_block = safety(get_block(0));
-        let rpc = MockRpc { return_block: arc_block.clone() };
+        let rpc = MockRpc {
+            return_block: arc_block.clone(),
+        };
         let mut node = create_node(initial_state, rpc);
 
         // sign node1
@@ -707,7 +805,10 @@ mod tests {
             let next_state = node.process_signature(&sender_id, &Signature(sig));
 
             match next_state {
-                NodeState::Master { signature_map: ref sigs, .. } => {
+                NodeState::Master {
+                    signature_map: ref sigs,
+                    ..
+                } => {
                     assert_eq!(sigs.len(), 2); // ignore duplicate.
                 }
                 ref state => panic!("{:?}", state),
@@ -721,7 +822,9 @@ mod tests {
     fn test_process_completedblock() {
         let initial_state = NodeState::Member;
         let arc_block = safety(get_block(0));
-        let rpc = MockRpc { return_block: arc_block.clone() };
+        let rpc = MockRpc {
+            return_block: arc_block.clone(),
+        };
         let mut node = create_node(initial_state, rpc);
 
         // pubkeys sorted index map;
@@ -764,7 +867,9 @@ mod tests {
     fn test_process_completedblock_ignore_different_master() {
         let initial_state = NodeState::Member;
         let arc_block = safety(get_block(0));
-        let rpc = MockRpc { return_block: arc_block.clone() };
+        let rpc = MockRpc {
+            return_block: arc_block.clone(),
+        };
         let mut node = create_node(initial_state, rpc);
 
         // pubkeys sorted index map;
@@ -784,25 +889,37 @@ mod tests {
     }
 
     mod test_for_waiting_ibd_finish {
-        use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
-        use bitcoin::Address;
         use crate::blockdata::Block;
         use crate::errors::Error;
-        use std::cell::Cell;
-        use crate::signer_node::NodeState;
+        use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
         use crate::signer_node::tests::create_node;
+        use crate::signer_node::NodeState;
+        use bitcoin::Address;
         use secp256k1::Signature;
+        use std::cell::Cell;
 
         struct MockRpc {
             pub results: [GetBlockchainInfoResult; 2],
-            pub call_count: Cell<usize>
+            pub call_count: Cell<usize>,
         }
 
         impl TapyrusApi for MockRpc {
-            fn getnewblock(&self, address: &Address) -> Result<Block, Error> { unimplemented!() }
-            fn testproposedblock(&self, block: &Block) -> Result<(), Error> { unimplemented!() }
-            fn combineblocksigs(&self, block: &Block, signatures: &Vec<Signature>) -> Result<Block, Error> { unimplemented!() }
-            fn submitblock(&self, block: &Block) -> Result<(), Error> { unimplemented!() }
+            fn getnewblock(&self, address: &Address) -> Result<Block, Error> {
+                unimplemented!()
+            }
+            fn testproposedblock(&self, block: &Block) -> Result<(), Error> {
+                unimplemented!()
+            }
+            fn combineblocksigs(
+                &self,
+                block: &Block,
+                signatures: &Vec<Signature>,
+            ) -> Result<Block, Error> {
+                unimplemented!()
+            }
+            fn submitblock(&self, block: &Block) -> Result<(), Error> {
+                unimplemented!()
+            }
 
             fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error> {
                 let result = self.results[self.call_count.get()].clone();
@@ -823,7 +940,7 @@ mod tests {
 
             let rpc = MockRpc {
                 results: [result1, result2],
-                call_count: Cell::new(0)
+                call_count: Cell::new(0),
             };
 
             let node = create_node(NodeState::Member, rpc);
