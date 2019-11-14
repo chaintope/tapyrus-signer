@@ -243,6 +243,7 @@ mod test {
     use crate::test_helper::{create_message, TestKeys};
 
     #[test]
+    #[ignore]
     fn redis_connection_test() {
         let connection_manager = Arc::new(RedisManager::new(
             "localhost".to_string(),
