@@ -4,12 +4,12 @@
 
 use std::str::FromStr;
 
-use bitcoin::{PublicKey, PrivateKey};
+use crate::signer_node::ROUND_INTERVAL_DEFAULT_SECS;
+use bitcoin::{PrivateKey, PublicKey};
 use clap::{App, Arg};
 use log;
 use serde::Deserialize;
 use std::error::Error;
-use crate::signer_node::ROUND_INTERVAL_DEFAULT_SECS;
 
 pub const OPTION_NAME_CONFIG: &str = "config";
 pub const OPTION_NAME_PUBLIC_KEY: &str = "publickeys";
@@ -99,18 +99,33 @@ pub struct SignerConfig<'a> {
 
 impl<'a> SignerConfig<'a> {
     pub fn public_keys(&self) -> Vec<PublicKey> {
-        let vec_string: Option<&Vec<String>> = self.toml_config.and_then(|config| config.publickeys.as_ref());
-        let pubkeys_within_config: Option<Vec<&str>> = vec_string.map(|v| v.iter().map(|s| &s as &str).collect());
+        let vec_string: Option<&Vec<String>> = self
+            .toml_config
+            .and_then(|config| config.publickeys.as_ref());
+        let pubkeys_within_config: Option<Vec<&str>> =
+            vec_string.map(|v| v.iter().map(|s| &s as &str).collect());
         // TODO: maybe panic is not suitable? should be return result<vec, error> ?
-        let specified = self.command_args.public_keys.as_ref().or(pubkeys_within_config.as_ref()).expect("Must be specified public_keys.");
-        let parse_results: Vec<Result<PublicKey, String>> = specified.iter().map(|s| {
-            PublicKey::from_str(s).or_else(|_e| Err(format!("'{}' is invalid public key format.\n", s)))
-        }).collect();
+        let specified = self
+            .command_args
+            .public_keys
+            .as_ref()
+            .or(pubkeys_within_config.as_ref())
+            .expect("Must be specified public_keys.");
+        let parse_results: Vec<Result<PublicKey, String>> = specified
+            .iter()
+            .map(|s| {
+                PublicKey::from_str(s)
+                    .or_else(|_e| Err(format!("'{}' is invalid public key format.\n", s)))
+            })
+            .collect();
 
         // separate invalid pubkey while doing convert.
         let mut iter = parse_results.iter();
-        let errors: Vec<&String> = iter.by_ref().filter(|r| r.is_err())
-            .map(|r| r.as_ref().err().unwrap()).collect();
+        let errors: Vec<&String> = iter
+            .by_ref()
+            .filter(|r| r.is_err())
+            .map(|r| r.as_ref().err().unwrap())
+            .collect();
         if !errors.is_empty() {
             panic!("{:?}", errors.into_iter().fold(String::new(), |s, e| s + e));
         }
@@ -120,19 +135,27 @@ impl<'a> SignerConfig<'a> {
 
     pub fn threshold(&self) -> u8 {
         // TODO: should be retrn Result<u8, Error>?
-        self.command_args.threshold
+        self.command_args
+            .threshold
             .or(self.toml_config.and_then(|config| config.threshold))
             .expect("Must be specified threshold.")
     }
 
     pub fn private_key(&self) -> PrivateKey {
-        let private_key_within_config: Option<&str> = self.toml_config
+        let private_key_within_config: Option<&str> = self
+            .toml_config
             .and_then(|config| config.privatekey.as_ref())
             .map(|p| p as &str);
-        self.command_args.private_key.or(private_key_within_config)
+        self.command_args
+            .private_key
+            .or(private_key_within_config)
             .and_then(|s| match PrivateKey::from_str(s) {
                 Ok(p) => Some(p),
-                Err(e) => panic!(format!("'{}' is invalid WIF format!. error msg: {:?}", s, e.description())),
+                Err(e) => panic!(format!(
+                    "'{}' is invalid WIF format!. error msg: {:?}",
+                    s,
+                    e.description()
+                )),
             })
             .expect("Must be specified private_key.")
     }
@@ -152,24 +175,33 @@ pub struct RpcConfig<'a> {
 
 impl<'a> RpcConfig<'a> {
     pub fn host(&'a self) -> &'a str {
-        let toml_value = self.toml_config
+        let toml_value = self
+            .toml_config
             .and_then(|config| config.rpc_endpoint_host.as_ref())
             .map(|s| s as &str);
-        self.command_args.host.or(toml_value).unwrap_or(DEFAULT_RPC_HOST)
+        self.command_args
+            .host
+            .or(toml_value)
+            .unwrap_or(DEFAULT_RPC_HOST)
     }
     pub fn port(&'a self) -> u32 {
         let toml_value = self.toml_config.and_then(|config| config.rpc_endpoint_port);
-        self.command_args.port.and_then(|s| s.parse::<u32>().ok())
-            .or(toml_value).unwrap_or(DEFAULT_RPC_PORT.parse().unwrap_or_default())
+        self.command_args
+            .port
+            .and_then(|s| s.parse::<u32>().ok())
+            .or(toml_value)
+            .unwrap_or(DEFAULT_RPC_PORT.parse().unwrap_or_default())
     }
     pub fn user_name(&'a self) -> Option<&'a str> {
-        let toml_value = self.toml_config
+        let toml_value = self
+            .toml_config
             .and_then(|config| config.rpc_endpoint_user.as_ref())
             .map(|s| s as &str);
         self.command_args.username.or(toml_value)
     }
     pub fn password(&'a self) -> Option<&'a str> {
-        let toml_value = self.toml_config
+        let toml_value = self
+            .toml_config
             .and_then(|config| config.rpc_endpoint_pass.as_ref())
             .map(|s| s as &str);
         self.command_args.password.or(toml_value)
@@ -188,15 +220,22 @@ pub struct RedisConfig<'a> {
 
 impl<'a> RedisConfig<'a> {
     pub fn host(&'a self) -> &'a str {
-        let toml_value = self.toml_config
+        let toml_value = self
+            .toml_config
             .and_then(|config| config.redis_host.as_ref())
             .map(|s| s as &str);
-        self.command_args.host.or(toml_value).unwrap_or(DEFAULT_REDIS_HOST)
+        self.command_args
+            .host
+            .or(toml_value)
+            .unwrap_or(DEFAULT_REDIS_HOST)
     }
     pub fn port(&'a self) -> u32 {
         let toml_value = self.toml_config.and_then(|config| config.redis_port);
-        self.command_args.port.and_then(|s| s.parse::<u32>().ok())
-            .or(toml_value).unwrap_or(DEFAULT_REDIS_PORT.parse().unwrap_or_default())
+        self.command_args
+            .port
+            .and_then(|s| s.parse::<u32>().ok())
+            .or(toml_value)
+            .unwrap_or(DEFAULT_REDIS_PORT.parse().unwrap_or_default())
     }
 }
 
@@ -216,28 +255,40 @@ pub struct GeneralConfig<'a> {
 impl<'a> GeneralConfig<'a> {
     pub fn round_duration(&'a self) -> u64 {
         let toml_value = self.toml_config.and_then(|config| config.round_duration);
-        self.command_args.round_duration
-            .and_then(|d| d.parse().ok()).or(toml_value)
+        self.command_args
+            .round_duration
+            .and_then(|d| d.parse().ok())
+            .or(toml_value)
             .unwrap_or(ROUND_INTERVAL_DEFAULT_SECS)
     }
     pub fn log_level(&'a self) -> &'a str {
-        let toml_value = self.toml_config
+        let toml_value = self
+            .toml_config
             .and_then(|config| config.log_level.as_ref())
             .map(|s| s as &str);
-        self.command_args.log_level.or(toml_value).unwrap_or(DEFAULT_LOG_LEVEL)
+        self.command_args
+            .log_level
+            .or(toml_value)
+            .unwrap_or(DEFAULT_LOG_LEVEL)
     }
     pub fn log_quiet(&'a self) -> bool {
-        let toml_value = self.toml_config.and_then(|config| config.log_quiet)
+        let toml_value = self
+            .toml_config
+            .and_then(|config| config.log_quiet)
             .unwrap_or_default();
         self.command_args.log_quiet || toml_value
     }
     pub fn skip_waiting_ibd(&'a self) -> bool {
-        let toml_value = self.toml_config.and_then(|config| config.skip_waiting_ibd)
+        let toml_value = self
+            .toml_config
+            .and_then(|config| config.skip_waiting_ibd)
             .unwrap_or_default();
         self.command_args.skip_waiting_ibd || toml_value
     }
     pub fn master(&'a self) -> bool {
-        let toml_value = self.toml_config.and_then(|config| config.master)
+        let toml_value = self
+            .toml_config
+            .and_then(|config| config.master)
             .unwrap_or_default();
         self.command_args.master || toml_value
     }
@@ -261,10 +312,16 @@ impl<'a> CommandArgs<'a> {
         // load from config file if exists.
         let config_file = matches.value_of(OPTION_NAME_CONFIG).unwrap();
         match read_config(config_file) {
-            Ok(c) => Ok(CommandArgs { matches, config: Some(c) }),
+            Ok(c) => Ok(CommandArgs {
+                matches,
+                config: Some(c),
+            }),
             Err(crate::errors::Error::ConfigFileIOError(ioerror)) => {
                 log::warn!("config file read error: {:?}", ioerror);
-                Ok(CommandArgs { matches, config: None })
+                Ok(CommandArgs {
+                    matches,
+                    config: None,
+                })
             }
             Err(e) => Err(e),
         }
@@ -275,7 +332,10 @@ impl<'a> CommandArgs<'a> {
         let num: Option<u8> = threshold_args.and_then(|s| s.parse().ok());
         SignerConfig {
             command_args: SignerCommandArgs {
-                public_keys: self.matches.values_of(OPTION_NAME_PUBLIC_KEY).map(|vs| vs.collect()),
+                public_keys: self
+                    .matches
+                    .values_of(OPTION_NAME_PUBLIC_KEY)
+                    .map(|vs| vs.collect()),
                 private_key: self.matches.value_of(OPTION_NAME_PRIVATE_KEY),
                 threshold: num,
             },
@@ -410,8 +470,7 @@ fn test_load() {
 
 #[test]
 fn test_allow_no_exists_config_file() {
-    let matches = get_options()
-        .get_matches_from(vec!["node", "-c=hoge.toml"]);
+    let matches = get_options().get_matches_from(vec!["node", "-c=hoge.toml"]);
     let args = CommandArgs::load(matches);
     assert!(args.is_ok());
     assert!(args.unwrap().config.is_none());
@@ -420,8 +479,8 @@ fn test_allow_no_exists_config_file() {
 #[test]
 #[should_panic(expected = "InvalidTomlFormat")]
 fn test_invalid_format_config_file() {
-    let matches = get_options()
-        .get_matches_from(vec!["node", "-c=tests/resources/invalid_format.toml"]);
+    let matches =
+        get_options().get_matches_from(vec!["node", "-c=tests/resources/invalid_format.toml"]);
     let _args = CommandArgs::load(matches).unwrap();
 }
 
@@ -432,15 +491,27 @@ fn test_load_from_file() {
     let args = CommandArgs::load(matches).unwrap();
     let pubkeys = args.signer_config().public_keys();
     assert_eq!(pubkeys.len(), 3);
-    assert_eq!(pubkeys[0].to_string(), "033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8");
-    assert_eq!(pubkeys[1].to_string(), "020464074b94702e9b07803d247021943bdcc1f8700b92b66defb7fadd76e80acf");
-    assert_eq!(pubkeys[2].to_string(), "02cbe0ad70ffe110d097db648fda20bef14dc72b5c9979c137c451820c176ac23f");
+    assert_eq!(
+        pubkeys[0].to_string(),
+        "033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8"
+    );
+    assert_eq!(
+        pubkeys[1].to_string(),
+        "020464074b94702e9b07803d247021943bdcc1f8700b92b66defb7fadd76e80acf"
+    );
+    assert_eq!(
+        pubkeys[2].to_string(),
+        "02cbe0ad70ffe110d097db648fda20bef14dc72b5c9979c137c451820c176ac23f"
+    );
 
     let threshold = args.signer_config().threshold();
     assert_eq!(threshold, 2);
 
     let privkey = args.signer_config().private_key();
-    assert_eq!(privkey.to_wif(), "cMtJPWz8D1KmTseJa778nWTS93uePrrN5FtUARUZHu7RsjuSTjGX");
+    assert_eq!(
+        privkey.to_wif(),
+        "cMtJPWz8D1KmTseJa778nWTS93uePrrN5FtUARUZHu7RsjuSTjGX"
+    );
 
     // rpc parameters are loaded from toml data.
     assert_eq!(args.rpc_config().host(), "localhost");
@@ -461,29 +532,39 @@ fn test_load_from_file() {
 
 #[test]
 fn test_priority_commandline() {
-    let matches = get_options()
-        .get_matches_from(vec!["node", "-c=tests/resources/signer_config.toml",
-                               "-p=020464074b94702e9b07803d247021943bdcc1f8700b92b66defb7fadd76e80acf",
-                               "-p=033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8",
-                               "--threshold=1",
-                               "--privatekey=L4Bw5GTJXL7Nd5wjprXim2sMpNgTSieZ14FCaHax7zzRnHbx19sc",
-                               "--rpchost=tapyrus.dev.chaintope.com",
-                               "--rpcport=12345",
-                               "--rpcuser=test",
-                               "--rpcpass=test",
-                               "--redishost=redis.endpoint.dev.chaintope.com",
-                               "--redisport=88888",
-        ]);
+    let matches = get_options().get_matches_from(vec![
+        "node",
+        "-c=tests/resources/signer_config.toml",
+        "-p=020464074b94702e9b07803d247021943bdcc1f8700b92b66defb7fadd76e80acf",
+        "-p=033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8",
+        "--threshold=1",
+        "--privatekey=L4Bw5GTJXL7Nd5wjprXim2sMpNgTSieZ14FCaHax7zzRnHbx19sc",
+        "--rpchost=tapyrus.dev.chaintope.com",
+        "--rpcport=12345",
+        "--rpcuser=test",
+        "--rpcpass=test",
+        "--redishost=redis.endpoint.dev.chaintope.com",
+        "--redisport=88888",
+    ]);
     let args = CommandArgs::load(matches).unwrap();
     let pubkeys = args.signer_config().public_keys();
     assert_eq!(pubkeys.len(), 2);
-    assert_eq!(pubkeys[0].to_string(), "020464074b94702e9b07803d247021943bdcc1f8700b92b66defb7fadd76e80acf");
-    assert_eq!(pubkeys[1].to_string(), "033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8");
+    assert_eq!(
+        pubkeys[0].to_string(),
+        "020464074b94702e9b07803d247021943bdcc1f8700b92b66defb7fadd76e80acf"
+    );
+    assert_eq!(
+        pubkeys[1].to_string(),
+        "033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8"
+    );
     let threshold = args.signer_config().threshold();
     assert_eq!(threshold, 1);
 
     let privkey = args.signer_config().private_key();
-    assert_eq!(privkey.to_wif(), "L4Bw5GTJXL7Nd5wjprXim2sMpNgTSieZ14FCaHax7zzRnHbx19sc");
+    assert_eq!(
+        privkey.to_wif(),
+        "L4Bw5GTJXL7Nd5wjprXim2sMpNgTSieZ14FCaHax7zzRnHbx19sc"
+    );
 
     // rpc parameters are loaded from toml data.
     assert_eq!(args.rpc_config().host(), "tapyrus.dev.chaintope.com");
@@ -492,17 +573,24 @@ fn test_priority_commandline() {
     assert_eq!(args.rpc_config().password(), Some("test"));
 
     // redis parameters are loaded from toml data.
-    assert_eq!(args.redis_config().host(), "redis.endpoint.dev.chaintope.com");
+    assert_eq!(
+        args.redis_config().host(),
+        "redis.endpoint.dev.chaintope.com"
+    );
     assert_eq!(args.redis_config().port(), 88888);
 }
 
 #[test]
-#[should_panic(expected = "\\'aaaa\\' is invalid public key format.\\n\\'bbbb\\' is invalid public key format.\\n")]
+#[should_panic(
+    expected = "\\'aaaa\\' is invalid public key format.\\n\\'bbbb\\' is invalid public key format.\\n"
+)]
 fn test_invid_pubkeys() {
-    let matches = get_options()
-        .get_matches_from(vec!["node", "-c=tests/resources/signer_config.toml",
-                               "-p=aaaa",
-                               "-p=bbbb"]);
+    let matches = get_options().get_matches_from(vec![
+        "node",
+        "-c=tests/resources/signer_config.toml",
+        "-p=aaaa",
+        "-p=bbbb",
+    ]);
     let args = CommandArgs::load(matches).unwrap();
     let _pubkeys = args.signer_config().public_keys();
 }
@@ -510,8 +598,7 @@ fn test_invid_pubkeys() {
 #[test]
 #[should_panic(expected = "Must be specified public_keys.")]
 fn test_no_pubkeys() {
-    let matches = get_options()
-        .get_matches_from(vec!["node"]);
+    let matches = get_options().get_matches_from(vec!["node"]);
     let args = CommandArgs {
         matches,
         config: Some(ConfigToml::default()),
@@ -522,8 +609,7 @@ fn test_no_pubkeys() {
 #[test]
 #[should_panic(expected = "Must be specified threshold.")]
 fn test_no_thrshold() {
-    let matches = get_options()
-        .get_matches_from(vec!["node"]);
+    let matches = get_options().get_matches_from(vec!["node"]);
     let args = CommandArgs {
         matches,
         config: Some(ConfigToml::default()),
@@ -534,8 +620,7 @@ fn test_no_thrshold() {
 #[test]
 #[should_panic(expected = "Must be specified private_key.")]
 fn test_no_private_key() {
-    let matches = get_options()
-        .get_matches_from(vec!["node"]);
+    let matches = get_options().get_matches_from(vec!["node"]);
     let args = CommandArgs {
         matches,
         config: Some(ConfigToml::default()),
@@ -546,8 +631,7 @@ fn test_no_private_key() {
 #[test]
 #[should_panic(expected = "'aabbccdd' is invalid WIF format!. error msg:")]
 fn test_invalid_private_key() {
-    let matches = get_options()
-        .get_matches_from(vec!["node"]);
+    let matches = get_options().get_matches_from(vec!["node"]);
     let args = CommandArgs {
         matches,
         config: Some(ConfigToml {

@@ -22,7 +22,6 @@ pub enum Error {
     RedisError(RedisError),
 }
 
-
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
@@ -61,5 +60,7 @@ impl From<std::io::Error> for Error {
 }
 
 impl From<RedisError> for Error {
-    fn from(e: RedisError) -> Error { Error::RedisError(e) }
+    fn from(e: RedisError) -> Error {
+        Error::RedisError(e)
+    }
 }

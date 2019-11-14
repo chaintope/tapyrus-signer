@@ -2,12 +2,12 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use std::sync::mpsc::{Receiver, Sender, channel, SyncSender, sync_channel};
+use crate::errors::Error;
+use log::warn;
+use std::sync::mpsc::{channel, sync_channel, Receiver, Sender, SyncSender};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread::JoinHandle;
 use std::time::Duration;
-use std::sync::{Arc, Mutex, RwLock};
-use log::warn;
-use crate::errors::Error;
 
 type ThreadSafeReceiver<T> = Arc<Mutex<Receiver<T>>>;
 
@@ -37,7 +37,8 @@ pub struct State {
 impl RoundTimeOutObserver {
     pub fn new(timelimit_secs: u64) -> Self {
         let (sender, receiver): (Sender<()>, Receiver<()>) = channel();
-        let (command_sender, command_receiver): (SyncSender<Command>, Receiver<Command>) = sync_channel(1);
+        let (command_sender, command_receiver): (SyncSender<Command>, Receiver<Command>) =
+            sync_channel(1);
         RoundTimeOutObserver {
             timelimit: Duration::from_secs(timelimit_secs),
             thread: None,
@@ -50,14 +51,19 @@ impl RoundTimeOutObserver {
     }
 
     pub fn is_started(&self) -> bool {
-        let guard = self.state.try_read()
+        let guard = self
+            .state
+            .try_read()
             .expect("Can't read started state. is Locked.");
         guard.started
-//        self.thread.try_lock().unwrap().is_some()
+        //        self.thread.try_lock().unwrap().is_some()
     }
 
     fn set_started_state(&self, flag: bool) {
-        let mut state_writer = self.state.try_write().expect("Can't state change to started!");
+        let mut state_writer = self
+            .state
+            .try_write()
+            .expect("Can't state change to started!");
         state_writer.started = flag;
     }
 
@@ -71,14 +77,17 @@ impl RoundTimeOutObserver {
         self.set_started_state(true);
         let thread_in_started = self.state.clone();
         let stop = move || {
-            let mut state = thread_in_started.try_write()
+            let mut state = thread_in_started
+                .try_write()
                 .expect("State can not change to stop.");
             state.started = false;
         };
-        let handler = std::thread::Builder::new().name("RoundTimeoutObserverThread".to_string())
+        let handler = std::thread::Builder::new()
+            .name("RoundTimeoutObserverThread".to_string())
             .spawn(move || {
                 // TODO: lock取れない場合はリトライした方が良いか？　多分lock取れないのはエラーにしといていいとは思うが。。
-                let receiver = command_receiver.try_lock()
+                let receiver = command_receiver
+                    .try_lock()
                     .expect("Command_receiver can not have lock.");
                 match receiver.recv_timeout(timelimit) {
                     Ok(Command::Stop) => {
@@ -90,13 +99,17 @@ impl RoundTimeOutObserver {
                         stop();
                         // time out, send timeout signal.
                         match sender.send(()) {
-                            Ok(_) => {},
-                            Err(e) => log::warn!("Round timeouted, but receiver not handle signal!: {:?}", e)
+                            Ok(_) => {}
+                            Err(e) => log::warn!(
+                                "Round timeouted, but receiver not handle signal!: {:?}",
+                                e
+                            ),
                         };
                     }
                 }
                 log::debug!("RoundTimeoutObserverThread finished.");
-            }).unwrap();
+            })
+            .unwrap();
         self.thread = Some(handler);
         Ok(())
     }
@@ -112,7 +125,10 @@ impl RoundTimeOutObserver {
                     }
                 }
                 Err(e) => {
-                    warn!("RoundTimeoutObserver thread maybe already dead. error:{:?}", e);
+                    warn!(
+                        "RoundTimeoutObserver thread maybe already dead. error:{:?}",
+                        e
+                    );
                 }
             }
         };
