@@ -1,0 +1,28 @@
+name: CI on Push
+
+on: [push]
+
+jobs:
+  ci:
+    container: rustlang/rust:nightly
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v1
+      - name: Setup
+        run: |
+          apt-get update
+          apt-get install -y clang
+          rustup component add rustfmt-preview
+      - name: Build
+        run: cargo build --release
+      - name: Run unit tests
+        run: cargo test --lib --release -v --no-fail-fast -- --nocapture --test
+      - name: Run documentation tests
+        run: cargo test --doc --release -v --no-fail-fast -- --nocapture --test
+      - name: Run integration tests
+        run: cargo test --test tapyrus-signer --release -v --no-fail-fast -- --nocapture --test
+      - name: Run benchmark tests
+        run: cargo test --lib --release -v --no-fail-fast -- --nocapture --bench
+      - name: Check Format
+        run: cargo fmt --verbose --all -- --check --verbose
+
