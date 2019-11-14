@@ -904,20 +904,20 @@ mod tests {
         }
 
         impl TapyrusApi for MockRpc {
-            fn getnewblock(&self, address: &Address) -> Result<Block, Error> {
+            fn getnewblock(&self, _address: &Address) -> Result<Block, Error> {
                 unimplemented!()
             }
-            fn testproposedblock(&self, block: &Block) -> Result<(), Error> {
+            fn testproposedblock(&self, _block: &Block) -> Result<(), Error> {
                 unimplemented!()
             }
             fn combineblocksigs(
                 &self,
-                block: &Block,
-                signatures: &Vec<Signature>,
+                _block: &Block,
+                _signatures: &Vec<Signature>,
             ) -> Result<Block, Error> {
                 unimplemented!()
             }
-            fn submitblock(&self, block: &Block) -> Result<(), Error> {
+            fn submitblock(&self, _block: &Block) -> Result<(), Error> {
                 unimplemented!()
             }
 
