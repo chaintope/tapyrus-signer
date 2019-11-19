@@ -21,5 +21,5 @@ base64 = "0.10.1"
 redis = "0.10.0"
 clap = "2.33.0"
 toml = "0.5"
-multi-party-schnorr = { git = "https://github.com/KZen-networks/multi-party-schnorr", tag = "v0.3.0" }
+multi-party-schnorr = { git = "https://github.com/Yamaguchi/multi-party-schnorr", branch = "master" }
 curv = { git = "https://github.com/KZen-networks/curv" , tag = "v0.2.0", features =  ["ec_secp256k1"]}
