@@ -30,7 +30,7 @@ pub trait TapyrusApi {
     /// Validate to candidateblock
     fn testproposedblock(&self, block: &Block) -> Result<bool, Error>;
     /// Broadcast new block include enough proof.
-    fn submitblock(&self, block: &Block) -> Result<(), Error>;
+    fn submitblock(&self, block: &Block) -> Result<Block, Error>;
     /// Get block chain info
     fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error>;
 }
@@ -105,8 +105,8 @@ impl TapyrusApi for Rpc {
         self.call::<bool>("testproposedblock", &args)
     }
 
-    fn submitblock(&self, block: &Block) -> Result<(), Error> {
-        self.call::<()>("submitblock", &[block.hex().into()])
+    fn submitblock(&self, block: &Block) -> Result<Block, Error> {
+        self.call::<Block>("submitblock", &[block.hex().into()])
     }
 
     fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error> {
@@ -191,9 +191,9 @@ pub mod tests {
             Ok(true)
         }
 
-        fn submitblock(&self, _block: &Block) -> Result<(), Error> {
-            let _block = self.result()?;
-            Ok(())
+        fn submitblock(&self, _block: &Block) -> Result<Block, Error> {
+            let block = self.result()?;
+            Ok(block)
         }
 
         fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error> {

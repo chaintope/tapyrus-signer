@@ -1160,7 +1160,7 @@ mod tests {
                 unimplemented!()
             }
 
-            fn submitblock(&self, _block: &Block) -> Result<(), Error> {
+            fn submitblock(&self, _block: &Block) -> Result<Block, Error> {
                 unimplemented!()
             }
 
