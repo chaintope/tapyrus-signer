@@ -37,7 +37,7 @@ pub trait TapyrusApi {
     /// Get or Create candidate block.
     fn getnewblock(&self, address: &Address) -> Result<Block, Error>;
     /// Validate to candidateblock
-    fn testproposedblock(&self, block: &Block) -> Result<(), Error>;
+    fn testproposedblock(&self, block: &Block) -> Result<bool, Error>;
     /// Combine Signatures to candidate block.
     fn combineblocksigs(&self, block: &Block, signatures: &Vec<Signature>) -> Result<Block, Error>;
     /// Broadcast new block include enough proof.
@@ -109,11 +109,11 @@ impl TapyrusApi for Rpc {
         }
     }
 
-    fn testproposedblock(&self, block: &Block) -> Result<(), Error> {
+    fn testproposedblock(&self, block: &Block) -> Result<bool, Error> {
         let blockhex = serde_json::Value::from(block.hex());
         let acceptnonstdtxn = serde_json::Value::Bool(true);
         let args = [blockhex, acceptnonstdtxn];
-        self.call::<()>("testproposedblock", &args)
+        self.call::<bool>("testproposedblock", &args)
     }
 
     fn combineblocksigs(&self, block: &Block, signatures: &Vec<Signature>) -> Result<Block, Error> {
@@ -216,9 +216,9 @@ pub mod tests {
             self.result()
         }
 
-        fn testproposedblock(&self, _block: &Block) -> Result<(), Error> {
+        fn testproposedblock(&self, _block: &Block) -> Result<bool, Error> {
             let _block = self.result()?;
-            Ok(())
+            Ok(true)
         }
 
         fn combineblocksigs(
