@@ -907,7 +907,7 @@ mod tests {
             fn getnewblock(&self, _address: &Address) -> Result<Block, Error> {
                 unimplemented!()
             }
-            fn testproposedblock(&self, _block: &Block) -> Result<(), Error> {
+            fn testproposedblock(&self, _block: &Block) -> Result<bool, Error> {
                 unimplemented!()
             }
             fn combineblocksigs(
