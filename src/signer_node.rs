@@ -16,7 +16,7 @@ use curv::{FE, GE};
 use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
 use redis::ControlFlow;
 
-use crate::blockdata::Block;
+use crate::blockdata::{Block, BlockHash};
 use crate::net::{ConnectionManager, Message, MessageType, SignerID};
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use crate::sign::Sign;
@@ -81,6 +81,7 @@ pub enum NodeState {
         block_key: Option<FE>,
         shared_block_secrets: SharedSecretMap,
         block_shared_keys: Option<(FE, GE)>,
+        candidate_block: Option<Block>,
     },
 }
 
@@ -140,6 +141,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 block_key: None,
                 block_shared_keys: None,
                 shared_block_secrets: BTreeMap::new(),
+                candidate_block: None,
             }
         };
         log::info!(
@@ -268,11 +270,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             MessageType::Nodevss(vss, secret_share) => {
                 self.process_nodevss(vss, secret_share, message.sender_id)
             }
-            MessageType::Blockvss(block, vss, secret_share) => {
-                self.process_blockvss(block, vss, secret_share, message.sender_id)
+            MessageType::Blockvss(blockhash, vss, secret_share) => {
+                self.process_blockvss(blockhash, vss, secret_share, message.sender_id)
             }
-            MessageType::Blocksig(block, gamma_i, e) => {
-                self.process_blocksig(block, gamma_i, e, message.sender_id)
+            MessageType::Blocksig(blockhash, gamma_i, e) => {
+                self.process_blocksig(blockhash, gamma_i, e, message.sender_id)
             }
             MessageType::Roundfailure => self.process_roundfailure(&message.sender_id),
         }
@@ -295,6 +297,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                             block_key: Some(key.u_i),
                             shared_block_secrets: shared_block_secrets.clone(),
                             block_shared_keys: block_shared_keys.clone(),
+                            candidate_block: Some(block.clone()),
                         }
                     }
                     Err(_e) => {
@@ -306,6 +309,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                             block_key: None,
                             shared_block_secrets: shared_block_secrets.clone(),
                             block_shared_keys: block_shared_keys.clone(),
+                            candidate_block: Some(block.clone()),
                         }
                     }
                 }
@@ -341,6 +345,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 block_key: None,
                 block_shared_keys: None,
                 shared_block_secrets: SharedSecretMap::new(),
+                candidate_block: None,
             }
         };
         log::info!(
@@ -398,7 +403,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     fn process_blockvss_inner(
         &self,
         _vss: &VerifiableSS,
-        block: &Block,
+        blockhash: BlockHash,
         _block_key: &Option<FE>,
         shared_block_secrets: &SharedSecretMap,
     ) -> Option<SharedKeys> {
@@ -415,6 +420,15 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             )
             .expect("invalid vss");
 
+            let block = match &self.current_state {
+                NodeState::Master {
+                    candidate_block, ..
+                } => candidate_block,
+                NodeState::Member {
+                    candidate_block, ..
+                } => candidate_block.as_ref().unwrap(),
+                _ => return None,
+            };
             log::trace!(
                 "block shared keys is: {:?}, {:?}",
                 shared_keys.x_i,
@@ -431,7 +445,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 Ok(local_sig) => {
                     self.connection_manager.broadcast_message(Message {
                         message_type: MessageType::Blocksig(
-                            block.clone(),
+                            blockhash,
                             local_sig.gamma_i,
                             local_sig.e,
                         ),
@@ -448,7 +462,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     }
     fn process_blockvss(
         &mut self,
-        block: Block,
+        blockhash: BlockHash,
         vss: VerifiableSS,
         secret_share: FE,
         from: SignerID,
@@ -471,7 +485,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 );
                 let shared_keys = self.process_blockvss_inner(
                     &vss,
-                    &block,
+                    blockhash,
                     &block_key,
                     &new_shared_block_secrets,
                 );
@@ -496,6 +510,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             NodeState::Member {
                 block_key,
                 shared_block_secrets,
+                candidate_block,
                 ..
             } => {
                 let mut new_shared_block_secrets = shared_block_secrets.clone();
@@ -508,7 +523,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 );
                 let shared_keys = self.process_blockvss_inner(
                     &vss,
-                    &block,
+                    blockhash,
                     &block_key,
                     &new_shared_block_secrets,
                 );
@@ -517,11 +532,13 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         block_key: block_key.clone(),
                         shared_block_secrets: new_shared_block_secrets,
                         block_shared_keys: Some((keys.x_i, keys.y)),
+                        candidate_block: candidate_block.clone(),
                     },
                     None => NodeState::Member {
                         block_key: block_key.clone(),
                         shared_block_secrets: new_shared_block_secrets,
                         block_shared_keys: None,
+                        candidate_block: candidate_block.clone(),
                     },
                 }
             }
@@ -529,7 +546,13 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
-    fn process_blocksig(&mut self, _block: Block, gamma_i: FE, e: FE, from: SignerID) -> NodeState {
+    fn process_blocksig(
+        &mut self,
+        blockhash: BlockHash,
+        gamma_i: FE,
+        e: FE,
+        from: SignerID,
+    ) -> NodeState {
         match &self.current_state {
             NodeState::Master {
                 block_key,
@@ -618,10 +641,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 block_key,
                 block_shared_keys,
                 shared_block_secrets,
+                candidate_block,
             } => NodeState::Member {
                 block_key: block_key.clone(),
                 block_shared_keys: block_shared_keys.clone(),
                 shared_block_secrets: shared_block_secrets.clone(),
+                candidate_block: candidate_block.clone(),
             },
             _ => self.current_state.clone(),
         }
@@ -690,7 +715,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         for i in 0..self.params.pubkey_list.len() {
             self.connection_manager.send_message(Message {
                 message_type: MessageType::Blockvss(
-                    block.clone(),
+                    block.hash().unwrap(),
                     vss_scheme.clone(),
                     secret_shares[i],
                 ),
@@ -1007,6 +1032,7 @@ mod tests {
             block_key: None,
             block_shared_keys: None,
             shared_block_secrets: SharedSecretMap::new(),
+            candidate_block: None,
         };
         let arc_block = safety(get_block(0));
         let rpc = MockRpc {
@@ -1039,6 +1065,7 @@ mod tests {
             block_key: None,
             block_shared_keys: None,
             shared_block_secrets: SharedSecretMap::new(),
+            candidate_block: None,
         };
         let arc_block = safety(get_block(0));
         let rpc = MockRpc {
@@ -1068,6 +1095,7 @@ mod tests {
             block_key: None,
             block_shared_keys: None,
             shared_block_secrets: SharedSecretMap::new(),
+            candidate_block: None,
         };
         let arc_block = safety(get_block(0));
         let rpc = MockRpc {
@@ -1115,6 +1143,7 @@ mod tests {
             block_key: None,
             block_shared_keys: None,
             shared_block_secrets: SharedSecretMap::new(),
+            candidate_block: None,
         };
         let arc_block = safety(get_block(0));
         let rpc = MockRpc {
@@ -1191,6 +1220,7 @@ mod tests {
                     block_key: None,
                     block_shared_keys: None,
                     shared_block_secrets: SharedSecretMap::new(),
+                    candidate_block: None,
                 },
                 rpc,
             );

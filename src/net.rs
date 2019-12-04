@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use crate::blockdata::Block;
+use crate::blockdata::{Block, BlockHash};
 use crate::errors;
 use crate::serialize::ByteBufVisitor;
 use bitcoin::PublicKey;
@@ -82,8 +82,8 @@ pub enum MessageType {
     Candidateblock(Block),
     Completedblock(Block),
     Nodevss(VerifiableSS, FE),
-    Blockvss(Block, VerifiableSS, FE),
-    Blocksig(Block, FE, FE),
+    Blockvss(BlockHash, VerifiableSS, FE),
+    Blocksig(BlockHash, FE, FE),
     Roundfailure,
 }
 

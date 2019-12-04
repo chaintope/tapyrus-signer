@@ -6,6 +6,7 @@ use crate::errors::Error;
 use bitcoin_hashes::{sha256d, Hash};
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct BlockHash([u8; 32]);
 
 impl BlockHash {
