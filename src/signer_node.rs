@@ -423,9 +423,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         };
         if let Some(block) = block_opt.clone() {
             if block.hash().unwrap() != blockhash {
+                log::error!("blockhash is invalid");
                 return None;
             }
         } else {
+            log::error!("candidateblock not found");
             return None;
         }
         if shared_block_secrets.len() == self.params.pubkey_list.len() {
@@ -570,7 +572,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             } => {
                 let mut new_signatures = signatures.clone();
                 new_signatures.insert(from, (gamma_i, e));
-                log::trace!("number of signatures: {:?}", new_signatures.len());
+                log::trace!(
+                    "number of signatures: {:?} (threshold: {:?})",
+                    new_signatures.len(),
+                    self.params.threshold
+                );
                 if candidate_block.hash().unwrap() != blockhash {
                     log::error!("blockhash is invalid");
                     return self.round_robin_master();
@@ -616,6 +622,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                             }
                         }
                         Err(_) => {
+                            log::error!("local signature is invalid.");
                             return self.round_robin_master();
                         }
                     };
@@ -627,7 +634,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                             self.params.rpc.submitblock(&new_block)
                         }
                         Err(_) => {
-                            log::error!("signature is invalid");
+                            log::error!("aggregated signature is invalid");
                             return self.round_robin_master();
                         }
                     };
