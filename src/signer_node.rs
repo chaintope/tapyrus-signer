@@ -412,6 +412,22 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             "number of shared_block_secrets: {:?}",
             shared_block_secrets.len()
         );
+        let block_opt: Option<Block> = match &self.current_state {
+            NodeState::Master {
+                candidate_block, ..
+            } => Some(candidate_block.clone()),
+            NodeState::Member {
+                candidate_block, ..
+            } => candidate_block.clone(),
+            _ => None,
+        };
+        if let Some(block) = block_opt.clone() {
+            if block.hash().unwrap() != blockhash {
+                return None;
+            }
+        } else {
+            return None;
+        }
         if shared_block_secrets.len() == self.params.pubkey_list.len() {
             let shared_keys = Sign::verify_vss_and_construct_key(
                 &params,
@@ -420,15 +436,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             )
             .expect("invalid vss");
 
-            let block = match &self.current_state {
-                NodeState::Master {
-                    candidate_block, ..
-                } => candidate_block,
-                NodeState::Member {
-                    candidate_block, ..
-                } => candidate_block.as_ref().unwrap(),
-                _ => return None,
-            };
             log::trace!(
                 "block shared keys is: {:?}, {:?}",
                 shared_keys.x_i,
@@ -438,14 +445,14 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             let result = Sign::sign(
                 &shared_keys,
                 &self.priv_shared_keys.clone().unwrap(),
-                block.hash().unwrap(),
+                block_opt.clone().unwrap().hash().unwrap(),
             );
 
             match result {
                 Ok(local_sig) => {
                     self.connection_manager.broadcast_message(Message {
                         message_type: MessageType::Blocksig(
-                            blockhash,
+                            block_opt.clone().unwrap().hash().unwrap(),
                             local_sig.gamma_i,
                             local_sig.e,
                         ),
@@ -564,7 +571,17 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 let mut new_signatures = signatures.clone();
                 new_signatures.insert(from, (gamma_i, e));
                 log::trace!("number of signatures: {:?}", new_signatures.len());
+                if candidate_block.hash().unwrap() != blockhash {
+                    log::error!("blockhash is invalid");
+                    return self.round_robin_master();
+                }
+
                 if new_signatures.len() >= self.params.pubkey_list.len() {
+                    if block_shared_keys.is_none() {
+                        log::error!("key is not shared.");
+                        return self.round_robin_master();
+                    }
+
                     let local_sigs: Vec<LocalSig> = new_signatures
                         .values()
                         .map(|s| LocalSig {
