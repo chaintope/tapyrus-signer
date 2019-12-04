@@ -582,7 +582,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     return self.round_robin_master();
                 }
 
-                if new_signatures.len() >= self.params.pubkey_list.len() {
+                if new_signatures.len() >= self.params.threshold as usize {
                     if block_shared_keys.is_none() {
                         log::error!("key is not shared.");
                         return self.round_robin_master();
@@ -595,10 +595,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                             e: s.1,
                         })
                         .collect();
-                    let parties = (0..self.params.pubkey_list.len()).collect::<Vec<usize>>();
+                    let parties = new_signatures
+                        .keys()
+                        .map(|k| sender_index(k, &self.params.pubkey_list))
+                        .collect::<Vec<usize>>();
                     let key_gen_vss_vec: Vec<VerifiableSS> = self.shared_secrets.to_vss();
                     let eph_vss_vec: Vec<VerifiableSS> = shared_block_secrets.to_vss();
-
                     let sum_of_local_sigs = LocalSig::verify_local_sigs(
                         &local_sigs,
                         &parties[..],
