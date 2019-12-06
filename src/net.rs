@@ -82,7 +82,7 @@ pub enum MessageType {
     Candidateblock(Block),
     Completedblock(Block),
     Nodevss(VerifiableSS, FE),
-    Blockvss(BlockHash, VerifiableSS, FE),
+    Blockvss(BlockHash, VerifiableSS, FE, VerifiableSS, FE),
     Blocksig(BlockHash, FE, FE),
     Roundfailure,
 }

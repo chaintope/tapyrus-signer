@@ -12,7 +12,7 @@ use std::{thread, time};
 use bitcoin::{Address, PrivateKey, PublicKey};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::*;
-use curv::{FE, GE};
+use curv::{BigInt, FE, GE};
 use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
 use redis::ControlFlow;
 
@@ -47,6 +47,8 @@ pub struct SharedSecret {
 
 pub type SharedSecretMap = BTreeMap<SignerID, SharedSecret>;
 
+pub type BidirectionalSharedSecretMap = BTreeMap<SignerID, (SharedSecret, SharedSecret)>;
+
 pub trait ToVerifiableSS {
     fn to_vss(&self) -> Vec<VerifiableSS>;
 }
@@ -57,6 +59,27 @@ impl ToVerifiableSS for SharedSecretMap {
     }
 }
 
+pub trait ToSharedSecretMap {
+    fn for_negative(&self) -> SharedSecretMap;
+    fn for_positive(&self) -> SharedSecretMap;
+}
+
+impl ToSharedSecretMap for BidirectionalSharedSecretMap {
+    fn for_positive(&self) -> SharedSecretMap {
+        let mut map = SharedSecretMap::new();
+        for (key, value) in self.iter() {
+            map.insert(*key, value.0.clone());
+        }
+        map
+    }
+    fn for_negative(&self) -> SharedSecretMap {
+        let mut map = SharedSecretMap::new();
+        for (key, value) in self.iter() {
+            map.insert(*key, value.1.clone());
+        }
+        map
+    }
+}
 pub trait ToShares {
     fn to_shares(&self) -> Vec<FE>;
 }
@@ -72,15 +95,15 @@ pub enum NodeState {
     Joining,
     Master {
         block_key: Option<FE>,
-        shared_block_secrets: SharedSecretMap,
-        block_shared_keys: Option<(FE, GE)>,
+        shared_block_secrets: BidirectionalSharedSecretMap,
+        block_shared_keys: Option<(bool, FE, GE)>,
         candidate_block: Block,
         signatures: BTreeMap<SignerID, (FE, FE)>,
     },
     Member {
         block_key: Option<FE>,
-        shared_block_secrets: SharedSecretMap,
-        block_shared_keys: Option<(FE, GE)>,
+        shared_block_secrets: BidirectionalSharedSecretMap,
+        block_shared_keys: Option<(bool, FE, GE)>,
         candidate_block: Option<Block>,
     },
 }
@@ -270,9 +293,20 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             MessageType::Nodevss(vss, secret_share) => {
                 self.process_nodevss(vss, secret_share, message.sender_id)
             }
-            MessageType::Blockvss(blockhash, vss, secret_share) => {
-                self.process_blockvss(blockhash, vss, secret_share, message.sender_id)
-            }
+            MessageType::Blockvss(
+                blockhash,
+                vss_for_positive,
+                secret_share_for_positive,
+                vss_for_negative,
+                secret_share_for_negative,
+            ) => self.process_blockvss(
+                blockhash,
+                vss_for_positive,
+                secret_share_for_positive,
+                vss_for_negative,
+                secret_share_for_negative,
+                message.sender_id,
+            ),
             MessageType::Blocksig(blockhash, gamma_i, e) => {
                 self.process_blocksig(blockhash, gamma_i, e, message.sender_id)
             }
@@ -344,7 +378,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             NodeState::Member {
                 block_key: None,
                 block_shared_keys: None,
-                shared_block_secrets: SharedSecretMap::new(),
+                shared_block_secrets: BidirectionalSharedSecretMap::new(),
                 candidate_block: None,
             }
         };
@@ -402,11 +436,9 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     fn process_blockvss_inner(
         &self,
-        _vss: &VerifiableSS,
         blockhash: BlockHash,
-        _block_key: &Option<FE>,
-        shared_block_secrets: &SharedSecretMap,
-    ) -> Option<SharedKeys> {
+        shared_block_secrets: &BidirectionalSharedSecretMap,
+    ) -> Option<(bool, SharedKeys)> {
         let params = self.sharing_params();
         log::trace!(
             "number of shared_block_secrets: {:?}",
@@ -431,24 +463,42 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             return None;
         }
         if shared_block_secrets.len() == self.params.pubkey_list.len() {
-            let shared_keys = Sign::verify_vss_and_construct_key(
+            let shared_keys_for_positive = Sign::verify_vss_and_construct_key(
                 &params,
-                &shared_block_secrets,
+                &shared_block_secrets.for_positive(),
                 &(self.params.self_node_index + 1),
             )
             .expect("invalid vss");
 
-            log::trace!(
-                "block shared keys is: {:?}, {:?}",
-                shared_keys.x_i,
-                shared_keys.y
-            );
-
-            let result = Sign::sign(
-                &shared_keys,
+            let result_for_positive = Sign::sign(
+                &shared_keys_for_positive,
                 &self.priv_shared_keys.clone().unwrap(),
                 block_opt.clone().unwrap().hash().unwrap(),
             );
+
+            let shared_keys_for_negative = Sign::verify_vss_and_construct_key(
+                &params,
+                &shared_block_secrets.for_negative(),
+                &(self.params.self_node_index + 1),
+            )
+            .expect("invalid vss");
+            let result_for_negative = Sign::sign(
+                &shared_keys_for_negative,
+                &self.priv_shared_keys.clone().unwrap(),
+                block_opt.clone().unwrap().hash().unwrap(),
+            );
+
+            let p = BigInt::from_str_radix(
+                "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
+                16,
+            )
+            .unwrap();
+            let is_positive = jacobi(&shared_keys_for_positive.y.y_coor().unwrap(), &p) == 1;
+            let (shared_keys, result) = if is_positive {
+                (shared_keys_for_positive, result_for_positive)
+            } else {
+                (shared_keys_for_negative, result_for_negative)
+            };
 
             match result {
                 Ok(local_sig) => {
@@ -462,9 +512,9 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         receiver_id: None,
                     });
                 }
-                Err(_) => (),
+                _ => (),
             }
-            return Some(shared_keys);
+            return Some((is_positive, shared_keys));
         } else {
             return None;
         }
@@ -472,8 +522,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     fn process_blockvss(
         &mut self,
         blockhash: BlockHash,
-        vss: VerifiableSS,
-        secret_share: FE,
+        vss_for_positive: VerifiableSS,
+        secret_share_for_positive: FE,
+        vss_for_negative: VerifiableSS,
+        secret_share_for_negative: FE,
         from: SignerID,
     ) -> NodeState {
         match &self.current_state {
@@ -487,23 +539,24 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 let mut new_shared_block_secrets = shared_block_secrets.clone();
                 new_shared_block_secrets.insert(
                     from,
-                    SharedSecret {
-                        vss: vss.clone(),
-                        secret_share,
-                    },
+                    (
+                        SharedSecret {
+                            vss: vss_for_positive.clone(),
+                            secret_share: secret_share_for_positive,
+                        },
+                        SharedSecret {
+                            vss: vss_for_negative.clone(),
+                            secret_share: secret_share_for_negative,
+                        },
+                    ),
                 );
-                let shared_keys = self.process_blockvss_inner(
-                    &vss,
-                    blockhash,
-                    &block_key,
-                    &new_shared_block_secrets,
-                );
+                let shared_keys = self.process_blockvss_inner(blockhash, &new_shared_block_secrets);
 
                 match shared_keys {
                     Some(keys) => NodeState::Master {
                         block_key: block_key.clone(),
                         shared_block_secrets: new_shared_block_secrets,
-                        block_shared_keys: Some((keys.x_i, keys.y)),
+                        block_shared_keys: Some((keys.0, keys.1.x_i, keys.1.y)),
                         candidate_block: candidate_block.clone(),
                         signatures: signatures.clone(),
                     },
@@ -525,22 +578,24 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 let mut new_shared_block_secrets = shared_block_secrets.clone();
                 new_shared_block_secrets.insert(
                     from,
-                    SharedSecret {
-                        vss: vss.clone(),
-                        secret_share,
-                    },
+                    (
+                        SharedSecret {
+                            vss: vss_for_positive.clone(),
+                            secret_share: secret_share_for_positive,
+                        },
+                        SharedSecret {
+                            vss: vss_for_negative.clone(),
+                            secret_share: secret_share_for_negative,
+                        },
+                    ),
                 );
-                let shared_keys = self.process_blockvss_inner(
-                    &vss,
-                    blockhash,
-                    &block_key,
-                    &new_shared_block_secrets,
-                );
+                let shared_keys = self.process_blockvss_inner(blockhash, &new_shared_block_secrets);
+
                 match shared_keys {
                     Some(keys) => NodeState::Member {
                         block_key: block_key.clone(),
                         shared_block_secrets: new_shared_block_secrets,
-                        block_shared_keys: Some((keys.x_i, keys.y)),
+                        block_shared_keys: Some((keys.0, keys.1.x_i, keys.1.y)),
                         candidate_block: candidate_block.clone(),
                     },
                     None => NodeState::Member {
@@ -578,7 +633,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     self.params.threshold
                 );
                 if candidate_block.hash().unwrap() != blockhash {
-                    log::error!("blockhash is invalid");
+                    log::error!(
+                        "blockhash is invalid, {:?}/{:?}",
+                        candidate_block.hash().unwrap(),
+                        blockhash
+                    );
                     return self.round_robin_master();
                 }
 
@@ -588,6 +647,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         return self.round_robin_master();
                     }
 
+                    let parties = new_signatures
+                        .keys()
+                        .map(|k| sender_index(k, &self.params.pubkey_list))
+                        .collect::<Vec<usize>>();
+                    let key_gen_vss_vec: Vec<VerifiableSS> = self.shared_secrets.to_vss();
                     let local_sigs: Vec<LocalSig> = new_signatures
                         .values()
                         .map(|s| LocalSig {
@@ -595,12 +659,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                             e: s.1,
                         })
                         .collect();
-                    let parties = new_signatures
-                        .keys()
-                        .map(|k| sender_index(k, &self.params.pubkey_list))
-                        .collect::<Vec<usize>>();
-                    let key_gen_vss_vec: Vec<VerifiableSS> = self.shared_secrets.to_vss();
-                    let eph_vss_vec: Vec<VerifiableSS> = shared_block_secrets.to_vss();
+                    let eph_vss_vec: Vec<VerifiableSS> = if block_shared_keys.unwrap().0 {
+                        shared_block_secrets.for_positive().to_vss()
+                    } else {
+                        shared_block_secrets.for_negative().to_vss()
+                    };
                     let sum_of_local_sigs = LocalSig::verify_local_sigs(
                         &local_sigs,
                         &parties[..],
@@ -614,7 +677,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                                 &vss_sum,
                                 &local_sigs,
                                 &parties[..],
-                                block_shared_keys.unwrap().1,
+                                block_shared_keys.unwrap().2,
                             );
                             let public_key = self.priv_shared_keys.clone().unwrap().y;
                             let hash = candidate_block.hash().unwrap().into_inner();
@@ -738,12 +801,21 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             &key.u_i,
             &parties,
         );
+        let order: BigInt = FE::q();
+        let (vss_scheme_for_negative, secret_shares_for_negative) = VerifiableSS::share_at_indices(
+            params.threshold,
+            params.share_count,
+            &(ECScalar::from(&(order - key.u_i.to_big_int()))),
+            &parties,
+        );
         for i in 0..self.params.pubkey_list.len() {
             self.connection_manager.send_message(Message {
                 message_type: MessageType::Blockvss(
                     block.hash().unwrap(),
                     vss_scheme.clone(),
                     secret_shares[i],
+                    vss_scheme_for_negative.clone(),
+                    secret_shares_for_negative[i],
                 ),
                 sender_id: self.params.signer_id,
                 receiver_id: Some(SignerID {
@@ -826,7 +898,7 @@ mod tests {
     use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
     use crate::rpc::tests::{safety, safety_error, MockRpc, SafetyBlock};
     use crate::rpc::TapyrusApi;
-    use crate::signer_node::{NodeParameters, NodeState, SharedSecretMap, SignerNode};
+    use crate::signer_node::{BidirectionalSharedSecretMap, NodeParameters, NodeState, SignerNode};
     use crate::test_helper::{get_block, TestKeys};
 
     type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
@@ -1057,7 +1129,7 @@ mod tests {
         let initial_state = NodeState::Member {
             block_key: None,
             block_shared_keys: None,
-            shared_block_secrets: SharedSecretMap::new(),
+            shared_block_secrets: BidirectionalSharedSecretMap::new(),
             candidate_block: None,
         };
         let arc_block = safety(get_block(0));
@@ -1090,7 +1162,7 @@ mod tests {
         let initial_state = NodeState::Member {
             block_key: None,
             block_shared_keys: None,
-            shared_block_secrets: SharedSecretMap::new(),
+            shared_block_secrets: BidirectionalSharedSecretMap::new(),
             candidate_block: None,
         };
         let arc_block = safety(get_block(0));
@@ -1120,7 +1192,7 @@ mod tests {
         let initial_state = NodeState::Member {
             block_key: None,
             block_shared_keys: None,
-            shared_block_secrets: SharedSecretMap::new(),
+            shared_block_secrets: BidirectionalSharedSecretMap::new(),
             candidate_block: None,
         };
         let arc_block = safety(get_block(0));
@@ -1168,7 +1240,7 @@ mod tests {
         let initial_state = NodeState::Member {
             block_key: None,
             block_shared_keys: None,
-            shared_block_secrets: SharedSecretMap::new(),
+            shared_block_secrets: BidirectionalSharedSecretMap::new(),
             candidate_block: None,
         };
         let arc_block = safety(get_block(0));
@@ -1198,7 +1270,7 @@ mod tests {
         use crate::errors::Error;
         use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
         use crate::signer_node::tests::create_node;
-        use crate::signer_node::{NodeState, SharedSecretMap};
+        use crate::signer_node::{BidirectionalSharedSecretMap, NodeState};
         use bitcoin::Address;
         use std::cell::Cell;
 
@@ -1245,7 +1317,7 @@ mod tests {
                 NodeState::Member {
                     block_key: None,
                     block_shared_keys: None,
-                    shared_block_secrets: SharedSecretMap::new(),
+                    shared_block_secrets: BidirectionalSharedSecretMap::new(),
                     candidate_block: None,
                 },
                 rpc,

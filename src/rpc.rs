@@ -56,7 +56,8 @@ impl Rpc {
             Ok(resp) => {
                 if log_enabled!(Trace) {
                     trace!(
-                        "JSON-RPC response: {}",
+                        "JSON-RPC response: {}: {}",
+                        name,
                         serde_json::to_string(&resp).unwrap()
                     );
                 }
