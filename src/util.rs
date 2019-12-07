@@ -57,9 +57,9 @@ fn test_sum_point() {
     use curv::BigInt;
 
     // scalar values
-    let s1 = ECScalar::from(&BigInt::from_str("1").unwrap());
-    let s2 = ECScalar::from(&BigInt::from_str("2").unwrap());
-    let s3 = ECScalar::from(&BigInt::from_str("3").unwrap());
+    let s1 = ECScalar::from(&BigInt::from(1));
+    let s2 = ECScalar::from(&BigInt::from(2));
+    let s3 = ECScalar::from(&BigInt::from(3));
 
     // point
     let p1 = GE::generator() * &s1;
@@ -68,7 +68,7 @@ fn test_sum_point() {
 
     let sum = sum_point(&vec![p1, p2, p3]);
 
-    let s6 = ECScalar::from(&BigInt::from_str("6").unwrap());
+    let s6 = ECScalar::from(&BigInt::from(6));
     let p6 = GE::generator() * &s6;
     assert_eq!(sum, p6);
 }
