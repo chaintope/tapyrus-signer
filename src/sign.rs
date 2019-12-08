@@ -91,16 +91,11 @@ impl Sign {
     }
 
     pub fn format_signature(signature: &Signature) -> String {
-        let mut array: Vec<u8> = Vec::new();
         let v_as_int = signature.v.x_coor().unwrap();
-        array.extend(curv::arithmetic::traits::Converter::to_vec(&v_as_int));
+        let v_as_str = v_as_int.to_str_radix(16);
         let s_as_int = signature.sigma.to_big_int();
-        array.extend(curv::arithmetic::traits::Converter::to_vec(&s_as_int));
-        let as_str = array
-            .iter()
-            .map(|b| format!("{:02x}", b))
-            .collect::<String>();
-        format!("{:x}{}", array.len(), as_str)
+        let s_as_str = s_as_int.to_str_radix(16);
+        format!("{:x}{:0>64}{:0>64}", 64, v_as_str, s_as_str)
     }
 }
 
@@ -167,4 +162,10 @@ fn test_format_signature() {
         v: Secp256k1Point::from_coor(&x, &y),
     };
     assert_eq!(Sign::format_signature(&sig), "40c726149bfb2d4ab64823e0cfd8245645a7950e605ef9222735d821ae570b1e91f2b3080d94faf40969c08b663ff1556fe7fbbcfcb648ac2763c16a15a08676f3");
+
+    let sig_0 = Signature {
+        sigma: ECScalar::from(&BigInt::one()),
+        v: Secp256k1Point::from_coor(&x, &y),
+    };
+    assert_eq!(Sign::format_signature(&sig_0), "40c726149bfb2d4ab64823e0cfd8245645a7950e605ef9222735d821ae570b1e910000000000000000000000000000000000000000000000000000000000000001");
 }
