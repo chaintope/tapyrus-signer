@@ -851,6 +851,7 @@ pub struct NodeParameters<T: TapyrusApi> {
 
 impl<T: TapyrusApi> NodeParameters<T> {
     pub fn new(
+        to_address: Address,
         pubkey_list: Vec<PublicKey>,
         private_key: PrivateKey,
         threshold: u8,
@@ -861,7 +862,6 @@ impl<T: TapyrusApi> NodeParameters<T> {
     ) -> NodeParameters<T> {
         let secp = secp256k1::Secp256k1::new();
         let self_pubkey = private_key.public_key(&secp);
-        let address = Address::p2pkh(&self_pubkey, private_key.network);
         let signer_id = SignerID {
             pubkey: self_pubkey,
         };
@@ -875,7 +875,7 @@ impl<T: TapyrusApi> NodeParameters<T> {
             threshold,
             private_key,
             rpc: Arc::new(rpc),
-            address,
+            address: to_address,
             signer_id,
             master_flag,
             self_node_index,
@@ -900,6 +900,7 @@ mod tests {
     use crate::rpc::TapyrusApi;
     use crate::signer_node::{BidirectionalSharedSecretMap, NodeParameters, NodeState, SignerNode};
     use crate::test_helper::{get_block, TestKeys};
+    use bitcoin::{Address, PrivateKey};
 
     type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
 
@@ -913,6 +914,12 @@ mod tests {
         pub receiver: Receiver<Message>,
         /// A function which is called when the node try to broadcast messages.
         pub broadcast_assert: SpyMethod,
+    }
+
+    fn address(private_key: &PrivateKey) -> Address {
+        let secp = secp256k1::Secp256k1::new();
+        let self_pubkey = private_key.public_key(&secp);
+        Address::p2pkh(&self_pubkey, private_key.network)
     }
 
     impl TestConnectionManager {
@@ -987,9 +994,18 @@ mod tests {
         let pubkey_list = testkeys.pubkeys();
         let threshold = 3;
         let private_key = testkeys.key[0];
+        let to_address = address(&private_key);
 
-        let mut params =
-            NodeParameters::new(pubkey_list, private_key, threshold, rpc, true, 0, true);
+        let mut params = NodeParameters::new(
+            to_address,
+            pubkey_list,
+            private_key,
+            threshold,
+            rpc,
+            true,
+            0,
+            true,
+        );
         params.round_duration = 0;
         let con = TestConnectionManager::new(publish_count, spy);
         let broadcaster = con.sender.clone();
@@ -1011,6 +1027,7 @@ mod tests {
         let pubkey_list = testkeys.pubkeys();
         let threshold = 2;
         let private_key = testkeys.key[0];
+        let to_address = address(&private_key);
 
         let con = TestConnectionManager::new(1, spy);
         let rpc = MockRpc {
@@ -1019,8 +1036,16 @@ mod tests {
         let broadcaster = con.sender.clone();
 
         let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
-        let mut params =
-            NodeParameters::new(pubkey_list, private_key, threshold, rpc, false, 0, true);
+        let mut params = NodeParameters::new(
+            to_address,
+            pubkey_list,
+            private_key,
+            threshold,
+            rpc,
+            false,
+            0,
+            true,
+        );
         params.round_duration = 0;
         let arc_node = Arc::new(Mutex::new(SignerNode::new(con, params)));
         let node = arc_node.clone();
@@ -1066,7 +1091,10 @@ mod tests {
         ];
         let threshold = 3;
         let private_key = testkeys.key[0];
+        let to_address = address(&private_key);
+
         let params = NodeParameters::new(
+            to_address,
             pubkey_list.clone(),
             private_key,
             threshold,
