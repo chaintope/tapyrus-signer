@@ -5,13 +5,14 @@
 use std::str::FromStr;
 
 use crate::signer_node::ROUND_INTERVAL_DEFAULT_SECS;
-use bitcoin::{PrivateKey, PublicKey};
+use bitcoin::{Address, PrivateKey, PublicKey};
 use clap::{App, Arg};
 use log;
 use serde::Deserialize;
 use std::error::Error;
 
 pub const OPTION_NAME_CONFIG: &str = "config";
+pub const OPTION_NAME_TO_ADDRESS: &str = "coinbase_pay_to_address";
 pub const OPTION_NAME_PUBLIC_KEY: &str = "publickeys";
 pub const OPTION_NAME_PRIVATE_KEY: &str = "privatekey";
 pub const OPTION_NAME_THRESHOLD: &str = "threshold";
@@ -45,6 +46,7 @@ pub const DEFAULT_CONFIG_FILENAME: &str = "signer_config.toml";
 
 #[derive(Debug, Deserialize, Default)]
 struct SignerToml {
+    to_address: Option<String>,
     publickeys: Option<Vec<String>>,
     privatekey: Option<String>,
     threshold: Option<u8>,
@@ -87,6 +89,7 @@ pub struct CommandArgs<'a> {
 }
 
 pub struct SignerCommandArgs<'a> {
+    to_address: Option<&'a str>,
     private_key: Option<&'a str>,
     public_keys: Option<Vec<&'a str>>,
     threshold: Option<u8>,
@@ -98,6 +101,32 @@ pub struct SignerConfig<'a> {
 }
 
 impl<'a> SignerConfig<'a> {
+    pub fn to_address(&self) -> Address {
+        let value_within_config: Option<&str> = self
+            .toml_config
+            .and_then(|config| config.to_address.as_ref())
+            .map(|p| p as &str);
+        self.command_args
+            .to_address
+            .or(value_within_config)
+            .and_then(|s| match Address::from_str(s) {
+                Ok(p) => {
+                    assert_eq!(
+                        p.network,
+                        self.private_key().network,
+                        "Network should be same among with to_address and WIF of private_key"
+                    );
+                    Some(p)
+                }
+                Err(e) => panic!(format!(
+                    "'{}' is invalid address. error msg: {:?}",
+                    s,
+                    e.description()
+                )),
+            })
+            .expect("Must be specified to_address.")
+    }
+
     pub fn public_keys(&self) -> Vec<PublicKey> {
         let vec_string: Option<&Vec<String>> = self
             .toml_config
@@ -332,6 +361,7 @@ impl<'a> CommandArgs<'a> {
         let num: Option<u8> = threshold_args.and_then(|s| s.parse().ok());
         SignerConfig {
             command_args: SignerCommandArgs {
+                to_address: self.matches.value_of(OPTION_NAME_TO_ADDRESS),
                 public_keys: self
                     .matches
                     .values_of(OPTION_NAME_PUBLIC_KEY)
@@ -395,6 +425,10 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
             .value_name("CONFIG_FILE_PATH")
             .default_value(DEFAULT_CONFIG_FILENAME)
             .help("Load settings from this file. when defined both in file and command line args, then command line args take precedence."))
+        .arg(Arg::with_name(OPTION_NAME_TO_ADDRESS)
+            .long("to_address")
+            .value_name("TO_ADDRESS")
+            .help("Coinbase pay to address."))
         .arg(Arg::with_name(OPTION_NAME_PUBLIC_KEY)
             .short("p")
             .long("publickey")
@@ -636,6 +670,7 @@ fn test_invalid_private_key() {
         matches,
         config: Some(ConfigToml {
             signer: Some(SignerToml {
+                to_address: Some("mbaffffff".to_string()),
                 publickeys: None,
                 threshold: Some(0),
                 privatekey: Some("aabbccdd".to_string()),

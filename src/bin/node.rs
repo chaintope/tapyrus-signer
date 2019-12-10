@@ -46,6 +46,7 @@ fn main() {
     let rpc = connect_rpc(configs.rpc_config());
 
     let params = NodeParameters::new(
+        signer_config.to_address(),
         signer_config.public_keys(),
         signer_config.private_key(),
         signer_config.threshold(),
