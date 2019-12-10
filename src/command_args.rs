@@ -680,3 +680,43 @@ fn test_invalid_private_key() {
     };
     let _privkey = args.signer_config().private_key();
 }
+
+#[test]
+#[should_panic(expected = "'aabbccdd' is invalid address. error msg:")]
+fn test_invalid_to_address() {
+    let matches = get_options().get_matches_from(vec!["node"]);
+    let args = CommandArgs {
+        matches,
+        config: Some(ConfigToml {
+            signer: Some(SignerToml {
+                to_address: Some("aabbccdd".to_string()),
+                publickeys: None,
+                threshold: Some(0),
+                privatekey: None,
+            }),
+            ..ConfigToml::default()
+        }),
+    };
+    let _to_address = args.signer_config().to_address();
+}
+
+#[test]
+#[should_panic(expected = "Network should be same among with to_address and WIF of private_key")]
+fn test_invalid_network_among_with_to_address_and_private_key() {
+    let matches = get_options().get_matches_from(vec!["node"]);
+    let args = CommandArgs {
+        matches,
+        config: Some(ConfigToml {
+            signer: Some(SignerToml {
+                to_address: Some("mkWk6dDtB6A1UtenWN3W24osVmbsyYD2oM".to_string()),
+                publickeys: None,
+                threshold: Some(0),
+                privatekey: Some(
+                    "KzEdPiFuaQktBK8WdsbuzXARzzyJ9uZWB9dnq78UF17Pe1fra33P".to_string(),
+                ),
+            }),
+            ..ConfigToml::default()
+        }),
+    };
+    let _to_address = args.signer_config().to_address();
+}
