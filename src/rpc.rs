@@ -5,19 +5,10 @@
 use bitcoin::Address;
 use log::Level::Trace;
 use log::{log_enabled, trace};
-use secp256k1::Signature;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde::Deserialize;
 
 use crate::blockdata::Block;
 use crate::errors::Error;
-
-#[derive(Debug, Serialize, Deserialize)]
-struct CombineBlockSigsResult {
-    hex: String,
-    warning: String,
-    complete: bool,
-}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct GetBlockchainInfoResult {
@@ -38,10 +29,8 @@ pub trait TapyrusApi {
     fn getnewblock(&self, address: &Address) -> Result<Block, Error>;
     /// Validate to candidateblock
     fn testproposedblock(&self, block: &Block) -> Result<bool, Error>;
-    /// Combine Signatures to candidate block.
-    fn combineblocksigs(&self, block: &Block, signatures: &Vec<Signature>) -> Result<Block, Error>;
     /// Broadcast new block include enough proof.
-    fn submitblock(&self, block: &Block) -> Result<(), Error>;
+    fn submitblock(&self, block: &Block) -> Result<Block, Error>;
     /// Get block chain info
     fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error>;
 }
@@ -67,7 +56,8 @@ impl Rpc {
             Ok(resp) => {
                 if log_enabled!(Trace) {
                     trace!(
-                        "JSON-RPC response: {}",
+                        "JSON-RPC response: {}: {}",
+                        name,
                         serde_json::to_string(&resp).unwrap()
                     );
                 }
@@ -116,26 +106,8 @@ impl TapyrusApi for Rpc {
         self.call::<bool>("testproposedblock", &args)
     }
 
-    fn combineblocksigs(&self, block: &Block, signatures: &Vec<Signature>) -> Result<Block, Error> {
-        let blockhex: Value = block.hex().into();
-        let signatures: Value = signatures
-            .iter()
-            .map(|sig| hex::encode(sig.serialize_der()))
-            .collect();
-        let args = [blockhex, signatures];
-        let resp = self.call::<CombineBlockSigsResult>("combineblocksigs", &args);
-
-        match resp {
-            Ok(CombineBlockSigsResult { hex: v, .. }) => {
-                let raw_block = hex::decode(v).expect("Decoding block hex failed");
-                Ok(Block::new(raw_block))
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    fn submitblock(&self, block: &Block) -> Result<(), Error> {
-        self.call::<()>("submitblock", &[block.hex().into()])
+    fn submitblock(&self, block: &Block) -> Result<Block, Error> {
+        self.call::<Block>("submitblock", &[block.hex().into()])
     }
 
     fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error> {
@@ -146,8 +118,7 @@ impl TapyrusApi for Rpc {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::sign::sign;
-    use crate::test_helper::{get_block, TestKeys};
+    use crate::test_helper::TestKeys;
     use secp256k1::Secp256k1;
 
     pub fn get_rpc_client() -> Rpc {
@@ -221,17 +192,9 @@ pub mod tests {
             Ok(true)
         }
 
-        fn combineblocksigs(
-            &self,
-            _block: &Block,
-            _signatures: &Vec<Signature>,
-        ) -> Result<Block, Error> {
-            self.result()
-        }
-
-        fn submitblock(&self, _block: &Block) -> Result<(), Error> {
-            let _block = self.result()?;
-            Ok(())
+        fn submitblock(&self, _block: &Block) -> Result<Block, Error> {
+            let block = self.result()?;
+            Ok(block)
         }
 
         fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error> {
@@ -264,49 +227,6 @@ pub mod tests {
 
         let result = rpc.testproposedblock(&block);
 
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    #[ignore]
-    fn test_combineblocksigs() {
-        let block = get_block(0);
-        let block_hash = block.hash().unwrap();
-        let keys = &TestKeys::new().key[..1]; // Just 1 signature
-        let sigs: Vec<Signature> = keys.iter().map(|key| sign(&key, &block_hash)).collect();
-
-        let rpc = get_rpc_client();
-        let result = rpc.combineblocksigs(&block, &sigs);
-
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    #[ignore]
-    fn test_submitblock() {
-        let rpc = get_rpc_client();
-
-        let block = call_getnewblock().unwrap();
-        let block_hash = block.hash().unwrap();
-        let keys = &TestKeys::new().key[..1]; // Just 1 signature
-        let sigs: Vec<Signature> = keys.iter().map(|key| sign(&key, &block_hash)).collect();
-
-        let result = rpc.combineblocksigs(&block, &sigs);
-        let completed_block = result.unwrap();
-        let result = rpc.submitblock(&completed_block);
-        assert!(result.is_ok());
-
-        // when invalid block.(cannot connect on the tip)
-        let block = get_block(0);
-        assert!(rpc.submitblock(&block).is_err());
-    }
-
-    #[test]
-    #[ignore]
-    fn test_getblockchaininfo() {
-        let rpc = get_rpc_client();
-        let result = rpc.getblockchaininfo();
-        println!("{:?}", result);
         assert!(result.is_ok());
     }
 }

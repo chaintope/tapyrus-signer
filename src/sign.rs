@@ -2,37 +2,170 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use crate::blockdata::BlockHash;
-use bitcoin::PrivateKey;
-use secp256k1::{Message, Secp256k1, Signature};
+use curv::arithmetic::traits::*;
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
+use curv::elliptic::curves::traits::*;
+use curv::{BigInt, FE, GE};
+use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
+use multi_party_schnorr::Error::InvalidSS;
 
-pub fn sign(private_key: &PrivateKey, hash: &BlockHash) -> Signature {
-    let sign = Secp256k1::signing_only();
-    let message = Message::from_slice(&(hash.borrow_inner())[..]).unwrap();
-    sign.sign(&message, &(private_key.key))
+use crate::blockdata::BlockHash;
+use crate::errors::Error;
+use crate::signer_node::SharedSecretMap;
+use crate::signer_node::ToShares;
+use crate::signer_node::ToVerifiableSS;
+use crate::util::*;
+
+pub struct Sign;
+
+impl Sign {
+    pub fn private_key_to_big_int(key: secp256k1::SecretKey) -> Option<BigInt> {
+        let value = format!("{}", key);
+        let n = BigInt::from_hex(&value);
+        Some(n)
+    }
+
+    pub fn create_key(index: usize, pk: Option<BigInt>) -> Keys {
+        let u: FE = match pk {
+            Some(i) => ECScalar::from(&i),
+            None => ECScalar::new_random(),
+        };
+        let y = &ECPoint::generator() * &u;
+
+        Keys {
+            u_i: u,
+            y_i: y,
+            party_index: index.clone(),
+        }
+    }
+
+    /// return SharedKeys { y, x_i },
+    /// where y is a aggregated public key and x_i is a share of player i.
+    pub fn verify_vss_and_construct_key(
+        params: &Parameters,
+        secret_shares: &SharedSecretMap,
+        index: &usize,
+    ) -> Result<SharedKeys, multi_party_schnorr::Error> {
+        assert_eq!(secret_shares.len(), params.share_count);
+
+        let correct_ss = secret_shares
+            .values()
+            .map(|v| v.vss.validate_share(&v.secret_share, *index))
+            .all(|result| result.is_ok());
+        let y_vec: Vec<GE> = secret_shares
+            .to_vss()
+            .iter()
+            .map(|vss| vss.commitments[0])
+            .collect();
+        match correct_ss {
+            true => {
+                let y = sum_point(&y_vec);
+                let x_i = secret_shares
+                    .to_shares()
+                    .iter()
+                    .fold(FE::zero(), |acc, x| acc + x);
+                Ok(SharedKeys { y, x_i })
+            }
+            false => Err(InvalidSS),
+        }
+    }
+
+    pub fn sign(
+        eph_shared_keys: &SharedKeys,
+        priv_shared_keys: &SharedKeys,
+        message: BlockHash,
+    ) -> Result<LocalSig, Error> {
+        let message_slice = message.borrow_inner();
+        let local_sig =
+            LocalSig::compute(&message_slice.clone(), &eph_shared_keys, &priv_shared_keys);
+        Ok(local_sig)
+    }
+
+    pub fn aggregate(
+        vss_sum: &VerifiableSS,
+        local_sigs: &Vec<LocalSig>,
+        parties: &[usize],
+        v: GE,
+    ) -> Signature {
+        Signature::generate(vss_sum, local_sigs, parties, v)
+    }
+
+    pub fn format_signature(signature: &Signature) -> String {
+        let v_as_int = signature.v.x_coor().unwrap();
+        let v_as_str = v_as_int.to_str_radix(16);
+        let s_as_int = signature.sigma.to_big_int();
+        let s_as_str = s_as_int.to_str_radix(16);
+        format!("{:x}{:0>64}{:0>64}", 64, v_as_str, s_as_str)
+    }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::test_helper::{get_block, TestKeys};
-    use base64;
+#[test]
+fn test_private_key_to_big_int() {
+    use std::str::FromStr;
 
-    #[test]
-    fn sign_test() {
-        let private_key = TestKeys::new().key[0];
-        let block = get_block(0);
-        let block_hash = block.hash().unwrap();
+    let key = secp256k1::SecretKey::from_str(
+        "657440783dd10977c49f87c51dc68b63508e88c7ea9371dc19e6fcd0f5f8639e",
+    )
+    .unwrap();
+    assert_eq!(
+        Sign::private_key_to_big_int(key).unwrap(),
+        BigInt::from_str(
+            "45888996919894035081237286108090342830506757770293597094224988299678468039582"
+        )
+        .unwrap()
+    );
+}
 
-        let sig = sign(&private_key, &block_hash);
+#[test]
+fn test_create_key() {
+    use curv::elliptic::curves::secp256_k1::*;
+    use std::str::FromStr;
 
-        assert_eq!("MEQCIDAL9iCj1rcP+pkj04erS31tGOtpOSKbCsNmG2796U+9AiADPTOWf1PxAhaaX+cZHW1ZAaJNNwoTBwqDM3V4Xz3j3g==",
-                   base64::encode(&sig.serialize_der()));
+    let pk = BigInt::from_str(
+        "45888996919894035081237286108090342830506757770293597094224988299678468039582",
+    )
+    .unwrap();
+    let key = Sign::create_key(0, Some(pk.clone()));
+    assert_eq!(key.party_index, 0);
+    assert_eq!(key.u_i, ECScalar::from(&pk));
+    let x = BigInt::from_str(
+        "59785365775367791548524849652375710528443431367690667459926784930515989662882",
+    )
+    .unwrap();
+    let y = BigInt::from_str(
+        "90722439330137878450843117102075228343061266416912046868469127729012019088799",
+    )
+    .unwrap();
+    assert_eq!(key.y_i, Secp256k1Point::from_coor(&x, &y));
+}
 
-        // check verifiable
-        let secp = Secp256k1::new();
-        let message = Message::from_slice(&(block_hash.borrow_inner())[..]).unwrap();
-        let public_key = private_key.public_key(&secp).key;
-        assert!(&secp.verify(&message, &sig, &public_key).is_ok());
-    }
+#[test]
+fn test_format_signature() {
+    use curv::elliptic::curves::secp256_k1::*;
+    use std::str::FromStr;
+
+    let pk = BigInt::from_str(
+        "109776030561885333132557262259067839518424530456572565024242550494358478943987",
+    )
+    .unwrap();
+    let x = BigInt::from_str(
+        "90077539296702276303134969795375843753866389548876542277234805612812650094225",
+    )
+    .unwrap();
+    let y = BigInt::from_str(
+        "87890325134225311191847774682692230651684221898402757774563799733641956930425",
+    )
+    .unwrap();
+
+    let sig = Signature {
+        sigma: ECScalar::from(&pk),
+        v: Secp256k1Point::from_coor(&x, &y),
+    };
+    assert_eq!(Sign::format_signature(&sig), "40c726149bfb2d4ab64823e0cfd8245645a7950e605ef9222735d821ae570b1e91f2b3080d94faf40969c08b663ff1556fe7fbbcfcb648ac2763c16a15a08676f3");
+
+    let sig_0 = Signature {
+        sigma: ECScalar::from(&BigInt::one()),
+        v: Secp256k1Point::from_coor(&x, &y),
+    };
+    assert_eq!(Sign::format_signature(&sig_0), "40c726149bfb2d4ab64823e0cfd8245645a7950e605ef9222735d821ae570b1e910000000000000000000000000000000000000000000000000000000000000001");
 }

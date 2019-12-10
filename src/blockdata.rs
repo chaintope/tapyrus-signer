@@ -6,6 +6,7 @@ use crate::errors::Error;
 use bitcoin_hashes::{sha256d, Hash};
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct BlockHash([u8; 32]);
 
 impl BlockHash {
@@ -53,5 +54,10 @@ impl Block {
 
     pub fn payload(&self) -> &[u8] {
         &self.0
+    }
+    pub fn add_proof(&self, proof: Vec<u8>) -> Block {
+        let (header, txs) = self.payload().split_at(104);
+        let new_payload = [header, &proof[..], &txs[1..]].concat();
+        Block(new_payload)
     }
 }

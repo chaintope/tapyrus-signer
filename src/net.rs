@@ -2,12 +2,13 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use crate::blockdata::Block;
+use crate::blockdata::{Block, BlockHash};
 use crate::errors;
 use crate::serialize::ByteBufVisitor;
 use bitcoin::PublicKey;
 use redis::{Client, Commands, ControlFlow, PubSubCommands, RedisError};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::cmp::Ordering;
 use std::sync::mpsc::{channel, Receiver, Sender};
 /// メッセージを受け取って、それを処理するためのモジュール
 /// メッセージの処理は、メッセージの種類とラウンドの状態に依存する。
@@ -17,8 +18,11 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
+use curv::FE;
+
 /// Signerの識別子。公開鍵を識別子にする。
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+#[derive(Debug, Eq, Hash, Copy, Clone)]
 pub struct SignerID {
     pub pubkey: PublicKey,
 }
@@ -26,6 +30,24 @@ pub struct SignerID {
 impl SignerID {
     pub fn new(pubkey: PublicKey) -> Self {
         SignerID { pubkey }
+    }
+}
+
+impl PartialEq for SignerID {
+    fn eq(&self, other: &Self) -> bool {
+        self.pubkey.to_bytes().eq(&other.pubkey.to_bytes())
+    }
+}
+
+impl PartialOrd for SignerID {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.pubkey.to_bytes().partial_cmp(&other.pubkey.to_bytes())
+    }
+}
+
+impl Ord for SignerID {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.pubkey.to_bytes().cmp(&other.pubkey.to_bytes())
     }
 }
 
@@ -58,8 +80,10 @@ impl<'de> Deserialize<'de> for SignerID {
 #[derive(PartialEq, Debug, Serialize, Deserialize)]
 pub enum MessageType {
     Candidateblock(Block),
-    Signature(Signature),
     Completedblock(Block),
+    Nodevss(VerifiableSS, FE),
+    Blockvss(BlockHash, VerifiableSS, FE, VerifiableSS, FE),
+    Blocksig(BlockHash, FE, FE),
     Roundfailure,
 }
 
@@ -67,6 +91,7 @@ pub enum MessageType {
 pub struct Message {
     pub message_type: MessageType,
     pub sender_id: SignerID,
+    pub receiver_id: Option<SignerID>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -98,9 +123,11 @@ impl<'de> Deserialize<'de> for Signature {
 pub trait ConnectionManager {
     type ERROR: std::error::Error;
     fn broadcast_message(&self, message: Message);
+    fn send_message(&self, message: Message);
     fn start(
         &self,
         message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
+        id: SignerID,
     ) -> JoinHandle<()>;
     fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<Self::ERROR>>>;
 }
@@ -167,24 +194,26 @@ impl RedisManager {
         }
     }
 
-    fn subscribe<F>(&self, message_processor: F) -> thread::JoinHandle<()>
+    fn subscribe<F>(&self, message_processor: F, id: SignerID) -> thread::JoinHandle<()>
     where
         F: FnMut(Message) -> ControlFlow<()> + Send + 'static,
     {
         let client = Arc::clone(&self.client);
         let error_sender = self.error_sender.clone();
+        let channel_name = format!("tapyrus-signer-{}", id.pubkey.key);
         thread::Builder::new()
             .name("RedisManagerThread".to_string())
             .spawn(move || {
                 fn inner_subscribe<F2>(
                     client: Arc<Client>,
                     mut message_processor: F2,
+                    channel_name: &str,
                 ) -> Result<(), ConnectionManagerError<RedisError>>
                 where
                     F2: FnMut(Message) -> ControlFlow<()> + Send + 'static,
                 {
                     let mut conn = client.get_connection()?;
-                    conn.subscribe(&["tapyrus-signer"], |msg| {
+                    conn.subscribe(&["tapyrus-signer", channel_name], |msg| {
                         let _ch = msg.get_channel_name();
                         let payload: String = msg.get_payload().unwrap();
                         log::trace!("receive message. payload: {}", payload);
@@ -194,7 +223,7 @@ impl RedisManager {
                     })?;
                     Ok(())
                 }
-                match inner_subscribe(client, message_processor) {
+                match inner_subscribe(client, message_processor, &channel_name) {
                     Ok(()) => {}
                     Err(e) => error_sender
                         .send(e)
@@ -203,11 +232,8 @@ impl RedisManager {
             })
             .expect("Failed create RedisManagerThread.")
     }
-}
 
-impl ConnectionManager for RedisManager {
-    type ERROR = RedisError;
-    fn broadcast_message(&self, message: Message) {
+    fn process_message(&self, message: Message, to: String) {
         let client = Arc::clone(&self.client);
         let message_in_thread = serde_json::to_string(&message).unwrap();
         thread::Builder::new()
@@ -218,18 +244,37 @@ impl ConnectionManager for RedisManager {
 
                 log::trace!("Publish {} to tapyrus-signer channel.", message_in_thread);
 
-                let _: () = conn.publish("tapyrus-signer", message_in_thread).unwrap();
+                let _: () = conn.publish(to, message_in_thread).unwrap();
             })
             .unwrap()
             .join()
             .expect("Can't connect to Redis Server.");
     }
+}
+
+impl ConnectionManager for RedisManager {
+    type ERROR = RedisError;
+
+    fn broadcast_message(&self, message: Message) {
+        assert!(message.receiver_id.is_none());
+        log::debug!("broadcast_message {:?} ", message);
+        let channel_name = "tapyrus-signer".to_string();
+        self.process_message(message, channel_name);
+    }
+
+    fn send_message(&self, message: Message) {
+        assert!(message.receiver_id.is_some());
+        log::debug!("send_message {:?} ", message);
+        let channel_name = format!("tapyrus-signer-{}", message.receiver_id.unwrap().pubkey.key);
+        self.process_message(message, channel_name);
+    }
 
     fn start(
         &self,
         message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
+        id: SignerID,
     ) -> JoinHandle<()> {
-        self.subscribe(message_processor)
+        self.subscribe(message_processor, id)
     }
 
     fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<Self::ERROR>>> {
@@ -240,7 +285,9 @@ impl ConnectionManager for RedisManager {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_helper::{create_message, TestKeys};
+    use crate::test_helper::TestKeys;
+    use std::collections::BTreeMap;
+    use std::str::FromStr;
 
     #[test]
     #[ignore]
@@ -258,11 +305,12 @@ mod test {
             ControlFlow::Break(())
         };
 
-        let subscriber = connection_manager.subscribe(message_processor);
+        let subscriber = connection_manager.subscribe(message_processor, sender_id);
 
         let message = Message {
             message_type: MessageType::Roundfailure,
             sender_id,
+            receiver_id: None,
         };
         connection_manager.broadcast_message(message);
 
@@ -288,22 +336,35 @@ mod test {
     }
 
     #[test]
-    fn signature_message_serialize_deserialize_test() {
-        let message = create_message();
-
-        let serialized = serde_json::to_string(&message).unwrap();
-
-        // check serialize
-        let expected_serialized_message = r#"{"message_type":{"Signature":[48,69,2,33,0,209,78,75,40,108,63,135,236,126,58,248,69,201,134,198,123,9,100,136,101,202,168,134,119,114,0,86,36,17,238,152,190,2,32,91,12,234,133,10,255,32,122,215,249,21,62,10,88,133,223,155,69,205,171,31,105,114,13,174,21,159,118,161,43,58,137]},"sender_id":[3,131,26,105,184,0,152,51,171,91,3,38,1,46,175,72,155,254,163,90,115,33,177,202,21,177,29,136,19,20,35,250,252]}"#;
-        assert_eq!(expected_serialized_message, serialized);
-
-        // check deserialize
-        let sig = Signature(secp256k1::Signature::from_der(&base64::decode("MEUCIQDRTksobD+H7H46+EXJhsZ7CWSIZcqohndyAFYkEe6YvgIgWwzqhQr/IHrX+RU+CliF35tFzasfaXINrhWfdqErOok=").unwrap()).unwrap());
-        let deserialized = serde_json::from_str::<Message>(expected_serialized_message).unwrap();
-        assert_eq!(deserialized.message_type, MessageType::Signature(sig));
-        assert_eq!(
-            deserialized.sender_id,
-            SignerID::new(TestKeys::new().pubkeys()[0])
+    fn test_sort_signer_id() {
+        let alice = SignerID::new(
+            PublicKey::from_str(
+                "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
+            )
+            .unwrap(),
         );
+        let bob = SignerID::new(
+            PublicKey::from_str(
+                "02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900",
+            )
+            .unwrap(),
+        );
+        let carol = SignerID::new(
+            PublicKey::from_str(
+                "02a85a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e",
+            )
+            .unwrap(),
+        );
+
+        assert!(alice > bob);
+        assert!(bob > carol);
+
+        //Sort key in BTreeMap.
+        let mut map: BTreeMap<SignerID, &str> = BTreeMap::new();
+        map.insert(alice, "a");
+        map.insert(bob, "b");
+        map.insert(carol, "c");
+        let values: Vec<&str> = map.values().cloned().collect();
+        assert_eq!(values, vec!["c", "b", "a"]);
     }
 }
