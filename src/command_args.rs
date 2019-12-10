@@ -670,7 +670,7 @@ fn test_invalid_private_key() {
         matches,
         config: Some(ConfigToml {
             signer: Some(SignerToml {
-                to_address: Some("mbaffffff".to_string()),
+                to_address: None,
                 publickeys: None,
                 threshold: Some(0),
                 privatekey: Some("aabbccdd".to_string()),
