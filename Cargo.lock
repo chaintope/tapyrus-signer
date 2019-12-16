@@ -574,7 +574,7 @@ dependencies = [
 [[package]]
 name = "multi-party-schnorr"
 version = "0.3.0"
-source = "git+https://github.com/Yamaguchi/multi-party-schnorr#6764d5d33e66b4115613d29a7663efb4e3df0952"
+source = "git+https://github.com/Yamaguchi/multi-party-schnorr?rev=cd92eecc736b7a48bd3a24284f3c3155c7f18179#cd92eecc736b7a48bd3a24284f3c3155c7f18179"
 dependencies = [
  "centipede 0.2.0 (git+https://github.com/KZen-networks/centipede?tag=v0.2.0)",
  "curv 0.2.0 (git+https://github.com/KZen-networks/curv?tag=v0.2.0)",
@@ -1011,7 +1011,7 @@ dependencies = [
  "http 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "jsonrpc 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "multi-party-schnorr 0.3.0 (git+https://github.com/Yamaguchi/multi-party-schnorr)",
+ "multi-party-schnorr 0.3.0 (git+https://github.com/Yamaguchi/multi-party-schnorr?rev=cd92eecc736b7a48bd3a24284f3c3155c7f18179)",
  "redis 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "secp256k1 0.15.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.102 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1344,7 +1344,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum mime 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "ba626b8a6de5da682e1caa06bdb42a335aee5a84db8e5046a3e8ab17ba0a3ae0"
 "checksum mio 0.6.19 (registry+https://github.com/rust-lang/crates.io-index)" = "83f51996a3ed004ef184e16818edc51fadffe8e7ca68be67f9dee67d84d0ff23"
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
-"checksum multi-party-schnorr 0.3.0 (git+https://github.com/Yamaguchi/multi-party-schnorr)" = "<none>"
+"checksum multi-party-schnorr 0.3.0 (git+https://github.com/Yamaguchi/multi-party-schnorr?rev=cd92eecc736b7a48bd3a24284f3c3155c7f18179)" = "<none>"
 "checksum net2 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)" = "42550d9fb7b6684a6d404d9fa7250c2eb2646df731d1c06afc06dcee9e1bcf88"
 "checksum num-traits 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)" = "443c53b3c3531dfcbfa499d8893944db78474ad7a1d87fa2d94d1a2231693ac6"
 "checksum num_cpus 1.11.1 (registry+https://github.com/rust-lang/crates.io-index)" = "76dac5ed2a876980778b8b85f75a71b6cbf0db0b1232ee12f826bccb00d09d72"
