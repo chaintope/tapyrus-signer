@@ -4,7 +4,7 @@
 
 use std::collections::BTreeMap;
 use std::convert::TryInto;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::Arc;
 use std::time::Duration;
 use std::{thread, time};
@@ -179,10 +179,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         // get error_handler that is for catch error within connection_manager.
         let connection_manager_error_handler = self.connection_manager.error_handler();
         loop {
+            log::trace!("Main Loop Start...");
             // After process when received message. Get message from receiver,
             // then change that state in main thread side.
             // messageを受け取った後の処理。receiverからmessageを受け取り、
             // stateの変更はmain thread側で行う。
+            log::trace!("Stop signal process...");
             match &self.stop_signal {
                 Some(ref r) => match r.try_recv() {
                     Ok(_) => {
@@ -190,44 +192,65 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         self.round_timer.stop();
                         break;
                     }
-                    Err(std::sync::mpsc::TryRecvError::Empty) => {}
+                    Err(std::sync::mpsc::TryRecvError::Empty) => {
+                        log::trace!("Stop signal empty. Continue to run.");
+                    }
                     Err(e) => {
                         panic!("{:?}", e);
                     }
                 },
-                None => {}
+                None => {
+                    log::trace!("Stop signal receiver is not set.");
+                }
             }
+
             // Receiving message.
+            log::trace!("Receiving messages...");
             match receiver.try_recv() {
                 Ok(msg) => {
+                    log::debug!("Got new message: {:?}", msg);
                     let next = self.process_message(msg);
                     self.current_state = next;
+                    log::debug!("Current state updated as {:?}", self.current_state);
                 }
-                Err(_e) => {}
+                Err(TryRecvError::Empty) => log::trace!("Nothing new messages."),
+                Err(e) => log::debug!("{:?}", e),
             }
+
             // Process for exceed time limit of Round.
+            log::trace!("Checking round duration timeout...");
             match self.round_timer.receiver.try_recv() {
                 Ok(_) => {
+                    log::trace!("Round duration is timeout. Starting round process...");
                     // Round timeout. force round robin master node.
                     self.current_state = self.round_robin_master();
+                    log::debug!("Current state updated as {:?}", self.current_state);
                     self.round_timer.restart().unwrap();
                 }
-                Err(_e) => {} // nothing to do.
+                Err(TryRecvError::Empty) => {
+                    log::trace!("Still waiting round duration interval.");
+                }
+                Err(e) => {
+                    log::debug!("{:?}", e);
+                }
             }
             // Should be panic, if happened error in connection_manager.
+            log::trace!("Checking network connection error...");
             match connection_manager_error_handler {
                 Some(ref receiver) => match receiver.try_recv() {
                     Ok(e) => {
                         self.round_timer.stop();
                         panic!(e.to_string());
                     }
-                    Err(_e) => {}
+                    Err(TryRecvError::Empty) => log::trace!("No errors."),
+                    Err(e) => log::debug!("{:?}", e),
                 },
                 None => {
                     log::warn!("Failed to get error_handler of connection_manager!");
                 }
             }
             // wait loop
+            log::trace!("Wait for next loop 300 ms...");
             std::thread::sleep(Duration::from_millis(300));
         }
     }

@@ -255,7 +255,11 @@ impl RedisManager {
                     Ok(())
                 }
                 match inner_process_message(client, &message_in_thread, &to) {
-                    Ok(()) => log::trace!("Success to send message {} in channel {}", message_in_thread, to),
+                    Ok(()) => log::trace!(
+                        "Success to send message {} in channel {}",
+                        message_in_thread,
+                        to
+                    ),
                     Err(e) => error_sender
                         .send(e)
                         .expect("Can't notify RedisManager connection error"),
