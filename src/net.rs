@@ -235,16 +235,31 @@ impl RedisManager {
 
     fn process_message(&self, message: Message, to: String) {
         let client = Arc::clone(&self.client);
+        let error_sender = self.error_sender.clone();
         let message_in_thread = serde_json::to_string(&message).unwrap();
+
         thread::Builder::new()
             .name("RedisBroadcastThread".to_string())
             .spawn(move || {
-                let conn = client.get_connection().unwrap();
-                thread::sleep(Duration::from_millis(500));
+                fn inner_process_message(
+                    client: Arc<Client>,
+                    message: &str,
+                    to: &str,
+                ) -> Result<(), ConnectionManagerError<RedisError>> {
+                    let conn = client.get_connection()?;
+                    thread::sleep(Duration::from_millis(500));
 
-                log::trace!("Publish {} to tapyrus-signer channel.", message_in_thread);
+                    log::trace!("Publish {} to tapyrus-signer channel.", message);
 
-                let _: () = conn.publish(to, message_in_thread).unwrap();
+                    let _: () = conn.publish(to, message)?;
+                    Ok(())
+                }
+                match inner_process_message(client, &message_in_thread, &to) {
+                    Ok(()) => log::trace!("Success to send message {} in channel {}", message_in_thread, to),
+                    Err(e) => error_sender
+                        .send(e)
+                        .expect("Can't notify RedisManager connection error"),
+                };
             })
             .unwrap()
             .join()
@@ -288,6 +303,32 @@ mod test {
     use crate::test_helper::TestKeys;
     use std::collections::BTreeMap;
     use std::str::FromStr;
+
+    #[test]
+    #[should_panic(expected = "ConnectionManagerError")]
+    fn test_error_when_sending_message_without_redis_connection() {
+        // create un-usable connection
+        let mut connection_manager = RedisManager::new("0.0.0.0".to_string(), "999".to_string());
+        let sender_id = SignerID {
+            pubkey: TestKeys::new().pubkeys()[0],
+        };
+
+        let message = Message {
+            message_type: MessageType::Roundfailure,
+            sender_id,
+            receiver_id: None,
+        };
+
+        connection_manager.process_message(message, "channel".to_string());
+
+        let error_handler = connection_manager.error_handler().unwrap();
+        match error_handler.try_recv() {
+            Ok(e) => {
+                panic!(e.to_string());
+            }
+            Err(_e) => {}
+        }
+    }
 
     #[test]
     #[ignore]
