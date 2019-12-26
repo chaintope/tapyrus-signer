@@ -12,28 +12,34 @@ use serde::Deserialize;
 use std::error::Error;
 
 pub const OPTION_NAME_CONFIG: &str = "config";
+
+/// # Signer Config
 pub const OPTION_NAME_TO_ADDRESS: &str = "coinbase_pay_to_address";
 pub const OPTION_NAME_PUBLIC_KEY: &str = "publickeys";
 pub const OPTION_NAME_PRIVATE_KEY: &str = "privatekey";
 pub const OPTION_NAME_THRESHOLD: &str = "threshold";
 pub const OPTION_NAME_MASTER_FLAG: &str = "master_flag";
+
+/// # RPC Config
 pub const OPTION_NAME_RPC_ENDPOINT_HOST: &str = "rpc_endpoint_host";
 pub const OPTION_NAME_RPC_ENDPOINT_PORT: &str = "rpc_endpoint_port";
 pub const OPTION_NAME_RPC_ENDPOINT_USER: &str = "rpc_endpoint_user";
 pub const OPTION_NAME_RPC_ENDPOINT_PASS: &str = "rpc_endpoint_pass";
 
+/// # Redis Config
 pub const OPTION_NAME_REDIS_HOST: &str = "redis_host";
 pub const OPTION_NAME_REDIS_PORT: &str = "redis_port";
 
+/// # General Config
 /// round category params.
 pub const OPTION_NAME_ROUND_DURATION: &str = "round_duration";
-
 /// log category params.
 pub const OPTION_NAME_LOG_QUIET: &str = "log_quiet";
 pub const OPTION_NAME_LOG_LEVEL: &str = "log_level";
-
+/// Others
 pub const OPTION_NAME_SKIP_WAITING_IBD: &str = "skip_waiting_ibd";
 
+/// # Default Values
 pub const DEFAULT_RPC_HOST: &str = "127.0.0.1";
 pub const DEFAULT_RPC_PORT: &str = "2377";
 pub const DEFAULT_RPC_USERNAME: &str = "";
