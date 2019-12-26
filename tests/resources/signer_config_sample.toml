@@ -59,3 +59,10 @@ log_level = "debug"
 # if this flag is true, then this node launch as Master.
 # this is optional, default false.
 master = true
+
+# `daemon` is flag for to run node as daemon process. Set true then the node run as daemon.
+daemon = true
+
+# `pid`
+# Specify pid file path. This option is enable when the node got '--daemon' flag.
+pid = "/tmp/tapyrus-signer.pid"

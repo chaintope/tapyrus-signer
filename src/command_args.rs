@@ -36,6 +36,9 @@ pub const OPTION_NAME_ROUND_DURATION: &str = "round_duration";
 /// log category params.
 pub const OPTION_NAME_LOG_QUIET: &str = "log_quiet";
 pub const OPTION_NAME_LOG_LEVEL: &str = "log_level";
+/// daemonize
+pub const OPTION_NAME_DAEMON: &str = "daemon";
+pub const OPTION_NAME_PID: &str = "pid";
 /// Others
 pub const OPTION_NAME_SKIP_WAITING_IBD: &str = "skip_waiting_ibd";
 
@@ -47,6 +50,7 @@ pub const DEFAULT_RPC_PASSWORD: &str = "";
 pub const DEFAULT_REDIS_HOST: &str = "127.0.0.1";
 pub const DEFAULT_REDIS_PORT: &str = "6379";
 pub const DEFAULT_LOG_LEVEL: &str = "info";
+pub const DEFAULT_PID: &str = "/tmp/tapyrus-signer.pid";
 /// default config file name
 pub const DEFAULT_CONFIG_FILENAME: &str = "signer_config.toml";
 
@@ -79,6 +83,8 @@ pub struct GeneralToml {
     log_quiet: Option<bool>,
     skip_waiting_ibd: Option<bool>,
     master: Option<bool>,
+    daemon: Option<bool>,
+    pid: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -280,6 +286,8 @@ pub struct GeneralCommandArgs<'a> {
     log_level: Option<&'a str>,
     skip_waiting_ibd: bool,
     master: bool,
+    daemon: bool,
+    pid: Option<&'a str>,
 }
 
 pub struct GeneralConfig<'a> {
@@ -326,6 +334,23 @@ impl<'a> GeneralConfig<'a> {
             .and_then(|config| config.master)
             .unwrap_or_default();
         self.command_args.master || toml_value
+    }
+    pub fn daemon(&'a self) -> bool {
+        let toml_value = self
+            .toml_config
+            .and_then(|config| config.daemon)
+            .unwrap_or_default();
+        self.command_args.daemon|| toml_value
+    }
+    pub fn pid(&'a self) -> &'a str {
+        let toml_value = self
+            .toml_config
+            .and_then(|config| config.pid.as_ref())
+            .map(|s| s as &str);
+        self.command_args
+            .pid
+            .or(toml_value)
+            .unwrap_or(DEFAULT_PID)
     }
 }
 
@@ -408,6 +433,8 @@ impl<'a> CommandArgs<'a> {
                 log_quiet: self.matches.is_present(OPTION_NAME_LOG_QUIET),
                 skip_waiting_ibd: self.matches.is_present(OPTION_NAME_SKIP_WAITING_IBD),
                 master: self.matches.is_present(OPTION_NAME_MASTER_FLAG),
+                daemon: self.matches.is_present(OPTION_NAME_DAEMON),
+                pid: self.matches.value_of(OPTION_NAME_PID),
             },
             toml_config: self.config.as_ref().and_then(|c| c.general.as_ref()),
         }
@@ -497,6 +524,15 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
         .arg(Arg::with_name(OPTION_NAME_SKIP_WAITING_IBD)
             .long("skip-waiting-ibd")
             .help("This flag make signer node don't waiting connected Tapyrus full node finishes Initial Block Download when signer node started. When block creation stopped much time, The status of Tapyrus full node changes to progressing Initial Block Download. In this case, block creation is never resume, because signer node waits the status is back to non-IBD. So you can use this flag to start signer node with ignore tapyrus full node status."))
+        .arg(Arg::with_name(OPTION_NAME_DAEMON)
+            .long("daemon")
+            .help("Daemonize the Tapyrus Signer node process."))
+        .arg(Arg::with_name(OPTION_NAME_PID)
+            .long("pid")
+            .takes_value(true)
+            .value_name("pid file")
+            .default_value(DEFAULT_PID)
+            .help("Specify pid file path. This option is enable when the node got '-daemon' flag."))
 }
 
 #[test]
@@ -568,6 +604,8 @@ fn test_load_from_file() {
     assert_eq!(args.general_config().log_level(), "debug");
     assert_eq!(args.general_config().log_quiet(), true);
     assert_eq!(args.general_config().master(), true);
+    assert_eq!(args.general_config().daemon(), true);
+    assert_eq!(args.general_config().pid(), "/tmp/tapyrus-signer.pid");
 }
 
 #[test]
@@ -585,6 +623,8 @@ fn test_priority_commandline() {
         "--rpcpass=test",
         "--redishost=redis.endpoint.dev.chaintope.com",
         "--redisport=88888",
+        "--daemon",
+        "--pid=/tmp/test.pid",
     ]);
     let args = CommandArgs::load(matches).unwrap();
     let pubkeys = args.signer_config().public_keys();
@@ -618,6 +658,9 @@ fn test_priority_commandline() {
         "redis.endpoint.dev.chaintope.com"
     );
     assert_eq!(args.redis_config().port(), 88888);
+
+    assert_eq!(args.general_config().daemon(), true);
+    assert_eq!(args.general_config().pid(), "/tmp/test.pid");
 }
 
 #[test]
