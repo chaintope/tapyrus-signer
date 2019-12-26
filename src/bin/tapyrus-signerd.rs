@@ -13,7 +13,6 @@ extern crate tapyrus_signer;
 use bitcoin::{PrivateKey, PublicKey};
 
 use daemonize::Daemonize;
-use daemonize::Daemonize;
 use std::fs::File;
 use std::sync::atomic::Ordering;
 use std::time::Duration;

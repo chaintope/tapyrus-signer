@@ -66,3 +66,8 @@ daemon = true
 # `pid`
 # Specify pid file path. This option is enable when the node got '--daemon' flag.
 pid = "/tmp/tapyrus-signer.pid"
+
+# `log_file`
+# Specify where log file export to. This option is enable when the node fot '--daemon' flag.
+# If not, logs are put on stdout and stderr.
+log_file = "/var/log/tapyrus-signer.log"

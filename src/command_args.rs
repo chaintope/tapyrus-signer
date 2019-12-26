@@ -624,6 +624,7 @@ fn test_load_from_file() {
     assert_eq!(args.general_config().master(), true);
     assert_eq!(args.general_config().daemon(), true);
     assert_eq!(args.general_config().pid(), "/tmp/tapyrus-signer.pid");
+    assert_eq!(args.general_config().log_file(), "/var/log/tapyrus-signer.log");
 }
 
 #[test]
@@ -643,6 +644,7 @@ fn test_priority_commandline() {
         "--redisport=88888",
         "--daemon",
         "--pid=/tmp/test.pid",
+        "--logfile=/tmp/tapyrus-signer.log",
     ]);
     let args = CommandArgs::load(matches).unwrap();
     let pubkeys = args.signer_config().public_keys();
@@ -679,6 +681,7 @@ fn test_priority_commandline() {
 
     assert_eq!(args.general_config().daemon(), true);
     assert_eq!(args.general_config().pid(), "/tmp/test.pid");
+    assert_eq!(args.general_config().log_file(), "/tmp/tapyrus-signer.log");
 }
 
 #[test]
