@@ -11,15 +11,20 @@ extern crate tapyrus_signer;
 
 use bitcoin::{PrivateKey, PublicKey};
 
+use std::sync::atomic::Ordering;
+use std::time::Duration;
 use tapyrus_signer::command_args::{CommandArgs, RedisConfig, RpcConfig};
 use tapyrus_signer::net::{ConnectionManager, RedisManager};
 use tapyrus_signer::rpc::Rpc;
 use tapyrus_signer::signer_node::{NodeParameters, SignerNode};
+use tapyrus_signer::util::{set_stop_signal_handler, signal_to_string};
 
 /// This command is for launch tapyrus-signer-node.
 /// command example:
 /// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e -p=02d111519ba1f3013a7a613ecdcc17f4d53fbcb558b70404b5fb0c84ebb90a8d3c -p=02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506 --privatekey=cTRkG8i8PP7imvryqQwcYm787WHRdMmUqBvi1Z456gHvVoKnJ9TK -t 3 --rpcport=12381 --rpcuser=user --rpcpass=pass --master
 fn main() {
+    start_unix_signal_handling();
+
     let configs = CommandArgs::new().unwrap();
 
     let general_config = configs.general_config();
@@ -103,6 +108,29 @@ fn connect_signer_network(rc: RedisConfig) -> impl ConnectionManager {
         .test_connection()
         .expect("Failed to connect redis. Please confirm redis connection info");
     redis_manager
+}
+
+/// Handle unix signal
+/// If the process got stop signals, it puts log and exit process.
+fn start_unix_signal_handling() {
+    let _ = std::thread::spawn(|| {
+        // Add signal handler
+        let unix_stop_signal_handler =
+            set_stop_signal_handler().expect("Failed to register signal handler.");
+
+        loop {
+            // Unix Signal handler
+            match unix_stop_signal_handler.load(Ordering::Relaxed) {
+                0 => {}
+                signal => {
+                    log::info!("Signer Node was stopped by {}", signal_to_string(signal));
+                    std::process::exit(0);
+                }
+            }
+
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    });
 }
 
 #[test]
