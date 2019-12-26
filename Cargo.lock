@@ -304,7 +304,7 @@ version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "boxfnonce 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.65 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.66 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

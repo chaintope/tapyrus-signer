@@ -4,14 +4,17 @@
 
 extern crate bitcoin;
 extern crate clap;
+extern crate daemonize;
 extern crate env_logger;
 extern crate log;
 extern crate redis;
 extern crate tapyrus_signer;
-extern crate daemonize;
 
 use bitcoin::{PrivateKey, PublicKey};
 
+use daemonize::Daemonize;
+use daemonize::Daemonize;
+use std::fs::File;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tapyrus_signer::command_args::{CommandArgs, RedisConfig, RpcConfig};
@@ -19,8 +22,6 @@ use tapyrus_signer::net::{ConnectionManager, RedisManager};
 use tapyrus_signer::rpc::Rpc;
 use tapyrus_signer::signer_node::{NodeParameters, SignerNode};
 use tapyrus_signer::util::{set_stop_signal_handler, signal_to_string};
-use daemonize::Daemonize;
-use std::fs::File;
 
 /// This command is for launch tapyrus-signer-node.
 /// command example:
@@ -33,9 +34,7 @@ fn main() {
     let general_config = configs.general_config();
 
     if general_config.daemon() {
-        daemonize(
-            general_config.pid()
-        );
+        daemonize(general_config.pid(), general_config.log_file());
     }
 
     let log_level = general_config.log_level();
@@ -74,11 +73,12 @@ fn main() {
     node.start();
 }
 
-fn daemonize(pid: &str) {
+fn daemonize(pid: &str, log_file: &str) {
     println!("Start Tapyrus Signer Daemon. pid file: {}", pid);
+    let stdout = File::create(log_file).unwrap();
+    let stderr = File::create(log_file).unwrap();
 
-    let daemonize = Daemonize::new()
-        .pid_file(pid);
+    let daemonize = Daemonize::new().pid_file(pid).stdout(stdout).stderr(stderr);
 
     match daemonize.start() {
         Ok(_) => println!("Success, daemonized"),

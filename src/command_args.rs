@@ -39,6 +39,7 @@ pub const OPTION_NAME_LOG_LEVEL: &str = "log_level";
 /// daemonize
 pub const OPTION_NAME_DAEMON: &str = "daemon";
 pub const OPTION_NAME_PID: &str = "pid";
+pub const OPTION_NAME_LOG_FILE: &str = "log_file";
 /// Others
 pub const OPTION_NAME_SKIP_WAITING_IBD: &str = "skip_waiting_ibd";
 
@@ -51,6 +52,7 @@ pub const DEFAULT_REDIS_HOST: &str = "127.0.0.1";
 pub const DEFAULT_REDIS_PORT: &str = "6379";
 pub const DEFAULT_LOG_LEVEL: &str = "info";
 pub const DEFAULT_PID: &str = "/tmp/tapyrus-signer.pid";
+pub const DEFAULT_LOG_FILE: &str = "/var/log/tapyrus-signer.log";
 /// default config file name
 pub const DEFAULT_CONFIG_FILENAME: &str = "signer_config.toml";
 
@@ -85,6 +87,7 @@ pub struct GeneralToml {
     master: Option<bool>,
     daemon: Option<bool>,
     pid: Option<String>,
+    log_file: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -288,6 +291,7 @@ pub struct GeneralCommandArgs<'a> {
     master: bool,
     daemon: bool,
     pid: Option<&'a str>,
+    log_file: Option<&'a str>,
 }
 
 pub struct GeneralConfig<'a> {
@@ -340,17 +344,24 @@ impl<'a> GeneralConfig<'a> {
             .toml_config
             .and_then(|config| config.daemon)
             .unwrap_or_default();
-        self.command_args.daemon|| toml_value
+        self.command_args.daemon || toml_value
     }
     pub fn pid(&'a self) -> &'a str {
         let toml_value = self
             .toml_config
             .and_then(|config| config.pid.as_ref())
             .map(|s| s as &str);
+        self.command_args.pid.or(toml_value).unwrap_or(DEFAULT_PID)
+    }
+    pub fn log_file(&'a self) -> &'a str {
+        let toml_value = self
+            .toml_config
+            .and_then(|config| config.log_file.as_ref())
+            .map(|s| s as &str);
         self.command_args
-            .pid
+            .log_file
             .or(toml_value)
-            .unwrap_or(DEFAULT_PID)
+            .unwrap_or(DEFAULT_LOG_FILE)
     }
 }
 
@@ -435,6 +446,7 @@ impl<'a> CommandArgs<'a> {
                 master: self.matches.is_present(OPTION_NAME_MASTER_FLAG),
                 daemon: self.matches.is_present(OPTION_NAME_DAEMON),
                 pid: self.matches.value_of(OPTION_NAME_PID),
+                log_file: self.matches.value_of(OPTION_NAME_LOG_FILE),
             },
             toml_config: self.config.as_ref().and_then(|c| c.general.as_ref()),
         }
@@ -530,9 +542,15 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
         .arg(Arg::with_name(OPTION_NAME_PID)
             .long("pid")
             .takes_value(true)
-            .value_name("pid file")
+            .value_name("file")
             .default_value(DEFAULT_PID)
-            .help("Specify pid file path. This option is enable when the node got '-daemon' flag."))
+            .help("Specify pid file path. This option is enable when the node got '--daemon' flag."))
+        .arg(Arg::with_name(OPTION_NAME_LOG_FILE)
+            .long("logfile")
+            .takes_value(true)
+            .value_name("file")
+            .default_value(DEFAULT_LOG_FILE)
+            .help("Specify where log file export to. This option is enable when the node fot '--daemon' flag. If not, logs are put on stdout and stderr."))
 }
 
 #[test]
