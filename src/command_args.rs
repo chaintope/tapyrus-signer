@@ -10,6 +10,7 @@ use clap::{App, Arg};
 use log;
 use serde::Deserialize;
 use std::error::Error;
+use std::path::PathBuf;
 
 pub const OPTION_NAME_CONFIG: &str = "config";
 
@@ -51,8 +52,20 @@ pub const DEFAULT_RPC_PASSWORD: &str = "";
 pub const DEFAULT_REDIS_HOST: &str = "127.0.0.1";
 pub const DEFAULT_REDIS_PORT: &str = "6379";
 pub const DEFAULT_LOG_LEVEL: &str = "info";
-pub const DEFAULT_PID: &str = "/tmp/tapyrus-signer.pid";
-pub const DEFAULT_LOG_FILE: &str = "/var/log/tapyrus-signer.log";
+
+lazy_static! {
+    pub static ref DEFAULT_PID: PathBuf = {
+        let mut v = std::env::temp_dir();
+        v.push("tapyrus-signer.pid");
+        v
+    };
+    pub static ref DEFAULT_LOG_FILE: PathBuf = {
+        let mut v = std::env::temp_dir();
+        v.push("tapyrus-signer.log");
+        v
+    };
+}
+
 /// default config file name
 pub const DEFAULT_CONFIG_FILENAME: &str = "signer_config.toml";
 
@@ -351,17 +364,22 @@ impl<'a> GeneralConfig<'a> {
             .toml_config
             .and_then(|config| config.pid.as_ref())
             .map(|s| s as &str);
-        self.command_args.pid.or(toml_value).unwrap_or(DEFAULT_PID)
+        self.command_args.pid.or(toml_value).unwrap_or(
+            DEFAULT_PID
+                .to_str()
+                .expect("Can't cast default pid PathBuf to &str"),
+        )
     }
     pub fn log_file(&'a self) -> &'a str {
         let toml_value = self
             .toml_config
             .and_then(|config| config.log_file.as_ref())
             .map(|s| s as &str);
-        self.command_args
-            .log_file
-            .or(toml_value)
-            .unwrap_or(DEFAULT_LOG_FILE)
+        self.command_args.log_file.or(toml_value).unwrap_or(
+            DEFAULT_LOG_FILE
+                .to_str()
+                .expect("Can't cast default log file PathBuf to &str"),
+        )
     }
 }
 
@@ -543,13 +561,11 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
             .long("pid")
             .takes_value(true)
             .value_name("file")
-            .default_value(DEFAULT_PID)
             .help("Specify pid file path. This option is enable when the node got '--daemon' flag."))
         .arg(Arg::with_name(OPTION_NAME_LOG_FILE)
             .long("logfile")
             .takes_value(true)
             .value_name("file")
-            .default_value(DEFAULT_LOG_FILE)
             .help("Specify where log file export to. This option is enable when the node fot '--daemon' flag. If not, logs are put on stdout and stderr."))
 }
 
