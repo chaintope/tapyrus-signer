@@ -8,8 +8,8 @@ Before every minor and major release:
 
 * Update version in `Cargo.toml`. See also [vertioning rule](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/versioning_rule.md).
 * Write release notes (see below)
-* Update Testnet environment. Tapyrus Testnet environment documents are [here](https://drive.google.com/drive/folders/1-J6GE77dH2u5giKoNsuQr24v02bQJjZp) (This is internal document in Chaintope Inc.)
-     * We should bland new testnet for new version if the release doesn't have compatibility and keep old testnet for a while.
+* Update Testnet environment. 
+     * We should create bland new testnet if the release doesn't have compatibility and keep old testnet for a while.
 
 ### Tapyrus maintainers/release engineers, suggestion for writing release notes
 
@@ -21,7 +21,7 @@ Generate list of authors:
 
     git log --format='- %aN' v(current version, e.g. 0.2.0)..v(new version, e.g. 0.3.1) | sort -fiu
 
-Create release note in `doc/release-notes/tapyrus/`.
+Create release note in `doc/release-notes/`.
 
 Put the summary of the release note on github release like [this](https://github.com/chaintope/tapyrus-signer/releases/tag/v0.3.0)
 Release tag is going to create when the github release note published.
