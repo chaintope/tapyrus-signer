@@ -624,7 +624,10 @@ fn test_load_from_file() {
     assert_eq!(args.general_config().master(), true);
     assert_eq!(args.general_config().daemon(), true);
     assert_eq!(args.general_config().pid(), "/tmp/tapyrus-signer.pid");
-    assert_eq!(args.general_config().log_file(), "/var/log/tapyrus-signer.log");
+    assert_eq!(
+        args.general_config().log_file(),
+        "/var/log/tapyrus-signer.log"
+    );
 }
 
 #[test]
