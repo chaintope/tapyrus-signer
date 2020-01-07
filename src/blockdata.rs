@@ -42,7 +42,7 @@ impl Debug for BlockHash {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub struct Block(Vec<u8>);
 
 impl Block {
@@ -82,6 +82,13 @@ impl Block {
         let (header, txs) = self.payload().split_at(Self::PROOF_POSISION);
         let new_payload = [header, &proof[..], &txs[1..]].concat();
         Block(new_payload)
+    }
+}
+
+impl Debug for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let h = hex::encode(&self.0);
+        write!(f, "Block({})", h)
     }
 }
 
@@ -130,5 +137,12 @@ mod tests {
             format!("{:?}", hash),
             "BlockHash(3d856f50e0718f72bab6516c1ab020ce3390ebc97490b6d2bad4054dc7a40a93)"
         );
+    }
+
+    #[test]
+    fn test_block_debug_fmt() {
+        let block = test_block();
+
+        assert_eq!(format!("{:?}", block), format!("Block({})", TEST_BLOCK));
     }
 }
