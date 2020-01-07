@@ -75,6 +75,18 @@ impl Block {
         Ok(BlockHash::from_slice(&hash)?)
     }
 
+    /// Returns block hash
+    pub fn hash(&self) -> Result<BlockHash, Error> {
+        if self.0[Self::PROOF_POSISION] == 0 {
+            return Err(Error::IncompleteBlock);
+        }
+
+        let header = &self.0[..(Self::PROOF_POSISION + 65)]; // length byte + signature(64 bytes)
+
+        let hash = sha256d::Hash::hash(header).into_inner();
+        Ok(BlockHash::from_slice(&hash)?)
+    }
+
     pub fn payload(&self) -> &[u8] {
         &self.0
     }
@@ -97,9 +109,15 @@ mod tests {
     use super::*;
 
     const TEST_BLOCK: &str = "010000000000000000000000000000000000000000000000000000000000000000000000c1457ff3e5c527e69858108edf0ff1f49eea9c58d8d37300a164b3b4f8c8c7cef1a2e72770d547feae29f2dd40123a97c580d44fd4493de072416d53331997617b96f05d00403a4c09253c7b583e5260074380c9b99b895f938e37799d326ded984fb707e91fa4df2e0524a4ccf5fe224945b4fb94784b411a760eb730d95402d3383dd7ffdc01010000000100000000000000000000000000000000000000000000000000000000000000000000000022210366262690cbdf648132ce0c088962c6361112582364ede120f3780ab73438fc4bffffffff0100f2052a010000002776a9226d70757956774d32596a454d755a4b72687463526b614a787062715447417346484688ac00000000";
+    const TEST_BLOCK_WITHOUT_PROOF: &str = "010000000000000000000000000000000000000000000000000000000000000000000000c1457ff3e5c527e69858108edf0ff1f49eea9c58d8d37300a164b3b4f8c8c7cef1a2e72770d547feae29f2dd40123a97c580d44fd4493de072416d53331997617b96f05d000001010000000100000000000000000000000000000000000000000000000000000000000000000000000022210366262690cbdf648132ce0c088962c6361112582364ede120f3780ab73438fc4bffffffff0100f2052a010000002776a9226d70757956774d32596a454d755a4b72687463526b614a787062715447417346484688ac00000000";
 
     fn test_block() -> Block {
         let raw_block = hex::decode(TEST_BLOCK).unwrap();
+        Block(raw_block)
+    }
+
+    fn test_block_without_proof() -> Block {
+        let raw_block = hex::decode(TEST_BLOCK_WITHOUT_PROOF).unwrap();
         Block(raw_block)
     }
 
@@ -115,17 +133,24 @@ mod tests {
 
     #[test]
     fn test_add_proof() {
-        let hex_block = "010000000000000000000000000000000000000000000000000000000000000000000000c1457ff3e5c527e69858108edf0ff1f49eea9c58d8d37300a164b3b4f8c8c7cef1a2e72770d547feae29f2dd40123a97c580d44fd4493de072416d53331997617b96f05d000001010000000100000000000000000000000000000000000000000000000000000000000000000000000022210366262690cbdf648132ce0c088962c6361112582364ede120f3780ab73438fc4bffffffff0100f2052a010000002776a9226d70757956774d32596a454d755a4b72687463526b614a787062715447417346484688ac00000000";
-        let raw_block = hex::decode(hex_block).unwrap();
-        let block = Block(raw_block);
-
+        let block = test_block_without_proof();
         let sig_hex = "403a4c09253c7b583e5260074380c9b99b895f938e37799d326ded984fb707e91fa4df2e0524a4ccf5fe224945b4fb94784b411a760eb730d95402d3383dd7ffdc";
 
-        let hex_expect = "010000000000000000000000000000000000000000000000000000000000000000000000c1457ff3e5c527e69858108edf0ff1f49eea9c58d8d37300a164b3b4f8c8c7cef1a2e72770d547feae29f2dd40123a97c580d44fd4493de072416d53331997617b96f05d00403a4c09253c7b583e5260074380c9b99b895f938e37799d326ded984fb707e91fa4df2e0524a4ccf5fe224945b4fb94784b411a760eb730d95402d3383dd7ffdc01010000000100000000000000000000000000000000000000000000000000000000000000000000000022210366262690cbdf648132ce0c088962c6361112582364ede120f3780ab73438fc4bffffffff0100f2052a010000002776a9226d70757956774d32596a454d755a4b72687463526b614a787062715447417346484688ac00000000";
-        let raw_expect = hex::decode(hex_expect).unwrap();
-        let expect = Block(raw_expect);
+        assert_eq!(block.add_proof(hex::decode(sig_hex).unwrap()), test_block());
+    }
 
-        assert_eq!(block.add_proof(hex::decode(sig_hex).unwrap()), expect);
+    #[test]
+    fn test_hash() {
+        let block = test_block();
+        let hash = block.hash().unwrap();
+
+        assert_eq!(
+            format!("{:?}", hash),
+            "BlockHash(86dbdec1ab22f4d43ef164ea5198bf6d4d96ea6ef97ca2dea97a40657af6d789)"
+        );
+
+        let incomplete_block = test_block_without_proof();
+        assert!(incomplete_block.hash().is_err());
     }
 
     #[test]
