@@ -477,7 +477,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             _ => None,
         };
         if let Some(block) = block_opt.clone() {
-            if block.hash().unwrap() != blockhash {
+            if block.hash_for_sign().unwrap() != blockhash {
                 log::error!("blockhash is invalid");
                 return None;
             }
@@ -496,7 +496,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             let result_for_positive = Sign::sign(
                 &shared_keys_for_positive,
                 &self.priv_shared_keys.clone().unwrap(),
-                block_opt.clone().unwrap().hash().unwrap(),
+                block_opt.clone().unwrap().hash_for_sign().unwrap(),
             );
 
             let shared_keys_for_negative = Sign::verify_vss_and_construct_key(
@@ -508,7 +508,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             let result_for_negative = Sign::sign(
                 &shared_keys_for_negative,
                 &self.priv_shared_keys.clone().unwrap(),
-                block_opt.clone().unwrap().hash().unwrap(),
+                block_opt.clone().unwrap().hash_for_sign().unwrap(),
             );
 
             let p = BigInt::from_str_radix(
@@ -527,7 +527,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 Ok(local_sig) => {
                     self.connection_manager.broadcast_message(Message {
                         message_type: MessageType::Blocksig(
-                            block_opt.clone().unwrap().hash().unwrap(),
+                            block_opt.clone().unwrap().hash_for_sign().unwrap(),
                             local_sig.gamma_i,
                             local_sig.e,
                         ),
@@ -655,10 +655,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     new_signatures.len(),
                     self.params.threshold
                 );
-                if candidate_block.hash().unwrap() != blockhash {
+                if candidate_block.hash_for_sign().unwrap() != blockhash {
                     log::error!(
                         "blockhash is invalid, {:?}/{:?}",
-                        candidate_block.hash().unwrap(),
+                        candidate_block.hash_for_sign().unwrap(),
                         blockhash
                     );
                     return self.round_robin_master();
@@ -703,7 +703,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                                 block_shared_keys.unwrap().2,
                             );
                             let public_key = self.priv_shared_keys.clone().unwrap().y;
-                            let hash = candidate_block.hash().unwrap().into_inner();
+                            let hash = candidate_block.hash_for_sign().unwrap().into_inner();
                             match signature.verify(&hash, &public_key) {
                                 Ok(_) => Ok(signature),
                                 Err(e) => Err(e),
@@ -834,7 +834,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         for i in 0..self.params.pubkey_list.len() {
             self.connection_manager.send_message(Message {
                 message_type: MessageType::Blockvss(
-                    block.hash().unwrap(),
+                    block.hash_for_sign().unwrap(),
                     vss_scheme.clone(),
                     secret_shares[i],
                     vss_scheme_for_negative.clone(),
