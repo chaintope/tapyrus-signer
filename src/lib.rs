@@ -10,6 +10,8 @@ extern crate base64;
 extern crate byteorder;
 extern crate hex;
 extern crate redis;
+#[macro_use]
+extern crate lazy_static;
 
 pub mod blockdata;
 pub mod command_args;

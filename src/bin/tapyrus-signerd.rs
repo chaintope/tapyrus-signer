@@ -4,6 +4,7 @@
 
 extern crate bitcoin;
 extern crate clap;
+extern crate daemonize;
 extern crate env_logger;
 extern crate log;
 extern crate redis;
@@ -11,6 +12,8 @@ extern crate tapyrus_signer;
 
 use bitcoin::{PrivateKey, PublicKey};
 
+use daemonize::Daemonize;
+use std::fs::File;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tapyrus_signer::command_args::{CommandArgs, RedisConfig, RpcConfig};
@@ -28,6 +31,11 @@ fn main() {
     let configs = CommandArgs::new().unwrap();
 
     let general_config = configs.general_config();
+
+    if general_config.daemon() {
+        daemonize(general_config.pid(), general_config.log_file());
+    }
+
     let log_level = general_config.log_level();
     let is_quiet = general_config.log_quiet();
     let round_duration = general_config.round_duration();
@@ -62,6 +70,19 @@ fn main() {
     );
     let node = &mut SignerNode::new(con, params);
     node.start();
+}
+
+fn daemonize(pid: &str, log_file: &str) {
+    println!("Start Tapyrus Signer Daemon. pid file: {}", pid);
+    let stdout = File::create(log_file).unwrap();
+    let stderr = File::create(log_file).unwrap();
+
+    let daemonize = Daemonize::new().pid_file(pid).stdout(stdout).stderr(stderr);
+
+    match daemonize.start() {
+        Ok(_) => println!("Success, daemonized"),
+        Err(e) => eprintln!("Error, {}", e),
+    }
 }
 
 fn validate_options(

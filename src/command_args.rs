@@ -10,30 +10,41 @@ use clap::{App, Arg};
 use log;
 use serde::Deserialize;
 use std::error::Error;
+use std::path::PathBuf;
 
 pub const OPTION_NAME_CONFIG: &str = "config";
+
+/// # Signer Config
 pub const OPTION_NAME_TO_ADDRESS: &str = "coinbase_pay_to_address";
 pub const OPTION_NAME_PUBLIC_KEY: &str = "publickeys";
 pub const OPTION_NAME_PRIVATE_KEY: &str = "privatekey";
 pub const OPTION_NAME_THRESHOLD: &str = "threshold";
 pub const OPTION_NAME_MASTER_FLAG: &str = "master_flag";
+
+/// # RPC Config
 pub const OPTION_NAME_RPC_ENDPOINT_HOST: &str = "rpc_endpoint_host";
 pub const OPTION_NAME_RPC_ENDPOINT_PORT: &str = "rpc_endpoint_port";
 pub const OPTION_NAME_RPC_ENDPOINT_USER: &str = "rpc_endpoint_user";
 pub const OPTION_NAME_RPC_ENDPOINT_PASS: &str = "rpc_endpoint_pass";
 
+/// # Redis Config
 pub const OPTION_NAME_REDIS_HOST: &str = "redis_host";
 pub const OPTION_NAME_REDIS_PORT: &str = "redis_port";
 
+/// # General Config
 /// round category params.
 pub const OPTION_NAME_ROUND_DURATION: &str = "round_duration";
-
 /// log category params.
 pub const OPTION_NAME_LOG_QUIET: &str = "log_quiet";
 pub const OPTION_NAME_LOG_LEVEL: &str = "log_level";
-
+/// daemonize
+pub const OPTION_NAME_DAEMON: &str = "daemon";
+pub const OPTION_NAME_PID: &str = "pid";
+pub const OPTION_NAME_LOG_FILE: &str = "log_file";
+/// Others
 pub const OPTION_NAME_SKIP_WAITING_IBD: &str = "skip_waiting_ibd";
 
+/// # Default Values
 pub const DEFAULT_RPC_HOST: &str = "127.0.0.1";
 pub const DEFAULT_RPC_PORT: &str = "2377";
 pub const DEFAULT_RPC_USERNAME: &str = "";
@@ -41,6 +52,20 @@ pub const DEFAULT_RPC_PASSWORD: &str = "";
 pub const DEFAULT_REDIS_HOST: &str = "127.0.0.1";
 pub const DEFAULT_REDIS_PORT: &str = "6379";
 pub const DEFAULT_LOG_LEVEL: &str = "info";
+
+lazy_static! {
+    pub static ref DEFAULT_PID: PathBuf = {
+        let mut v = std::env::temp_dir();
+        v.push("tapyrus-signer.pid");
+        v
+    };
+    pub static ref DEFAULT_LOG_FILE: PathBuf = {
+        let mut v = std::env::temp_dir();
+        v.push("tapyrus-signer.log");
+        v
+    };
+}
+
 /// default config file name
 pub const DEFAULT_CONFIG_FILENAME: &str = "signer_config.toml";
 
@@ -73,6 +98,9 @@ pub struct GeneralToml {
     log_quiet: Option<bool>,
     skip_waiting_ibd: Option<bool>,
     master: Option<bool>,
+    daemon: Option<bool>,
+    pid: Option<String>,
+    log_file: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -274,6 +302,9 @@ pub struct GeneralCommandArgs<'a> {
     log_level: Option<&'a str>,
     skip_waiting_ibd: bool,
     master: bool,
+    daemon: bool,
+    pid: Option<&'a str>,
+    log_file: Option<&'a str>,
 }
 
 pub struct GeneralConfig<'a> {
@@ -320,6 +351,35 @@ impl<'a> GeneralConfig<'a> {
             .and_then(|config| config.master)
             .unwrap_or_default();
         self.command_args.master || toml_value
+    }
+    pub fn daemon(&'a self) -> bool {
+        let toml_value = self
+            .toml_config
+            .and_then(|config| config.daemon)
+            .unwrap_or_default();
+        self.command_args.daemon || toml_value
+    }
+    pub fn pid(&'a self) -> &'a str {
+        let toml_value = self
+            .toml_config
+            .and_then(|config| config.pid.as_ref())
+            .map(|s| s as &str);
+        self.command_args.pid.or(toml_value).unwrap_or(
+            DEFAULT_PID
+                .to_str()
+                .expect("Can't cast default pid PathBuf to &str"),
+        )
+    }
+    pub fn log_file(&'a self) -> &'a str {
+        let toml_value = self
+            .toml_config
+            .and_then(|config| config.log_file.as_ref())
+            .map(|s| s as &str);
+        self.command_args.log_file.or(toml_value).unwrap_or(
+            DEFAULT_LOG_FILE
+                .to_str()
+                .expect("Can't cast default log file PathBuf to &str"),
+        )
     }
 }
 
@@ -402,6 +462,9 @@ impl<'a> CommandArgs<'a> {
                 log_quiet: self.matches.is_present(OPTION_NAME_LOG_QUIET),
                 skip_waiting_ibd: self.matches.is_present(OPTION_NAME_SKIP_WAITING_IBD),
                 master: self.matches.is_present(OPTION_NAME_MASTER_FLAG),
+                daemon: self.matches.is_present(OPTION_NAME_DAEMON),
+                pid: self.matches.value_of(OPTION_NAME_PID),
+                log_file: self.matches.value_of(OPTION_NAME_LOG_FILE),
             },
             toml_config: self.config.as_ref().and_then(|c| c.general.as_ref()),
         }
@@ -491,6 +554,19 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
         .arg(Arg::with_name(OPTION_NAME_SKIP_WAITING_IBD)
             .long("skip-waiting-ibd")
             .help("This flag make signer node don't waiting connected Tapyrus full node finishes Initial Block Download when signer node started. When block creation stopped much time, The status of Tapyrus full node changes to progressing Initial Block Download. In this case, block creation is never resume, because signer node waits the status is back to non-IBD. So you can use this flag to start signer node with ignore tapyrus full node status."))
+        .arg(Arg::with_name(OPTION_NAME_DAEMON)
+            .long("daemon")
+            .help("Daemonize the Tapyrus Signer node process."))
+        .arg(Arg::with_name(OPTION_NAME_PID)
+            .long("pid")
+            .takes_value(true)
+            .value_name("file")
+            .help("Specify pid file path. This option is enable when the node got '--daemon' flag."))
+        .arg(Arg::with_name(OPTION_NAME_LOG_FILE)
+            .long("logfile")
+            .takes_value(true)
+            .value_name("file")
+            .help("Specify where log file export to. This option is enable when the node fot '--daemon' flag. If not, logs are put on stdout and stderr."))
 }
 
 #[test]
@@ -562,6 +638,12 @@ fn test_load_from_file() {
     assert_eq!(args.general_config().log_level(), "debug");
     assert_eq!(args.general_config().log_quiet(), true);
     assert_eq!(args.general_config().master(), true);
+    assert_eq!(args.general_config().daemon(), true);
+    assert_eq!(args.general_config().pid(), "/tmp/tapyrus-signer.pid");
+    assert_eq!(
+        args.general_config().log_file(),
+        "/var/log/tapyrus-signer.log"
+    );
 }
 
 #[test]
@@ -579,6 +661,9 @@ fn test_priority_commandline() {
         "--rpcpass=test",
         "--redishost=redis.endpoint.dev.chaintope.com",
         "--redisport=88888",
+        "--daemon",
+        "--pid=/tmp/test.pid",
+        "--logfile=/tmp/tapyrus-signer.log",
     ]);
     let args = CommandArgs::load(matches).unwrap();
     let pubkeys = args.signer_config().public_keys();
@@ -612,6 +697,10 @@ fn test_priority_commandline() {
         "redis.endpoint.dev.chaintope.com"
     );
     assert_eq!(args.redis_config().port(), 88888);
+
+    assert_eq!(args.general_config().daemon(), true);
+    assert_eq!(args.general_config().pid(), "/tmp/test.pid");
+    assert_eq!(args.general_config().log_file(), "/tmp/tapyrus-signer.log");
 }
 
 #[test]

@@ -25,3 +25,5 @@ multi-party-schnorr = { git = "https://github.com/Yamaguchi/multi-party-schnorr"
 curv = { git = "https://github.com/KZen-networks/curv" , tag = "v0.2.0", features =  ["ec_secp256k1"]}
 signal-hook = "0.1.12"
 libc = "0.2.66"
+daemonize = "0.4.1"
+lazy_static = "1.4.0"
