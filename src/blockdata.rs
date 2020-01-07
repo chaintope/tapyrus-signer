@@ -46,7 +46,7 @@ impl Debug for BlockHash {
 pub struct Block(Vec<u8>);
 
 impl Block {
-    const PROOF_POSISION: usize = 105;
+    const PROOF_POSITION: usize = 105;
 
     pub fn new(data: Vec<u8>) -> Block {
         Block(data)
@@ -60,7 +60,7 @@ impl Block {
     /// time: 4
     /// length of aggPubkey: 1
     pub fn get_header_without_proof(&self) -> &[u8] {
-        &self.0[..Self::PROOF_POSISION]
+        &self.0[..Self::PROOF_POSITION]
     }
 
     pub fn hex(&self) -> String {
@@ -77,11 +77,11 @@ impl Block {
 
     /// Returns block hash
     pub fn hash(&self) -> Result<BlockHash, Error> {
-        if self.0[Self::PROOF_POSISION] == 0 {
+        if self.0[Self::PROOF_POSITION] == 0 {
             return Err(Error::IncompleteBlock);
         }
 
-        let header = &self.0[..(Self::PROOF_POSISION + 65)]; // length byte + signature(64 bytes)
+        let header = &self.0[..(Self::PROOF_POSITION + 65)]; // length byte + signature(64 bytes)
 
         let hash = sha256d::Hash::hash(header).into_inner();
         Ok(BlockHash::from_slice(&hash)?)
@@ -91,7 +91,7 @@ impl Block {
         &self.0
     }
     pub fn add_proof(&self, proof: Vec<u8>) -> Block {
-        let (header, txs) = self.payload().split_at(Self::PROOF_POSISION);
+        let (header, txs) = self.payload().split_at(Self::PROOF_POSITION);
         let new_payload = [header, &proof[..], &txs[1..]].concat();
         Block(new_payload)
     }
