@@ -378,10 +378,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         }
                     }
                     Err(_e) => {
-                        log::warn!(
-                            "Received Invalid candidate block sender: {}",
-                            sender_id
-                        );
+                        log::warn!("Received Invalid candidate block sender: {}", sender_id);
                         NodeState::Member {
                             block_key: None,
                             shared_block_secrets: shared_block_secrets.clone(),
