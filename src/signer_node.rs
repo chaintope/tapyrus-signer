@@ -141,8 +141,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     pub fn start(&mut self) {
         if !self.params.skip_waiting_ibd {
             self.wait_for_ibd_finish(std::time::Duration::from_secs(10));
+        } else {
+            log::info!("Skip waiting for ibd finish.")
         }
 
+        log::info!("Start thread for redis subscription");
         let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
         let closure = move |message: Message| match sender.send(message) {
             Ok(_) => ControlFlow::Continue,
@@ -151,15 +154,25 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 ControlFlow::Break(())
             }
         };
-
-        // redisとの通信を行うthreadを開始
         let id = self.params.signer_id;
         let _handler = self.connection_manager.start(closure, id);
+
+        log::info!("Start Key generation Protocol");
         self.create_node_share();
 
         self.current_state = if self.params.master_flag {
+            log::info!(
+                "Start round as Master by master flag (my index: {}, master index: {})",
+                self.params.self_node_index,
+                self.master_index
+            );
             self.start_new_round()
         } else {
+            log::info!(
+                "Start round as Member by no master flag (my index: {}, master index: {})",
+                self.params.self_node_index,
+                self.master_index
+            );
             NodeState::Member {
                 block_key: None,
                 block_shared_keys: None,
@@ -167,12 +180,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 candidate_block: None,
             }
         };
-        log::info!(
-            "node start. NodeState: {:?}, node_index: {}, master_index: {}",
-            &self.current_state,
-            &self.params.self_node_index,
-            &self.master_index
-        );
 
         // Roundのtimeoutを監視するthreadを開始
         self.round_timer.start().unwrap();
@@ -290,6 +297,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         std::thread::sleep(Duration::from_secs(self.params.round_duration));
 
         let block = self.params.rpc.getnewblock(&self.params.address).unwrap();
+        log::info!(
+            "Broadcast candidate block. block hash for signing: {:?}",
+            block
+                .hash_for_sign()
+                .expect("Can't get blockhash for singing")
+        );
         self.connection_manager.broadcast_message(Message {
             message_type: MessageType::Candidateblock(block.clone()),
             sender_id: self.params.signer_id,
@@ -338,6 +351,13 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     }
 
     fn process_candidateblock(&mut self, sender_id: &SignerID, block: &Block) -> NodeState {
+        log::info!(
+            "candidateblock received. block hash for signing: {:?}",
+            block
+                .hash_for_sign()
+                .expect("Can't get blockhash for singing")
+        );
+
         match &self.current_state {
             NodeState::Member {
                 shared_block_secrets,
@@ -359,7 +379,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     }
                     Err(_e) => {
                         log::warn!(
-                            "Received Invalid candidate block!!: sender: {:?}",
+                            "Received Invalid candidate block sender: {}",
                             sender_id
                         );
                         NodeState::Member {
@@ -395,9 +415,19 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         let next_index = (self.master_index + 1) % self.params.pubkey_list.len();
         self.master_index = next_index;
         let next_state = if self.params.self_node_index == next_index {
+            log::info!(
+                "Start next round as Master (my index: {}, master index: {})",
+                self.params.self_node_index,
+                self.master_index
+            );
             // self node is master.
             self.start_new_round()
         } else {
+            log::info!(
+                "Start next round as Member (my index: {}, master index: {})",
+                self.params.self_node_index,
+                self.master_index
+            );
             NodeState::Member {
                 block_key: None,
                 block_shared_keys: None,
@@ -405,12 +435,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 candidate_block: None,
             }
         };
-        log::info!(
-            "Round Robin: Next State {:?}, node_index: {}, master_inde: {}",
-            next_state,
-            self.params.self_node_index,
-            self.master_index
-        );
         next_state
     }
     fn process_completedblock(&mut self, sender_id: &SignerID, _block: &Block) -> NodeState {
@@ -448,8 +472,9 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             .expect("invalid vss");
 
             self.priv_shared_keys = Some(shared_keys.clone());
-            log::trace!(
-                "node shared keys is stored: {:?}, {:?}",
+            log::info!("All VSSs are collected. Ready to start Signature Issuing Protocol");
+            log::debug!(
+                "All VSSs are stored. My share for generating local sig: {:?}, Aggregated Pubkey: {:?}",
                 shared_keys.x_i,
                 shared_keys.y
             );
@@ -478,11 +503,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         };
         if let Some(block) = block_opt.clone() {
             if block.hash_for_sign().unwrap() != blockhash {
-                log::error!("blockhash is invalid");
+                log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", block.hash_for_sign(), blockhash);
                 return None;
             }
         } else {
-            log::error!("candidateblock not found");
+            // Signer node need to receive candidateblock before receiving VSS.
+            log::error!("Invalid blockvss message received. candidateblock was not received in this round yet, but got VSS.");
             return None;
         }
         if shared_block_secrets.len() == self.params.pubkey_list.len() {
@@ -656,11 +682,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     self.params.threshold
                 );
                 if candidate_block.hash_for_sign().unwrap() != blockhash {
-                    log::error!(
-                        "blockhash is invalid, {:?}/{:?}",
-                        candidate_block.hash_for_sign().unwrap(),
-                        blockhash
-                    );
+                    log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", candidate_block.hash_for_sign().unwrap(), blockhash);
                     return self.round_robin_master();
                 }
 
@@ -729,6 +751,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     match result {
                         Ok(new_block) => {
                             // send completeblock message
+                            log::info!(
+                                "Broadcast CompletedBlock message. {:?}",
+                                new_block
+                                    .hash()
+                                    .expect("Can't get block hash from completed block")
+                            );
                             let message = Message {
                                 message_type: MessageType::Completedblock(new_block),
                                 sender_id: self.params.signer_id.clone(),
@@ -798,6 +826,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             &key.u_i,
             &parties,
         );
+
+        log::info!("Sending VSS to each other signers");
 
         for i in 0..self.params.pubkey_list.len() {
             self.connection_manager.send_message(Message {

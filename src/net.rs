@@ -33,6 +33,12 @@ impl SignerID {
     }
 }
 
+impl std::fmt::Display for SignerID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.pubkey)
+    }
+}
+
 impl PartialEq for SignerID {
     fn eq(&self, other: &Self) -> bool {
         self.pubkey.to_bytes().eq(&other.pubkey.to_bytes())
