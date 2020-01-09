@@ -888,7 +888,6 @@ pub struct NodeParameters<T: TapyrusApi> {
     pub rpc: std::sync::Arc<T>,
     pub address: Address,
     pub signer_id: SignerID,
-    pub master_flag: bool,
     pub self_node_index: usize,
     pub round_duration: u64,
     pub skip_waiting_ibd: bool,
@@ -901,7 +900,6 @@ impl<T: TapyrusApi> NodeParameters<T> {
         private_key: PrivateKey,
         threshold: u8,
         rpc: T,
-        master_flag: bool,
         round_duration: u64,
         skip_waiting_ibd: bool,
     ) -> NodeParameters<T> {
@@ -910,7 +908,6 @@ impl<T: TapyrusApi> NodeParameters<T> {
         let signer_id = SignerID {
             pubkey: self_pubkey,
         };
-        let master_flag = master_flag;
 
         let mut pubkey_list = pubkey_list;
         &pubkey_list.sort();
@@ -922,7 +919,6 @@ impl<T: TapyrusApi> NodeParameters<T> {
             rpc: Arc::new(rpc),
             address: to_address,
             signer_id,
-            master_flag,
             self_node_index,
             round_duration,
             skip_waiting_ibd,
@@ -1047,7 +1043,6 @@ mod tests {
             private_key,
             threshold,
             rpc,
-            true,
             0,
             true,
         );
@@ -1087,7 +1082,6 @@ mod tests {
             private_key,
             threshold,
             rpc,
-            false,
             0,
             true,
         );
@@ -1146,7 +1140,6 @@ mod tests {
             MockRpc {
                 return_block: safety_error("Not set block.".to_string()),
             },
-            true,
             0,
             true,
         );
@@ -1247,7 +1240,6 @@ mod tests {
 
         let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
         node.stop_handler(stop_handler);
-        node.params.master_flag = false;
 
         assert_eq!(node.master_index, 0 as usize);
         let ss = stop_signal.clone();
