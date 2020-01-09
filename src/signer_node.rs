@@ -738,7 +738,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                             let sig_hex = Sign::format_signature(&signature);
                             let new_block: Block =
                                 candidate_block.add_proof(hex::decode(sig_hex).unwrap());
-                            self.params.rpc.submitblock(&new_block)
+                            match self.params.rpc.submitblock(&new_block) {
+                                Ok(_) => Ok(new_block),
+                                Err(e) => Err(e),
+                            }
                         }
                         Err(_) => {
                             log::error!("aggregated signature is invalid");
@@ -747,6 +750,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     };
                     match result {
                         Ok(new_block) => {
+                            log::info!(
+                                "Round Success. caindateblock(block hash for sign)={:?} completedblock={:?}",
+                                candidate_block.hash_for_sign().expect("Can't get block hash"),
+                                new_block.hash().expect("Can't get block hash")
+                            );
                             // send completeblock message
                             log::info!(
                                 "Broadcast CompletedBlock message. {:?}",
@@ -761,7 +769,9 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                             };
                             self.connection_manager.broadcast_message(message);
                         }
-                        Err(_) => {}
+                        Err(e) => {
+                            log::error!("block rejected by Tapyrus Core: {:?}", e);
+                        }
                     }
                     // start round robin of master node.
                     return self.round_robin_master();
@@ -1365,7 +1375,7 @@ mod tests {
                 unimplemented!()
             }
 
-            fn submitblock(&self, _block: &Block) -> Result<Block, Error> {
+            fn submitblock(&self, _block: &Block) -> Result<(), Error> {
                 unimplemented!()
             }
 
