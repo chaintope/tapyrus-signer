@@ -161,29 +161,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         log::info!("Start Key generation Protocol");
         self.create_node_share();
 
-        self.current_state = if self.params.master_flag {
-            log::info!(
-                "Start round as Master by master flag (my index: {}, master index: {})",
-                self.params.self_node_index,
-                self.master_index
-            );
-            self.start_new_round()
-        } else {
-            log::info!(
-                "Start round as Member by no master flag (my index: {}, master index: {})",
-                self.params.self_node_index,
-                self.master_index
-            );
-            NodeState::Member {
-                block_key: None,
-                block_shared_keys: None,
-                shared_block_secrets: BTreeMap::new(),
-                candidate_block: None,
-            }
-        };
-
-        // Roundのtimeoutを監視するthreadを開始
+        // Start First Round
+        log::info!("Start block creation rounds.");
         self.round_timer.start().unwrap();
+        self.current_state = self.start_next_round(true);
+
         // get error_handler that is for catch error within connection_manager.
         let connection_manager_error_handler = self.connection_manager.error_handler();
         loop {
@@ -231,7 +213,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 Ok(_) => {
                     log::trace!("Round duration is timeout. Starting round process...");
                     // Round timeout. force round robin master node.
-                    self.current_state = self.round_robin_master();
+                    self.current_state = self.start_next_round(false);
                     log::debug!("Current state updated as {:?}", self.current_state);
                     self.round_timer.restart().unwrap();
                 }
@@ -404,9 +386,15 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
-    /// Master role pass to the node of next index.
-    fn round_robin_master(&mut self) -> NodeState {
-        let next_index = (self.master_index + 1) % self.params.pubkey_list.len();
+    /// Start next round.
+    /// decide master of next round according to Round-robin.
+    fn start_next_round(&mut self, first_round: bool) -> NodeState {
+        let next_index = if first_round {
+            self.master_index
+        } else {
+            (self.master_index + 1) % self.params.pubkey_list.len()
+        };
+
         self.master_index = next_index;
         let next_state = if self.params.self_node_index == next_index {
             log::info!(
@@ -436,7 +424,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         if index == self.master_index {
             // authorization master.
             // start round robin of master node.
-            return self.round_robin_master();
+            return self.start_next_round(false);
         }
         self.current_state.clone()
     }
@@ -675,15 +663,15 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     new_signatures.len(),
                     self.params.threshold
                 );
-                if candidate_block.sighash().unwrap() != blockhash {
+                if candidate_block.hash().unwrap() != blockhash {
                     log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", candidate_block.sighash().unwrap(), blockhash);
-                    return self.round_robin_master();
+                    return self.start_next_round(false);
                 }
 
                 if new_signatures.len() >= self.params.threshold as usize {
                     if block_shared_keys.is_none() {
                         log::error!("key is not shared.");
-                        return self.round_robin_master();
+                        return self.start_next_round(false);
                     }
 
                     let parties = new_signatures
@@ -727,7 +715,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         }
                         Err(_) => {
                             log::error!("local signature is invalid.");
-                            return self.round_robin_master();
+                            return self.start_next_round(false);
                         }
                     };
                     let result = match verification {
@@ -742,7 +730,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         }
                         Err(_) => {
                             log::error!("aggregated signature is invalid");
-                            return self.round_robin_master();
+                            return self.start_next_round(false);
                         }
                     };
                     match result {
@@ -771,7 +759,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         }
                     }
                     // start round robin of master node.
-                    return self.round_robin_master();
+                    return self.start_next_round(false);
                 }
                 NodeState::Master {
                     block_key: block_key.clone(),
@@ -1348,6 +1336,31 @@ mod tests {
             NodeState::Member { .. } => assert!(true),
             n => panic!("Should be Member, but state:{:?}", n),
         }
+    }
+
+    #[test]
+    fn test_start_next_round() {
+        let arc_block = safety(get_block(0));
+        let rpc = MockRpc {
+            return_block: arc_block.clone(),
+        };
+        let mut node = create_node(
+            NodeState::Member {
+                block_key: None,
+                block_shared_keys: None,
+                shared_block_secrets: BidirectionalSharedSecretMap::new(),
+                candidate_block: None,
+            },
+            rpc,
+        );
+
+        assert_eq!(node.master_index, 0);
+
+        node.start_next_round(true);
+        assert_eq!(node.master_index, 0);
+
+        node.start_next_round(false);
+        assert_eq!(node.master_index, 1);
     }
 
     mod test_for_waiting_ibd_finish {
