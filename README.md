@@ -60,8 +60,7 @@ Example for If launch as master node.
  -p=02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506 \
  --privatekey=<private key that the pair of one of above publickeys> \
  -t 3 \
- --rpcport=12381 --rpcuser=user --rpcpass=pass \
- --master
+ --rpcport=12381 --rpcuser=user --rpcpass=pass
 ```
 And helpful comment is in `src/test_helper.rs`.
 

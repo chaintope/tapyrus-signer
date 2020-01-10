@@ -19,7 +19,6 @@ pub const OPTION_NAME_TO_ADDRESS: &str = "coinbase_pay_to_address";
 pub const OPTION_NAME_PUBLIC_KEY: &str = "publickeys";
 pub const OPTION_NAME_PRIVATE_KEY: &str = "privatekey";
 pub const OPTION_NAME_THRESHOLD: &str = "threshold";
-pub const OPTION_NAME_MASTER_FLAG: &str = "master_flag";
 
 /// # RPC Config
 pub const OPTION_NAME_RPC_ENDPOINT_HOST: &str = "rpc_endpoint_host";
@@ -97,7 +96,6 @@ pub struct GeneralToml {
     log_level: Option<String>,
     log_quiet: Option<bool>,
     skip_waiting_ibd: Option<bool>,
-    master: Option<bool>,
     daemon: Option<bool>,
     pid: Option<String>,
     log_file: Option<String>,
@@ -301,7 +299,6 @@ pub struct GeneralCommandArgs<'a> {
     log_quiet: bool,
     log_level: Option<&'a str>,
     skip_waiting_ibd: bool,
-    master: bool,
     daemon: bool,
     pid: Option<&'a str>,
     log_file: Option<&'a str>,
@@ -345,13 +342,6 @@ impl<'a> GeneralConfig<'a> {
             .unwrap_or_default();
         self.command_args.skip_waiting_ibd || toml_value
     }
-    pub fn master(&'a self) -> bool {
-        let toml_value = self
-            .toml_config
-            .and_then(|config| config.master)
-            .unwrap_or_default();
-        self.command_args.master || toml_value
-    }
     pub fn daemon(&'a self) -> bool {
         let toml_value = self
             .toml_config
@@ -384,7 +374,7 @@ impl<'a> GeneralConfig<'a> {
 }
 
 /// command example:
-/// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e --privatekey=cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA -t 2 --master
+/// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e --privatekey=cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA -t 2
 impl<'a> CommandArgs<'a> {
     /// constructor.
     /// Basically, search config file as file name signer_config.toml in current dir.
@@ -461,7 +451,6 @@ impl<'a> CommandArgs<'a> {
                 log_level: self.matches.value_of(OPTION_NAME_LOG_LEVEL),
                 log_quiet: self.matches.is_present(OPTION_NAME_LOG_QUIET),
                 skip_waiting_ibd: self.matches.is_present(OPTION_NAME_SKIP_WAITING_IBD),
-                master: self.matches.is_present(OPTION_NAME_MASTER_FLAG),
                 daemon: self.matches.is_present(OPTION_NAME_DAEMON),
                 pid: self.matches.value_of(OPTION_NAME_PID),
                 log_file: self.matches.value_of(OPTION_NAME_LOG_FILE),
@@ -478,7 +467,7 @@ fn read_config(file_path: &str) -> Result<ConfigToml, crate::errors::Error> {
 }
 
 /// command example:
-/// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e --privatekey=cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA -t 2 --master
+/// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e --privatekey=cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA -t 2
 pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
     App::new("node")
         .about("Tapyrus siner node")
@@ -507,9 +496,6 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
             .long("privatekey")
             .value_name("PRIVATE_KEY")
             .help("The PrivateKey of this signer node. WIF format."))
-        .arg(Arg::with_name(OPTION_NAME_MASTER_FLAG)
-            .long("master")
-            .help("Master Node Flag. If launch as Master node, then set this option."))
         .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_HOST)
             .long("rpchost")
             .value_name("HOST_NAME or IP")
@@ -637,7 +623,6 @@ fn test_load_from_file() {
     assert_eq!(args.general_config().round_duration(), 5);
     assert_eq!(args.general_config().log_level(), "debug");
     assert_eq!(args.general_config().log_quiet(), true);
-    assert_eq!(args.general_config().master(), true);
     assert_eq!(args.general_config().daemon(), true);
     assert_eq!(args.general_config().pid(), "/tmp/tapyrus-signer.pid");
     assert_eq!(

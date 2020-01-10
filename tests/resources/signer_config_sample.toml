@@ -55,11 +55,6 @@ log_quiet = true
 # this is optional, default vlue `info`.
 log_level = "debug"
 
-# `master` is Master Node flag.
-# if this flag is true, then this node launch as Master.
-# this is optional, default false.
-master = true
-
 # `daemon` is flag for to run node as daemon process. Set true then the node run as daemon.
 daemon = true
 
