@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 pub mod hash {
-    use serde::{Deserialize, Serialize};
     use crate::errors::Error;
+    use serde::{Deserialize, Serialize};
     use std::fmt::Debug;
 
     /// This is hash value container struct.
@@ -77,7 +77,7 @@ impl Block {
 
     /// Returns hash for signing. This hash value doesn't include proof field. Actual block hash
     /// includes proof data.
-    pub fn hash_for_sign(&self) -> Result<hash::Hash, Error> {
+    pub fn sighash(&self) -> Result<hash::Hash, Error> {
         let header = self.get_header_without_proof();
         let hash = sha256d::Hash::hash(header).into_inner();
         Ok(hash::Hash::from_slice(&hash)?)
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn test_block_hash_debug_fmt() {
         let block = test_block();
-        let hash = block.hash_for_sign().unwrap();
+        let hash = block.sighash().unwrap();
 
         assert_eq!(
             format!("{:?}", hash),

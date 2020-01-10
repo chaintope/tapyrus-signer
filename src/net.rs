@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use crate::blockdata::{Block};
 use crate::blockdata::hash::Hash;
+use crate::blockdata::Block;
 use crate::errors;
 use crate::serialize::ByteBufVisitor;
 use bitcoin::PublicKey;
