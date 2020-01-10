@@ -7,38 +7,46 @@ use bitcoin_hashes::{sha256d, Hash};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-#[derive(Serialize, Deserialize, PartialEq)]
-pub struct BlockHash([u8; 32]);
+pub mod hash {
+    use serde::{Deserialize, Serialize};
+    use crate::errors::Error;
+    use std::fmt::Debug;
 
-impl BlockHash {
-    const LEN: usize = 32;
+    /// This is hash value container struct.
+    /// This struct assumes porting value from sha256d::Hash.
+    #[derive(Serialize, Deserialize, PartialEq)]
+    pub struct Hash([u8; 32]);
 
-    pub fn from_slice(sl: &[u8]) -> Result<BlockHash, Error> {
-        if sl.len() != Self::LEN {
-            Err(Error::InvalidLength(Self::LEN, sl.len()))
-        } else {
-            let mut ret = [0; 32];
-            ret.copy_from_slice(sl);
-            Ok(BlockHash(ret))
+    impl Hash {
+        const LEN: usize = 32;
+
+        pub fn from_slice(sl: &[u8]) -> Result<Hash, Error> {
+            if sl.len() != Self::LEN {
+                Err(Error::InvalidLength(Self::LEN, sl.len()))
+            } else {
+                let mut ret = [0; 32];
+                ret.copy_from_slice(sl);
+                Ok(Hash(ret))
+            }
+        }
+
+        pub fn into_inner(self) -> [u8; 32] {
+            self.0
+        }
+        pub fn borrow_inner(&self) -> &[u8; 32] {
+            &self.0
         }
     }
 
-    pub fn into_inner(self) -> [u8; 32] {
-        self.0
-    }
-    pub fn borrow_inner(&self) -> &[u8; 32] {
-        &self.0
-    }
-}
+    impl Debug for Hash {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            // Change byteorder to Big Endian
+            let mut rev = self.0.clone();
+            rev.reverse();
 
-impl Debug for BlockHash {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Change byteorder to Big Endian
-        let mut rev = self.0.clone();
-        rev.reverse();
-
-        let h = hex::encode(rev);
-        write!(f, "BlockHash({})", h)
+            let h = hex::encode(rev);
+            write!(f, "Hash({})", h)
+        }
     }
 }
 
@@ -69,14 +77,14 @@ impl Block {
 
     /// Returns hash for signing. This hash value doesn't include proof field. Actual block hash
     /// includes proof data.
-    pub fn hash_for_sign(&self) -> Result<BlockHash, Error> {
+    pub fn hash_for_sign(&self) -> Result<hash::Hash, Error> {
         let header = self.get_header_without_proof();
         let hash = sha256d::Hash::hash(header).into_inner();
-        Ok(BlockHash::from_slice(&hash)?)
+        Ok(hash::Hash::from_slice(&hash)?)
     }
 
     /// Returns block hash
-    pub fn hash(&self) -> Result<BlockHash, Error> {
+    pub fn hash(&self) -> Result<hash::Hash, Error> {
         if self.0[Self::PROOF_POSITION] == 0 {
             return Err(Error::IncompleteBlock);
         }
@@ -84,7 +92,7 @@ impl Block {
         let header = &self.0[..(Self::PROOF_POSITION + 65)]; // length byte + signature(64 bytes)
 
         let hash = sha256d::Hash::hash(header).into_inner();
-        Ok(BlockHash::from_slice(&hash)?)
+        Ok(hash::Hash::from_slice(&hash)?)
     }
 
     pub fn payload(&self) -> &[u8] {
@@ -146,7 +154,7 @@ mod tests {
 
         assert_eq!(
             format!("{:?}", hash),
-            "BlockHash(86dbdec1ab22f4d43ef164ea5198bf6d4d96ea6ef97ca2dea97a40657af6d789)"
+            "Hash(86dbdec1ab22f4d43ef164ea5198bf6d4d96ea6ef97ca2dea97a40657af6d789)"
         );
 
         let incomplete_block = test_block_without_proof();
@@ -160,7 +168,7 @@ mod tests {
 
         assert_eq!(
             format!("{:?}", hash),
-            "BlockHash(3d856f50e0718f72bab6516c1ab020ce3390ebc97490b6d2bad4054dc7a40a93)"
+            "Hash(3d856f50e0718f72bab6516c1ab020ce3390ebc97490b6d2bad4054dc7a40a93)"
         );
     }
 

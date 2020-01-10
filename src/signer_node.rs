@@ -16,7 +16,8 @@ use curv::{BigInt, FE, GE};
 use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
 use redis::ControlFlow;
 
-use crate::blockdata::{Block, BlockHash};
+use crate::blockdata::Block;
+use crate::blockdata::hash::Hash;
 use crate::net::{ConnectionManager, Message, MessageType, SignerID};
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use crate::sign::Sign;
@@ -481,7 +482,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     fn process_blockvss_inner(
         &self,
-        blockhash: BlockHash,
+        blockhash: Hash,
         shared_block_secrets: &BidirectionalSharedSecretMap,
     ) -> Option<(bool, SharedKeys)> {
         let params = self.sharing_params();
@@ -567,7 +568,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     }
     fn process_blockvss(
         &mut self,
-        blockhash: BlockHash,
+        blockhash: Hash,
         vss_for_positive: VerifiableSS,
         secret_share_for_positive: FE,
         vss_for_negative: VerifiableSS,
@@ -658,7 +659,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     fn process_blocksig(
         &mut self,
-        blockhash: BlockHash,
+        blockhash: Hash,
         gamma_i: FE,
         e: FE,
         from: SignerID,
