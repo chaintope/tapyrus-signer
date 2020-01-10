@@ -2,7 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use crate::blockdata::{Block, BlockHash};
+use crate::blockdata::hash::Hash;
+use crate::blockdata::Block;
 use crate::errors;
 use crate::serialize::ByteBufVisitor;
 use bitcoin::PublicKey;
@@ -30,6 +31,12 @@ pub struct SignerID {
 impl SignerID {
     pub fn new(pubkey: PublicKey) -> Self {
         SignerID { pubkey }
+    }
+}
+
+impl std::fmt::Display for SignerID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.pubkey)
     }
 }
 
@@ -82,8 +89,8 @@ pub enum MessageType {
     Candidateblock(Block),
     Completedblock(Block),
     Nodevss(VerifiableSS, FE),
-    Blockvss(BlockHash, VerifiableSS, FE, VerifiableSS, FE),
-    Blocksig(BlockHash, FE, FE),
+    Blockvss(Hash, VerifiableSS, FE, VerifiableSS, FE),
+    Blocksig(Hash, FE, FE),
     Roundfailure,
 }
 

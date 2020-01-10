@@ -9,7 +9,7 @@ use curv::{BigInt, FE, GE};
 use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
 use multi_party_schnorr::Error::InvalidSS;
 
-use crate::blockdata::BlockHash;
+use crate::blockdata::hash::Hash;
 use crate::errors::Error;
 use crate::signer_node::SharedSecretMap;
 use crate::signer_node::ToShares;
@@ -73,7 +73,7 @@ impl Sign {
     pub fn sign(
         eph_shared_keys: &SharedKeys,
         priv_shared_keys: &SharedKeys,
-        message: BlockHash,
+        message: Hash,
     ) -> Result<LocalSig, Error> {
         let message_slice = message.borrow_inner();
         let local_sig =
