@@ -129,7 +129,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             current_state: NodeState::Joining,
             stop_signal: None,
             master_index: 0,
-            round_timer: RoundTimeOutObserver::new(timer_limit),
+            round_timer: RoundTimeOutObserver::new("round_timer", timer_limit),
             priv_shared_keys: None,
             shared_secrets: BTreeMap::new(),
         }

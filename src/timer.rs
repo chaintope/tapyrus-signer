@@ -16,6 +16,7 @@ fn to_thread_safe<T>(r: Receiver<T>) -> ThreadSafeReceiver<T> {
 }
 
 pub struct RoundTimeOutObserver {
+    name: String,
     timelimit: Duration,
     sender: Sender<()>,
     pub receiver: Receiver<()>,
@@ -35,11 +36,12 @@ pub struct State {
 }
 
 impl RoundTimeOutObserver {
-    pub fn new(timelimit_secs: u64) -> Self {
+    pub fn new(name: &str, timelimit_secs: u64) -> Self {
         let (sender, receiver): (Sender<()>, Receiver<()>) = channel();
         let (command_sender, command_receiver): (SyncSender<Command>, Receiver<Command>) =
             sync_channel(1);
         RoundTimeOutObserver {
+            name: name.to_string(),
             timelimit: Duration::from_secs(timelimit_secs),
             thread: None,
             sender,
@@ -82,6 +84,8 @@ impl RoundTimeOutObserver {
                 .expect("State can not change to stop.");
             state.started = false;
         };
+
+        let name = self.name.clone();
         let handler = std::thread::Builder::new()
             .name("RoundTimeoutObserverThread".to_string())
             .spawn(move || {
@@ -89,13 +93,14 @@ impl RoundTimeOutObserver {
                 let receiver = command_receiver
                     .try_lock()
                     .expect("Command_receiver can not have lock.");
+                log::trace!("Start Timer name={} timelimit={:?}", name, timelimit);
                 match receiver.recv_timeout(timelimit) {
                     Ok(Command::Stop) => {
-                        log::debug!("Command::Stop received.");
+                        log::trace!("Stop Timer by Stop command name={}", name);
                         stop();
                     }
                     Err(_e) => {
-                        log::warn!("Timelimit reached!");
+                        log::trace!("Stop Timer by time out name={}", name);
                         stop();
                         // time out, send timeout signal.
                         match sender.send(()) {
@@ -107,7 +112,7 @@ impl RoundTimeOutObserver {
                         };
                     }
                 }
-                log::debug!("RoundTimeoutObserverThread finished.");
+                log::trace!("RoundTimeoutObserverThread finished.");
             })
             .unwrap();
         self.thread = Some(handler);
@@ -151,53 +156,59 @@ impl Drop for RoundTimeOutObserver {
     }
 }
 
-#[test]
-pub fn test_timeout_signal() {
-    let mut observer = RoundTimeOutObserver::new(0);
-    observer.start().unwrap();
-    match observer.receiver.recv_timeout(Duration::from_millis(300)) {
-        Ok(_) => assert_eq!(observer.is_started(), false),
-        Err(e) => panic!("Timeout signal not received. {:?}", e),
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::RoundTimeOutObserver;
+    use std::time::Duration;
 
-#[test]
-pub fn test_timer_stop() {
-    let mut observer = RoundTimeOutObserver::new(1);
-    observer.start().unwrap();
-    observer.stop();
-    match observer.receiver.recv_timeout(Duration::from_millis(1100)) {
-        Ok(_) => panic!("Should not send stop signal."),
-        Err(_e) => assert_eq!(observer.is_started(), false), // Observer thread should did stop.
-    }
-}
-
-#[test]
-pub fn test_prevent_duplicate_start() {
-    let mut observer = RoundTimeOutObserver::new(1);
-    observer.start().unwrap();
-    match observer.start() {
-        Ok(_) => panic!("Should be Error!"),
-        Err(e) => {
-            let error = format!("{:?}", e);
-            assert_eq!(error, "TimerAlreadyStarted");
+    #[test]
+    fn test_timeout_signal() {
+        let mut observer = RoundTimeOutObserver::new("test timer", 0);
+        observer.start().unwrap();
+        match observer.receiver.recv_timeout(Duration::from_millis(300)) {
+            Ok(_) => assert_eq!(observer.is_started(), false),
+            Err(e) => panic!("Timeout signal not received. {:?}", e),
         }
     }
-}
 
-#[test]
-pub fn test_timeout_and_restart() {
-    let mut observer = RoundTimeOutObserver::new(1);
-    observer.start().unwrap();
-    assert_eq!(observer.is_started(), true);
-    match observer.receiver.recv_timeout(Duration::from_millis(1100)) {
-        Ok(_) => assert_eq!(observer.is_started(), false),
-        Err(e) => panic!("Timeout signal not received. {:?}", e),
+    #[test]
+    fn test_timer_stop() {
+        let mut observer = RoundTimeOutObserver::new("test timer", 1);
+        observer.start().unwrap();
+        observer.stop();
+        match observer.receiver.recv_timeout(Duration::from_millis(1100)) {
+            Ok(_) => panic!("Should not send stop signal."),
+            Err(_e) => assert_eq!(observer.is_started(), false), // Observer thread should did stop.
+        }
     }
-    println!("2nd round start.");
-    observer.restart().unwrap();
-    match observer.receiver.recv_timeout(Duration::from_millis(1500)) {
-        Ok(_) => assert_eq!(observer.is_started(), false),
-        Err(e) => panic!("Timeout signal not received. {:?}", e),
+
+    #[test]
+    fn test_prevent_duplicate_start() {
+        let mut observer = RoundTimeOutObserver::new("test timer", 1);
+        observer.start().unwrap();
+        match observer.start() {
+            Ok(_) => panic!("Should be Error!"),
+            Err(e) => {
+                let error = format!("{:?}", e);
+                assert_eq!(error, "TimerAlreadyStarted");
+            }
+        }
+    }
+
+    #[test]
+    fn test_timeout_and_restart() {
+        let mut observer = RoundTimeOutObserver::new("test timer", 1);
+        observer.start().unwrap();
+        assert_eq!(observer.is_started(), true);
+        match observer.receiver.recv_timeout(Duration::from_millis(1100)) {
+            Ok(_) => assert_eq!(observer.is_started(), false),
+            Err(e) => panic!("Timeout signal not received. {:?}", e),
+        }
+        println!("2nd round start.");
+        observer.restart().unwrap();
+        match observer.receiver.recv_timeout(Duration::from_millis(1500)) {
+            Ok(_) => assert_eq!(observer.is_started(), false),
+            Err(e) => panic!("Timeout signal not received. {:?}", e),
+        }
     }
 }
