@@ -789,11 +789,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     }
 
     fn create_node_share(&mut self) {
-        //Wait for completing redis connection.
-        thread::sleep(time::Duration::from_secs(10));
-
         let params = self.sharing_params();
-
         let key = Sign::create_key(
             self.params.self_node_index + 1,
             Sign::private_key_to_big_int(self.params.private_key.key),
@@ -1244,7 +1240,7 @@ mod tests {
         assert_eq!(node.master_index, 0 as usize);
         let ss = stop_signal.clone();
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(16));
+            thread::sleep(Duration::from_secs(6)); // 6s = 1 round (5s) + 1s
             ss.send(1).unwrap();
         });
         node.start();
