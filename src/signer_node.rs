@@ -27,7 +27,7 @@ use crate::util::*;
 /// Round interval.
 pub static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
 /// Round time limit delta. Round timeout timer should be little longer than `ROUND_INTERVAL_DEFAULT_SECS`.
-static ROUND_TIMELIMIT_DELTA: u64 = 5;
+static ROUND_TIMELIMIT_DELTA: u64 = 10;
 
 pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     connection_manager: C,
@@ -923,7 +923,7 @@ mod tests {
     use crate::rpc::tests::{safety, safety_error, MockRpc, SafetyBlock};
     use crate::rpc::TapyrusApi;
     use crate::signer_node::{BidirectionalSharedSecretMap, NodeParameters, NodeState, SignerNode};
-    use crate::test_helper::{get_block, TestKeys};
+    use crate::test_helper::{get_block, TestKeys, enable_log};
     use bitcoin::{Address, PrivateKey};
 
     type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
@@ -1207,6 +1207,7 @@ mod tests {
 
     #[test]
     fn test_timeout_roundrobin() {
+        enable_log(None);
         let closure: SpyMethod = Box::new(move |_message: Arc<Message>| {});
         let initial_state = NodeState::Member {
             block_key: None,
@@ -1227,7 +1228,7 @@ mod tests {
         assert_eq!(node.master_index, 0 as usize);
         let ss = stop_signal.clone();
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(6)); // 6s = 1 round (5s) + 1s
+            thread::sleep(Duration::from_secs(11)); // 11s = 1 round (10s) + 1s
             ss.send(1).unwrap();
         });
         node.start();
