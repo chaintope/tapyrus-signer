@@ -663,7 +663,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     new_signatures.len(),
                     self.params.threshold
                 );
-                if candidate_block.hash().unwrap() != blockhash {
+                if candidate_block.sighash().unwrap() != blockhash {
                     log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", candidate_block.sighash().unwrap(), blockhash);
                     return self.start_next_round(false);
                 }
