@@ -107,6 +107,7 @@ pub enum NodeState {
         block_shared_keys: Option<(bool, FE, GE)>,
         candidate_block: Block,
         signatures: BTreeMap<SignerID, (FE, FE)>,
+        round_is_done: bool,
     },
     Member {
         block_key: Option<FE>,
@@ -301,6 +302,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             shared_block_secrets: BTreeMap::new(),
             candidate_block: block,
             signatures: BTreeMap::new(),
+            round_is_done: false,
         }
     }
 
@@ -375,6 +377,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 block_shared_keys,
                 shared_block_secrets,
                 signatures,
+                round_is_done: false,
                 ..
             } => {
                 let key = self.create_block_vss(block.clone());
@@ -384,6 +387,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     shared_block_secrets: shared_block_secrets.clone(),
                     candidate_block: block.clone(),
                     signatures: signatures.clone(),
+                    round_is_done: false,
                 }
             }
             _ => self.current_state.clone(),
@@ -565,6 +569,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 shared_block_secrets,
                 candidate_block,
                 signatures,
+                round_is_done: false,
                 ..
             } => {
                 let mut new_shared_block_secrets = shared_block_secrets.clone();
@@ -590,6 +595,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         block_shared_keys: Some((keys.0, keys.1.x_i, keys.1.y)),
                         candidate_block: candidate_block.clone(),
                         signatures: signatures.clone(),
+                        round_is_done: false,
                     },
                     None => NodeState::Master {
                         block_key: block_key.clone(),
@@ -597,6 +603,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         block_shared_keys: None,
                         candidate_block: candidate_block.clone(),
                         signatures: signatures.clone(),
+                        round_is_done: false,
                     },
                 }
             }
@@ -655,6 +662,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 shared_block_secrets,
                 candidate_block,
                 signatures,
+                round_is_done: false,
             } => {
                 let mut new_signatures = signatures.clone();
                 new_signatures.insert(from, (gamma_i, e));
@@ -753,6 +761,15 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                                 receiver_id: None,
                             };
                             self.connection_manager.broadcast_message(message);
+
+                            return NodeState::Master {
+                                block_key: block_key.clone(),
+                                block_shared_keys: block_shared_keys.clone(),
+                                shared_block_secrets: shared_block_secrets.clone(),
+                                candidate_block: candidate_block.clone(),
+                                signatures: new_signatures,
+                                round_is_done: true,
+                            };
                         }
                         Err(e) => {
                             log::error!("block rejected by Tapyrus Core: {:?}", e);
@@ -765,6 +782,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     shared_block_secrets: shared_block_secrets.clone(),
                     candidate_block: candidate_block.clone(),
                     signatures: new_signatures,
+                    round_is_done: false,
                 }
             }
             state @ _ => state.clone(),
@@ -919,7 +937,7 @@ mod tests {
 
     use redis::ControlFlow;
 
-    use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
+    use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID, MessageType};
     use crate::rpc::tests::{safety, safety_error, MockRpc, SafetyBlock};
     use crate::rpc::TapyrusApi;
     use crate::signer_node::{BidirectionalSharedSecretMap, NodeParameters, NodeState, SignerNode};
@@ -1167,8 +1185,13 @@ mod tests {
 
         bloadcaster.send(message).unwrap();
         match broadcast_r.recv_timeout(Duration::from_millis(500)) {
-            Ok(m) => panic!("Should not broadcast Signature message: {:?}", m),
-            Err(_e) => assert!(true),
+            Ok(m) => {
+                match unsafe { &*Arc::into_raw(m) } {
+                    m @ Message{ message_type: MessageType::Blockvss{ .. }, .. } => assert!(false, "A node should not broadcast Signature message: {:?}", m),
+                    _ => {}
+                }
+            }
+            Err(_e) => {},
         }
         stop_signal.send(1).unwrap(); // this line not necessary, but for manners.
     }
