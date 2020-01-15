@@ -394,6 +394,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
+    fn is_master(&self, sender_id: &SignerID) -> bool {
+        let master_id = self.params.pubkey_list[self.master_index];
+        master_id == sender_id.pubkey
+    }
+
     /// Start next round.
     /// decide master of next round according to Round-robin.
     fn start_next_round(&mut self, first_round: bool) -> NodeState {
@@ -430,7 +435,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         next_state
     }
     fn process_completedblock(&mut self, sender_id: &SignerID, _block: &Block) -> NodeState {
-        self.start_next_round(false)
+        if self.is_master(sender_id) {
+            self.start_next_round(false)
+        } else {
+            self.current_state.clone()
+        }
     }
 
     fn process_nodevss(
