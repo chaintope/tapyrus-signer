@@ -141,7 +141,7 @@ and member node.
 3. Signature issuing protocol
      * This step has no differences with member process. So describe below.     
 4. Submit Block
-     * Call combineblocksigs RPC
+     * Set signature created in 3.Signature issuing protocol into block header.
      * Call submitblock RPC
      * Publish completed block with completedblock message.
 5. Decide Next Master
@@ -177,10 +177,14 @@ and member node.
 2. Sharing local signatures  
      * Calculate own share from VSSs got in "Sharing VSSs".
      * Calculate aggregated public key from commitments which correspond constant term's coefficients
-     * Generate local signature from two shares which are generated in Key Generation Protocol and previous step, Aggregated public key, Sighash which is message of signature and it is hash value of block header except proof field, aggrecated public key and temporary aggregated public key which is created in prevous step.
+     * Generate local signature from below informations.
+          * Two shares which are generated in Key Generation Protocol and previous step.
+          * Aggregated public key which is generated in Key Generation Protocol.
+          * Temporary aggregated public key which is created in previous step.
+          * Sighash which is message of signature. It is hash value of block header except proof field.
      * Broadcast local signature using blocksig message.
-     * Receive local signature and verify it.
-     * If the number of local signatures met threshold. Aggregate final signature and put it in block header. This is valid block which can be published to Tapyrus network.  
+     * Receive local signatures from other nodes and verify them.
+     * If the number of local signatures met threshold, aggregate final signature and put it in block header .
 
 ### About Timeout
 
