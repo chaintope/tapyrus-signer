@@ -946,11 +946,11 @@ mod tests {
 
     use redis::ControlFlow;
 
-    use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID, MessageType};
+    use crate::net::{ConnectionManager, ConnectionManagerError, Message, MessageType, SignerID};
     use crate::rpc::tests::{safety, safety_error, MockRpc, SafetyBlock};
     use crate::rpc::TapyrusApi;
     use crate::signer_node::{BidirectionalSharedSecretMap, NodeParameters, NodeState, SignerNode};
-    use crate::test_helper::{get_block, TestKeys, enable_log};
+    use crate::test_helper::{enable_log, get_block, TestKeys};
     use bitcoin::{Address, PrivateKey};
 
     type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
@@ -1194,13 +1194,20 @@ mod tests {
 
         bloadcaster.send(message).unwrap();
         match broadcast_r.recv_timeout(Duration::from_millis(500)) {
-            Ok(m) => {
-                match unsafe { &*Arc::into_raw(m) } {
-                    m @ Message{ message_type: MessageType::Blockvss{ .. }, .. } => assert!(false, "A node should not broadcast Signature message: {:?}", m),
-                    _ => {}
-                }
-            }
-            Err(_e) => {},
+            Ok(m) => match unsafe { &*Arc::into_raw(m) } {
+                m
+                @
+                Message {
+                    message_type: MessageType::Blockvss { .. },
+                    ..
+                } => assert!(
+                    false,
+                    "A node should not broadcast Signature message: {:?}",
+                    m
+                ),
+                _ => {}
+            },
+            Err(_e) => {}
         }
         stop_signal.send(1).unwrap(); // this line not necessary, but for manners.
     }
