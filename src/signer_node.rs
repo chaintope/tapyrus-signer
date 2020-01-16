@@ -755,15 +755,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                             log::info!(
                                 "Round Success. caindateblock(block hash for sign)={:?} completedblock={:?}",
                                 candidate_block.sighash(),
-                                new_block.hash().expect("Can't get block hash")
+                                new_block.hash()
                             );
                             // send completeblock message
-                            log::info!(
-                                "Broadcast CompletedBlock message. {:?}",
-                                new_block
-                                    .hash()
-                                    .expect("Can't get block hash from completed block")
-                            );
+                            log::info!("Broadcast CompletedBlock message. {:?}", new_block.hash());
                             let message = Message {
                                 message_type: MessageType::Completedblock(new_block),
                                 sender_id: self.params.signer_id.clone(),
