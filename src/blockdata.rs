@@ -77,10 +77,11 @@ impl Block {
 
     /// Returns hash for signing. This hash value doesn't include proof field. Actual block hash
     /// includes proof data.
-    pub fn sighash(&self) -> Result<hash::Hash, Error> {
+    pub fn sighash(&self) -> hash::Hash {
         let header = self.get_header_without_proof();
         let hash = sha256d::Hash::hash(header).into_inner();
-        Ok(hash::Hash::from_slice(&hash)?)
+        hash::Hash::from_slice(&hash)
+            .expect("couldn't convert to blockdata::hash::Hash from sha256d::hash")
     }
 
     /// Returns block hash
@@ -164,7 +165,7 @@ mod tests {
     #[test]
     fn test_block_hash_debug_fmt() {
         let block = test_block();
-        let hash = block.sighash().unwrap();
+        let hash = block.sighash();
 
         assert_eq!(
             format!("{:?}", hash),

@@ -288,7 +288,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         let block = self.params.rpc.getnewblock(&self.params.address).unwrap();
         log::info!(
             "Broadcast candidate block. block hash for signing: {:?}",
-            block.sighash().expect("Can't get blockhash for singing")
+            block.sighash()
         );
         self.connection_manager.broadcast_message(Message {
             message_type: MessageType::Candidateblock(block.clone()),
@@ -341,7 +341,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     fn process_candidateblock(&mut self, sender_id: &SignerID, block: &Block) -> NodeState {
         log::info!(
             "candidateblock received. block hash for signing: {:?}",
-            block.sighash().expect("Can't get blockhash for singing")
+            block.sighash()
         );
 
         match &self.current_state {
@@ -497,7 +497,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             _ => None,
         };
         if let Some(block) = block_opt.clone() {
-            if block.sighash().unwrap() != blockhash {
+            if block.sighash() != blockhash {
                 log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", block.sighash(), blockhash);
                 return None;
             }
@@ -517,7 +517,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             let result_for_positive = Sign::sign(
                 &shared_keys_for_positive,
                 &self.priv_shared_keys.clone().unwrap(),
-                block_opt.clone().unwrap().sighash().unwrap(),
+                block_opt.clone().unwrap().sighash(),
             );
 
             let shared_keys_for_negative = Sign::verify_vss_and_construct_key(
@@ -529,7 +529,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             let result_for_negative = Sign::sign(
                 &shared_keys_for_negative,
                 &self.priv_shared_keys.clone().unwrap(),
-                block_opt.clone().unwrap().sighash().unwrap(),
+                block_opt.clone().unwrap().sighash(),
             );
 
             let p = BigInt::from_str_radix(
@@ -548,7 +548,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 Ok(local_sig) => {
                     self.connection_manager.broadcast_message(Message {
                         message_type: MessageType::Blocksig(
-                            block_opt.clone().unwrap().sighash().unwrap(),
+                            block_opt.clone().unwrap().sighash(),
                             local_sig.gamma_i,
                             local_sig.e,
                         ),
@@ -680,8 +680,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     new_signatures.len(),
                     self.params.threshold
                 );
-                if candidate_block.sighash().unwrap() != blockhash {
-                    log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", candidate_block.sighash().unwrap(), blockhash);
+                if candidate_block.sighash() != blockhash {
+                    log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", candidate_block.sighash(), blockhash);
                     return self.current_state.clone();
                 }
 
@@ -724,7 +724,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                                 block_shared_keys.unwrap().2,
                             );
                             let public_key = self.priv_shared_keys.clone().unwrap().y;
-                            let hash = candidate_block.sighash().unwrap().into_inner();
+                            let hash = candidate_block.sighash().into_inner();
                             match signature.verify(&hash, &public_key) {
                                 Ok(_) => Ok(signature),
                                 Err(e) => Err(e),
@@ -754,7 +754,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         Ok(new_block) => {
                             log::info!(
                                 "Round Success. caindateblock(block hash for sign)={:?} completedblock={:?}",
-                                candidate_block.sighash().expect("Can't get block hash"),
+                                candidate_block.sighash(),
                                 new_block.hash().expect("Can't get block hash")
                             );
                             // send completeblock message
@@ -866,7 +866,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         for i in 0..self.params.pubkey_list.len() {
             self.connection_manager.send_message(Message {
                 message_type: MessageType::Blockvss(
-                    block.sighash().unwrap(),
+                    block.sighash(),
                     vss_scheme.clone(),
                     secret_shares[i],
                     vss_scheme_for_negative.clone(),
