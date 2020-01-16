@@ -27,7 +27,7 @@ use crate::util::*;
 /// Round interval.
 pub static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
 /// Round time limit delta. Round timeout timer should be little longer than `ROUND_INTERVAL_DEFAULT_SECS`.
-static ROUND_TIMELIMIT_DELTA: u64 = 5;
+static ROUND_TIMELIMIT_DELTA: u64 = 10;
 
 pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     connection_manager: C,
@@ -35,6 +35,13 @@ pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     current_state: NodeState,
     stop_signal: Option<Receiver<u32>>,
     master_index: usize,
+    /// ## Round Timer
+    /// If the round duration is over, notify it and go through next round.
+    ///
+    /// Round timer must follow below rules.
+    /// * The timer is started on rounds start only.
+    /// * New round is started on only receiving completedblock message
+    ///   or previous round is timeout.
     round_timer: RoundTimeOutObserver,
     priv_shared_keys: Option<SharedKeys>,
     shared_secrets: SharedSecretMap,
@@ -100,6 +107,7 @@ pub enum NodeState {
         block_shared_keys: Option<(bool, FE, GE)>,
         candidate_block: Block,
         signatures: BTreeMap<SignerID, (FE, FE)>,
+        round_is_done: bool,
     },
     Member {
         block_key: Option<FE>,
@@ -129,7 +137,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             current_state: NodeState::Joining,
             stop_signal: None,
             master_index: 0,
-            round_timer: RoundTimeOutObserver::new(timer_limit),
+            round_timer: RoundTimeOutObserver::new("round_timer", timer_limit),
             priv_shared_keys: None,
             shared_secrets: BTreeMap::new(),
         }
@@ -163,7 +171,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
         // Start First Round
         log::info!("Start block creation rounds.");
-        self.round_timer.start().unwrap();
         self.current_state = self.start_next_round(true);
 
         // get error_handler that is for catch error within connection_manager.
@@ -211,11 +218,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             log::trace!("Checking round duration timeout...");
             match self.round_timer.receiver.try_recv() {
                 Ok(_) => {
-                    log::trace!("Round duration is timeout. Starting round process...");
                     // Round timeout. force round robin master node.
+                    log::trace!("Round duration is timeout. Starting next round...");
                     self.current_state = self.start_next_round(false);
                     log::debug!("Current state updated as {:?}", self.current_state);
-                    self.round_timer.restart().unwrap();
                 }
                 Err(TryRecvError::Empty) => {
                     log::trace!("Still waiting round duration interval.");
@@ -282,7 +288,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         let block = self.params.rpc.getnewblock(&self.params.address).unwrap();
         log::info!(
             "Broadcast candidate block. block hash for signing: {:?}",
-            block.sighash().expect("Can't get blockhash for singing")
+            block.sighash()
         );
         self.connection_manager.broadcast_message(Message {
             message_type: MessageType::Candidateblock(block.clone()),
@@ -296,6 +302,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             shared_block_secrets: BTreeMap::new(),
             candidate_block: block,
             signatures: BTreeMap::new(),
+            round_is_done: false,
         }
     }
 
@@ -334,7 +341,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     fn process_candidateblock(&mut self, sender_id: &SignerID, block: &Block) -> NodeState {
         log::info!(
             "candidateblock received. block hash for signing: {:?}",
-            block.sighash().expect("Can't get blockhash for singing")
+            block.sighash()
         );
 
         match &self.current_state {
@@ -348,7 +355,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         self.master_index = sender_index(sender_id, &self.params.pubkey_list);
                         let key = self.create_block_vss(block.clone());
                         // TODO: Errorを処理する必要あるかな？
-                        self.round_timer.restart().unwrap();
                         NodeState::Member {
                             block_key: Some(key.u_i),
                             shared_block_secrets: shared_block_secrets.clone(),
@@ -371,6 +377,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 block_shared_keys,
                 shared_block_secrets,
                 signatures,
+                round_is_done: false,
                 ..
             } => {
                 let key = self.create_block_vss(block.clone());
@@ -380,15 +387,23 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     shared_block_secrets: shared_block_secrets.clone(),
                     candidate_block: block.clone(),
                     signatures: signatures.clone(),
+                    round_is_done: false,
                 }
             }
             _ => self.current_state.clone(),
         }
     }
 
+    fn is_master(&self, sender_id: &SignerID) -> bool {
+        let master_id = self.params.pubkey_list[self.master_index];
+        master_id == sender_id.pubkey
+    }
+
     /// Start next round.
     /// decide master of next round according to Round-robin.
     fn start_next_round(&mut self, first_round: bool) -> NodeState {
+        self.round_timer.restart().unwrap();
+
         let next_index = if first_round {
             self.master_index
         } else {
@@ -420,13 +435,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         next_state
     }
     fn process_completedblock(&mut self, sender_id: &SignerID, _block: &Block) -> NodeState {
-        let index = sender_index(sender_id, &self.params.pubkey_list);
-        if index == self.master_index {
-            // authorization master.
-            // start round robin of master node.
-            return self.start_next_round(false);
+        if self.is_master(sender_id) {
+            self.start_next_round(false)
+        } else {
+            self.current_state.clone()
         }
-        self.current_state.clone()
     }
 
     fn process_nodevss(
@@ -484,7 +497,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             _ => None,
         };
         if let Some(block) = block_opt.clone() {
-            if block.sighash().unwrap() != blockhash {
+            if block.sighash() != blockhash {
                 log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", block.sighash(), blockhash);
                 return None;
             }
@@ -504,7 +517,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             let result_for_positive = Sign::sign(
                 &shared_keys_for_positive,
                 &self.priv_shared_keys.clone().unwrap(),
-                block_opt.clone().unwrap().sighash().unwrap(),
+                block_opt.clone().unwrap().sighash(),
             );
 
             let shared_keys_for_negative = Sign::verify_vss_and_construct_key(
@@ -516,7 +529,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             let result_for_negative = Sign::sign(
                 &shared_keys_for_negative,
                 &self.priv_shared_keys.clone().unwrap(),
-                block_opt.clone().unwrap().sighash().unwrap(),
+                block_opt.clone().unwrap().sighash(),
             );
 
             let p = BigInt::from_str_radix(
@@ -535,7 +548,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 Ok(local_sig) => {
                     self.connection_manager.broadcast_message(Message {
                         message_type: MessageType::Blocksig(
-                            block_opt.clone().unwrap().sighash().unwrap(),
+                            block_opt.clone().unwrap().sighash(),
                             local_sig.gamma_i,
                             local_sig.e,
                         ),
@@ -565,6 +578,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 shared_block_secrets,
                 candidate_block,
                 signatures,
+                round_is_done: false,
                 ..
             } => {
                 let mut new_shared_block_secrets = shared_block_secrets.clone();
@@ -590,6 +604,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         block_shared_keys: Some((keys.0, keys.1.x_i, keys.1.y)),
                         candidate_block: candidate_block.clone(),
                         signatures: signatures.clone(),
+                        round_is_done: false,
                     },
                     None => NodeState::Master {
                         block_key: block_key.clone(),
@@ -597,6 +612,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         block_shared_keys: None,
                         candidate_block: candidate_block.clone(),
                         signatures: signatures.clone(),
+                        round_is_done: false,
                     },
                 }
             }
@@ -655,6 +671,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 shared_block_secrets,
                 candidate_block,
                 signatures,
+                round_is_done: false,
             } => {
                 let mut new_signatures = signatures.clone();
                 new_signatures.insert(from, (gamma_i, e));
@@ -663,15 +680,15 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     new_signatures.len(),
                     self.params.threshold
                 );
-                if candidate_block.hash().unwrap() != blockhash {
-                    log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", candidate_block.sighash().unwrap(), blockhash);
-                    return self.start_next_round(false);
+                if candidate_block.sighash() != blockhash {
+                    log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", candidate_block.sighash(), blockhash);
+                    return self.current_state.clone();
                 }
 
                 if new_signatures.len() >= self.params.threshold as usize {
                     if block_shared_keys.is_none() {
                         log::error!("key is not shared.");
-                        return self.start_next_round(false);
+                        return self.current_state.clone();
                     }
 
                     let parties = new_signatures
@@ -707,7 +724,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                                 block_shared_keys.unwrap().2,
                             );
                             let public_key = self.priv_shared_keys.clone().unwrap().y;
-                            let hash = candidate_block.sighash().unwrap().into_inner();
+                            let hash = candidate_block.sighash().into_inner();
                             match signature.verify(&hash, &public_key) {
                                 Ok(_) => Ok(signature),
                                 Err(e) => Err(e),
@@ -715,7 +732,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         }
                         Err(_) => {
                             log::error!("local signature is invalid.");
-                            return self.start_next_round(false);
+                            return self.current_state.clone();
                         }
                     };
                     let result = match verification {
@@ -730,36 +747,38 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         }
                         Err(_) => {
                             log::error!("aggregated signature is invalid");
-                            return self.start_next_round(false);
+                            return self.current_state.clone();
                         }
                     };
                     match result {
                         Ok(new_block) => {
                             log::info!(
                                 "Round Success. caindateblock(block hash for sign)={:?} completedblock={:?}",
-                                candidate_block.sighash().expect("Can't get block hash"),
-                                new_block.hash().expect("Can't get block hash")
+                                candidate_block.sighash(),
+                                new_block.hash()
                             );
                             // send completeblock message
-                            log::info!(
-                                "Broadcast CompletedBlock message. {:?}",
-                                new_block
-                                    .hash()
-                                    .expect("Can't get block hash from completed block")
-                            );
+                            log::info!("Broadcast CompletedBlock message. {:?}", new_block.hash());
                             let message = Message {
                                 message_type: MessageType::Completedblock(new_block),
                                 sender_id: self.params.signer_id.clone(),
                                 receiver_id: None,
                             };
                             self.connection_manager.broadcast_message(message);
+
+                            return NodeState::Master {
+                                block_key: block_key.clone(),
+                                block_shared_keys: block_shared_keys.clone(),
+                                shared_block_secrets: shared_block_secrets.clone(),
+                                candidate_block: candidate_block.clone(),
+                                signatures: new_signatures,
+                                round_is_done: true,
+                            };
                         }
                         Err(e) => {
                             log::error!("block rejected by Tapyrus Core: {:?}", e);
                         }
                     }
-                    // start round robin of master node.
-                    return self.start_next_round(false);
                 }
                 NodeState::Master {
                     block_key: block_key.clone(),
@@ -767,20 +786,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     shared_block_secrets: shared_block_secrets.clone(),
                     candidate_block: candidate_block.clone(),
                     signatures: new_signatures,
+                    round_is_done: false,
                 }
             }
-            NodeState::Member {
-                block_key,
-                block_shared_keys,
-                shared_block_secrets,
-                candidate_block,
-            } => NodeState::Member {
-                block_key: block_key.clone(),
-                block_shared_keys: block_shared_keys.clone(),
-                shared_block_secrets: shared_block_secrets.clone(),
-                candidate_block: candidate_block.clone(),
-            },
-            _ => self.current_state.clone(),
+            state @ _ => state.clone(),
         }
     }
 
@@ -789,11 +798,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     }
 
     fn create_node_share(&mut self) {
-        //Wait for completing redis connection.
-        thread::sleep(time::Duration::from_secs(10));
-
         let params = self.sharing_params();
-
         let key = Sign::create_key(
             self.params.self_node_index + 1,
             Sign::private_key_to_big_int(self.params.private_key.key),
@@ -856,7 +861,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         for i in 0..self.params.pubkey_list.len() {
             self.connection_manager.send_message(Message {
                 message_type: MessageType::Blockvss(
-                    block.sighash().unwrap(),
+                    block.sighash(),
                     vss_scheme.clone(),
                     secret_shares[i],
                     vss_scheme_for_negative.clone(),
@@ -936,11 +941,11 @@ mod tests {
 
     use redis::ControlFlow;
 
-    use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
+    use crate::net::{ConnectionManager, ConnectionManagerError, Message, MessageType, SignerID};
     use crate::rpc::tests::{safety, safety_error, MockRpc, SafetyBlock};
     use crate::rpc::TapyrusApi;
     use crate::signer_node::{BidirectionalSharedSecretMap, NodeParameters, NodeState, SignerNode};
-    use crate::test_helper::{get_block, TestKeys};
+    use crate::test_helper::{enable_log, get_block, TestKeys};
     use bitcoin::{Address, PrivateKey};
 
     type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
@@ -1184,8 +1189,20 @@ mod tests {
 
         bloadcaster.send(message).unwrap();
         match broadcast_r.recv_timeout(Duration::from_millis(500)) {
-            Ok(m) => panic!("Should not broadcast Signature message: {:?}", m),
-            Err(_e) => assert!(true),
+            Ok(m) => match unsafe { &*Arc::into_raw(m) } {
+                m
+                @
+                Message {
+                    message_type: MessageType::Blockvss { .. },
+                    ..
+                } => assert!(
+                    false,
+                    "A node should not broadcast Signature message: {:?}",
+                    m
+                ),
+                _ => {}
+            },
+            Err(_e) => {}
         }
         stop_signal.send(1).unwrap(); // this line not necessary, but for manners.
     }
@@ -1224,6 +1241,7 @@ mod tests {
 
     #[test]
     fn test_timeout_roundrobin() {
+        enable_log(None);
         let closure: SpyMethod = Box::new(move |_message: Arc<Message>| {});
         let initial_state = NodeState::Member {
             block_key: None,
@@ -1244,7 +1262,7 @@ mod tests {
         assert_eq!(node.master_index, 0 as usize);
         let ss = stop_signal.clone();
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(16));
+            thread::sleep(Duration::from_secs(11)); // 11s = 1 round (10s) + 1s
             ss.send(1).unwrap();
         });
         node.start();

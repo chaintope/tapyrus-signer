@@ -77,22 +77,24 @@ impl Block {
 
     /// Returns hash for signing. This hash value doesn't include proof field. Actual block hash
     /// includes proof data.
-    pub fn sighash(&self) -> Result<hash::Hash, Error> {
+    pub fn sighash(&self) -> hash::Hash {
         let header = self.get_header_without_proof();
         let hash = sha256d::Hash::hash(header).into_inner();
-        Ok(hash::Hash::from_slice(&hash)?)
+        hash::Hash::from_slice(&hash)
+            .expect("couldn't convert to blockdata::hash::Hash from sha256d::hash")
     }
 
     /// Returns block hash
-    pub fn hash(&self) -> Result<hash::Hash, Error> {
-        if self.0[Self::PROOF_POSITION] == 0 {
-            return Err(Error::IncompleteBlock);
-        }
-
-        let header = &self.0[..(Self::PROOF_POSITION + 65)]; // length byte + signature(64 bytes)
+    pub fn hash(&self) -> hash::Hash {
+        let header = if self.0[Self::PROOF_POSITION] == 0 {
+            &self.0[..(Self::PROOF_POSITION + 1)] // length byte
+        } else {
+            &self.0[..(Self::PROOF_POSITION + 65)] // length byte + signature(64 bytes)
+        };
 
         let hash = sha256d::Hash::hash(header).into_inner();
-        Ok(hash::Hash::from_slice(&hash)?)
+        hash::Hash::from_slice(&hash)
+            .expect("couldn't convert to blockdata::hash::Hash from sha256d::hash")
     }
 
     pub fn payload(&self) -> &[u8] {
@@ -150,21 +152,18 @@ mod tests {
     #[test]
     fn test_hash() {
         let block = test_block();
-        let hash = block.hash().unwrap();
+        let hash = block.hash();
 
         assert_eq!(
             format!("{:?}", hash),
             "Hash(86dbdec1ab22f4d43ef164ea5198bf6d4d96ea6ef97ca2dea97a40657af6d789)"
         );
-
-        let incomplete_block = test_block_without_proof();
-        assert!(incomplete_block.hash().is_err());
     }
 
     #[test]
     fn test_block_hash_debug_fmt() {
         let block = test_block();
-        let hash = block.sighash().unwrap();
+        let hash = block.sighash();
 
         assert_eq!(
             format!("{:?}", hash),
