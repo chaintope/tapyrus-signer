@@ -13,7 +13,7 @@ extern crate tapyrus_signer;
 use bitcoin::{PrivateKey, PublicKey};
 
 use daemonize::Daemonize;
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tapyrus_signer::command_args::{CommandArgs, RedisConfig, RpcConfig};
@@ -72,8 +72,17 @@ fn main() {
 
 fn daemonize(pid: &str, log_file: &str) {
     println!("Start Tapyrus Signer Daemon. pid file: {}", pid);
-    let stdout = File::create(log_file).unwrap();
-    let stderr = File::create(log_file).unwrap();
+    let stdout = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(log_file)
+        .expect(&format!("Couldn't open {}", log_file));
+
+    let stderr = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(log_file)
+        .expect(&format!("Couldn't open {}", log_file));
 
     let daemonize = Daemonize::new().pid_file(pid).stdout(stdout).stderr(stderr);
 
