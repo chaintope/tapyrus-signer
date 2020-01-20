@@ -4,6 +4,7 @@
 
 mod utils;
 mod node_parameters;
+mod message_processor;
 
 use utils::sender_index;
 pub use node_parameters::NodeParameters;
@@ -29,6 +30,7 @@ use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use crate::sign::Sign;
 use crate::timer::RoundTimeOutObserver;
 use crate::util::*;
+use crate::signer_node::message_processor::process_candidateblock;
 
 /// Round interval.
 pub static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
@@ -310,9 +312,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     pub fn process_message(&mut self, message: Message) -> NodeState {
         match message.message_type {
-            MessageType::Candidateblock(block) => {
-                self.process_candidateblock(&message.sender_id, &block)
-            }
+            MessageType::Candidateblock(block) => process_candidateblock(&message.sender_id, &block, self),
             MessageType::Completedblock(block) => {
                 self.process_completedblock(&message.sender_id, &block)
             }
@@ -337,62 +337,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 self.process_blocksig(blockhash, gamma_i, e, message.sender_id)
             }
             MessageType::Roundfailure => self.process_roundfailure(&message.sender_id),
-        }
-    }
-
-    fn process_candidateblock(&mut self, sender_id: &SignerID, block: &Block) -> NodeState {
-        log::info!(
-            "candidateblock received. block hash for signing: {:?}",
-            block.sighash()
-        );
-
-        match &self.current_state {
-            NodeState::Member {
-                shared_block_secrets,
-                block_shared_keys,
-                ..
-            } => {
-                match self.params.rpc.testproposedblock(&block) {
-                    Ok(_) => {
-                        self.master_index = sender_index(sender_id, &self.params.pubkey_list);
-                        let key = self.create_block_vss(block.clone());
-                        // TODO: Errorを処理する必要あるかな？
-                        NodeState::Member {
-                            block_key: Some(key.u_i),
-                            shared_block_secrets: shared_block_secrets.clone(),
-                            block_shared_keys: block_shared_keys.clone(),
-                            candidate_block: Some(block.clone()),
-                        }
-                    }
-                    Err(_e) => {
-                        log::warn!("Received Invalid candidate block sender: {}", sender_id);
-                        NodeState::Member {
-                            block_key: None,
-                            shared_block_secrets: shared_block_secrets.clone(),
-                            block_shared_keys: block_shared_keys.clone(),
-                            candidate_block: Some(block.clone()),
-                        }
-                    }
-                }
-            }
-            NodeState::Master {
-                block_shared_keys,
-                shared_block_secrets,
-                signatures,
-                round_is_done: false,
-                ..
-            } => {
-                let key = self.create_block_vss(block.clone());
-                NodeState::Master {
-                    block_key: Some(key.u_i),
-                    block_shared_keys: block_shared_keys.clone(),
-                    shared_block_secrets: shared_block_secrets.clone(),
-                    candidate_block: block.clone(),
-                    signatures: signatures.clone(),
-                    round_is_done: false,
-                }
-            }
-            _ => self.current_state.clone(),
         }
     }
 
@@ -904,6 +848,7 @@ mod tests {
     use crate::signer_node::{BidirectionalSharedSecretMap, NodeParameters, NodeState, SignerNode};
     use crate::test_helper::{enable_log, get_block, TestKeys};
     use bitcoin::{Address, PrivateKey};
+    use crate::signer_node::message_processor::process_candidateblock;
 
     type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
 
@@ -1186,11 +1131,11 @@ mod tests {
         // 4 -> 1
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
         assert_eq!(node.master_index, 0); // in begin, master_index is 0.
-        let _next_state = node.process_candidateblock(&sender_id, &get_block(0));
+        let _next_state = process_candidateblock(&sender_id, &get_block(0), &mut node);
         assert_eq!(node.master_index, 0);
 
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
-        let _next_state = node.process_candidateblock(&sender_id, &get_block(0));
+        let _next_state = process_candidateblock(&sender_id, &get_block(0), &mut node);
         assert_eq!(node.master_index, 4);
 
         node.round_timer.stop();
