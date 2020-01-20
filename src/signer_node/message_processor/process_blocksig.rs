@@ -1,25 +1,26 @@
-use crate::net::{SignerID, ConnectionManager, Message, MessageType};
 use crate::blockdata::hash::Hash;
-use curv::FE;
-use crate::signer_node::{SignerNode, NodeState};
-use crate::rpc::TapyrusApi;
-use crate::signer_node::utils::sender_index;
-use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::LocalSig;
-use crate::sign::Sign;
 use crate::blockdata::Block;
+use crate::net::{ConnectionManager, Message, MessageType, SignerID};
+use crate::rpc::TapyrusApi;
+use crate::sign::Sign;
+use crate::signer_node::utils::sender_index;
 use crate::signer_node::ToSharedSecretMap;
-use crate::signer_node::SharedSecretMap;
 use crate::signer_node::ToVerifiableSS;
+use crate::signer_node::{NodeState, SignerNode};
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
+use curv::FE;
+use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::LocalSig;
 
 pub fn process_blocksig<T, C>(
     sender_id: &SignerID,
     blockhash: Hash,
     gamma_i: FE,
     e: FE,
-    signer_node: &mut SignerNode<T, C>) -> NodeState
-    where T: TapyrusApi,
-          C: ConnectionManager,
+    signer_node: &mut SignerNode<T, C>,
+) -> NodeState
+where
+    T: TapyrusApi,
+    C: ConnectionManager,
 {
     match &signer_node.current_state {
         NodeState::Master {
@@ -33,10 +34,10 @@ pub fn process_blocksig<T, C>(
             let mut new_signatures = signatures.clone();
             new_signatures.insert(sender_id.clone(), (gamma_i, e));
             log::trace!(
-                    "number of signatures: {:?} (threshold: {:?})",
-                    new_signatures.len(),
-                    signer_node.params.threshold
-                );
+                "number of signatures: {:?} (threshold: {:?})",
+                new_signatures.len(),
+                signer_node.params.threshold
+            );
             if candidate_block.sighash() != blockhash {
                 log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", candidate_block.sighash(), blockhash);
                 return signer_node.current_state.clone();

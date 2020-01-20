@@ -1,6 +1,6 @@
+use super::utils::sender_index;
 use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
-use super::utils::sender_index;
 use bitcoin::{Address, PrivateKey, PublicKey};
 use std::sync::Arc;
 

@@ -1,15 +1,15 @@
-use crate::net::{SignerID, ConnectionManager, Message, MessageType};
 use crate::blockdata::hash::Hash;
-use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-use curv::{FE, BigInt};
-use crate::signer_node::{SignerNode, NodeState, SharedSecret, BidirectionalSharedSecretMap};
-use crate::rpc::TapyrusApi;
-use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::SharedKeys;
 use crate::blockdata::Block;
+use crate::net::{ConnectionManager, Message, MessageType, SignerID};
+use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
-use crate::util::jacobi;
 use crate::signer_node::ToSharedSecretMap;
+use crate::signer_node::{BidirectionalSharedSecretMap, NodeState, SharedSecret, SignerNode};
+use crate::util::jacobi;
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::ECPoint;
+use curv::{BigInt, FE};
+use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::SharedKeys;
 
 pub fn process_blockvss<T, C>(
     sender_id: &SignerID,
@@ -18,9 +18,11 @@ pub fn process_blockvss<T, C>(
     secret_share_for_positive: FE,
     vss_for_negative: VerifiableSS,
     secret_share_for_negative: FE,
-    signer_node: &mut SignerNode<T, C>) -> NodeState
-    where T: TapyrusApi,
-          C: ConnectionManager,
+    signer_node: &mut SignerNode<T, C>,
+) -> NodeState
+where
+    T: TapyrusApi,
+    C: ConnectionManager,
 {
     match &signer_node.current_state {
         NodeState::Master {
@@ -45,7 +47,8 @@ pub fn process_blockvss<T, C>(
                     },
                 ),
             );
-            let shared_keys = process_blockvss_inner(signer_node, blockhash, &new_shared_block_secrets);
+            let shared_keys =
+                process_blockvss_inner(signer_node, blockhash, &new_shared_block_secrets);
 
             match shared_keys {
                 Some(keys) => NodeState::Master {
@@ -86,7 +89,8 @@ pub fn process_blockvss<T, C>(
                     },
                 ),
             );
-            let shared_keys = process_blockvss_inner(signer_node, blockhash, &new_shared_block_secrets);
+            let shared_keys =
+                process_blockvss_inner(signer_node, blockhash, &new_shared_block_secrets);
 
             match shared_keys {
                 Some(keys) => NodeState::Member {
@@ -112,14 +116,15 @@ fn process_blockvss_inner<T, C>(
     blockhash: Hash,
     shared_block_secrets: &BidirectionalSharedSecretMap,
 ) -> Option<(bool, SharedKeys)>
-    where T: TapyrusApi,
-          C: ConnectionManager,
+where
+    T: TapyrusApi,
+    C: ConnectionManager,
 {
     let params = signer_node.sharing_params();
     log::trace!(
-            "number of shared_block_secrets: {:?}",
-            shared_block_secrets.len()
-        );
+        "number of shared_block_secrets: {:?}",
+        shared_block_secrets.len()
+    );
     let block_opt: Option<Block> = match &signer_node.current_state {
         NodeState::Master {
             candidate_block, ..
@@ -145,7 +150,7 @@ fn process_blockvss_inner<T, C>(
             &shared_block_secrets.for_positive(),
             &(signer_node.params.self_node_index + 1),
         )
-            .expect("invalid vss");
+        .expect("invalid vss");
 
         let result_for_positive = Sign::sign(
             &shared_keys_for_positive,
@@ -158,7 +163,7 @@ fn process_blockvss_inner<T, C>(
             &shared_block_secrets.for_negative(),
             &(signer_node.params.self_node_index + 1),
         )
-            .expect("invalid vss");
+        .expect("invalid vss");
         let result_for_negative = Sign::sign(
             &shared_keys_for_negative,
             &signer_node.priv_shared_keys.clone().unwrap(),
@@ -169,7 +174,7 @@ fn process_blockvss_inner<T, C>(
             "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
             16,
         )
-            .unwrap();
+        .unwrap();
         let is_positive = jacobi(&shared_keys_for_positive.y.y_coor().unwrap(), &p) == 1;
         let (shared_keys, result) = if is_positive {
             (shared_keys_for_positive, result_for_positive)

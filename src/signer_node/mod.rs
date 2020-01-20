@@ -2,39 +2,31 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-mod utils;
-mod node_parameters;
 mod message_processor;
+mod node_parameters;
+mod utils;
 
-use utils::sender_index;
-pub use node_parameters::NodeParameters;
-
-use std::collections::BTreeMap;
-use std::convert::TryInto;
-use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
-use std::sync::Arc;
-use std::time::Duration;
-use std::{thread, time};
-
-use bitcoin::{Address, PrivateKey, PublicKey};
-use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-use curv::elliptic::curves::traits::*;
-use curv::{BigInt, FE, GE};
-use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
-use redis::ControlFlow;
-
-use crate::blockdata::hash::Hash;
 use crate::blockdata::Block;
 use crate::net::{ConnectionManager, Message, MessageType, SignerID};
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use crate::sign::Sign;
-use crate::timer::RoundTimeOutObserver;
-use crate::util::*;
+use crate::signer_node::message_processor::process_blocksig;
+use crate::signer_node::message_processor::process_blockvss;
 use crate::signer_node::message_processor::process_candidateblock;
 use crate::signer_node::message_processor::process_completedblock;
 use crate::signer_node::message_processor::process_nodevss;
-use crate::signer_node::message_processor::process_blockvss;
-use crate::signer_node::message_processor::process_blocksig;
+use crate::timer::RoundTimeOutObserver;
+use crate::util::*;
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
+use curv::elliptic::curves::traits::*;
+use curv::{BigInt, FE, GE};
+use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
+pub use node_parameters::NodeParameters;
+use redis::ControlFlow;
+use std::collections::BTreeMap;
+use std::convert::TryInto;
+use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+use std::time::Duration;
 
 /// Round interval.
 pub static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
@@ -316,11 +308,33 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     pub fn process_message(&mut self, message: Message) -> NodeState {
         match message.message_type {
-            MessageType::Candidateblock(block) => process_candidateblock(&message.sender_id, &block, self),
-            MessageType::Completedblock(block) => process_completedblock(&message.sender_id, &block, self),
-            MessageType::Nodevss(vss, secret_share) => process_nodevss(&message.sender_id, vss, secret_share, self),
-            MessageType::Blockvss(blockhash, vss_for_positive, secret_share_for_positive, vss_for_negative, secret_share_for_negative) => process_blockvss(&message.sender_id, blockhash, vss_for_positive, secret_share_for_positive, vss_for_negative, secret_share_for_negative, self),
-            MessageType::Blocksig(blockhash, gamma_i, e) => process_blocksig(&message.sender_id, blockhash, gamma_i, e,self),
+            MessageType::Candidateblock(block) => {
+                process_candidateblock(&message.sender_id, &block, self)
+            }
+            MessageType::Completedblock(block) => {
+                process_completedblock(&message.sender_id, &block, self)
+            }
+            MessageType::Nodevss(vss, secret_share) => {
+                process_nodevss(&message.sender_id, vss, secret_share, self)
+            }
+            MessageType::Blockvss(
+                blockhash,
+                vss_for_positive,
+                secret_share_for_positive,
+                vss_for_negative,
+                secret_share_for_negative,
+            ) => process_blockvss(
+                &message.sender_id,
+                blockhash,
+                vss_for_positive,
+                secret_share_for_positive,
+                vss_for_negative,
+                secret_share_for_negative,
+                self,
+            ),
+            MessageType::Blocksig(blockhash, gamma_i, e) => {
+                process_blocksig(&message.sender_id, blockhash, gamma_i, e, self)
+            }
             MessageType::Roundfailure => self.process_roundfailure(&message.sender_id),
         }
     }
@@ -472,11 +486,11 @@ mod tests {
     use crate::net::{ConnectionManager, ConnectionManagerError, Message, MessageType, SignerID};
     use crate::rpc::tests::{safety, safety_error, MockRpc, SafetyBlock};
     use crate::rpc::TapyrusApi;
+    use crate::signer_node::message_processor::process_candidateblock;
+    use crate::signer_node::message_processor::process_completedblock;
     use crate::signer_node::{BidirectionalSharedSecretMap, NodeParameters, NodeState, SignerNode};
     use crate::test_helper::{enable_log, get_block, TestKeys};
     use bitcoin::{Address, PrivateKey};
-    use crate::signer_node::message_processor::process_candidateblock;
-    use crate::signer_node::message_processor::process_completedblock;
 
     type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
 

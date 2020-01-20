@@ -1,16 +1,21 @@
-use crate::net::{Message, ConnectionManager, MessageType, SignerID};
-use crate::signer_node::{NodeState, SignerNode};
+use crate::blockdata::Block;
+use crate::net::{ConnectionManager, SignerID};
 use crate::rpc::TapyrusApi;
 use crate::signer_node::utils::sender_index;
-use crate::blockdata::Block;
+use crate::signer_node::{NodeState, SignerNode};
 
-pub fn process_candidateblock<T, C>(sender_id: &SignerID, block: &Block, signer_node: &mut SignerNode<T, C>) -> NodeState
-    where T: TapyrusApi,
-          C: ConnectionManager,
+pub fn process_candidateblock<T, C>(
+    sender_id: &SignerID,
+    block: &Block,
+    signer_node: &mut SignerNode<T, C>,
+) -> NodeState
+where
+    T: TapyrusApi,
+    C: ConnectionManager,
 {
     log::info!(
-      "candidateblock received. block hash for signing: {:?}",
-      block.sighash()
+        "candidateblock received. block hash for signing: {:?}",
+        block.sighash()
     );
 
     match &signer_node.current_state {
@@ -21,7 +26,8 @@ pub fn process_candidateblock<T, C>(sender_id: &SignerID, block: &Block, signer_
         } => {
             match signer_node.params.rpc.testproposedblock(&block) {
                 Ok(_) => {
-                    signer_node.master_index = sender_index(sender_id, &signer_node.params.pubkey_list);
+                    signer_node.master_index =
+                        sender_index(sender_id, &signer_node.params.pubkey_list);
                     let key = signer_node.create_block_vss(block.clone());
                     // TODO: Errorを処理する必要あるかな？
                     NodeState::Member {

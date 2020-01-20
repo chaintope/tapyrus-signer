@@ -9,7 +9,6 @@ use bitcoin::{Address, PrivateKey, PublicKey};
 use clap::{App, Arg};
 use log;
 use serde::Deserialize;
-use std::error::Error;
 use std::path::PathBuf;
 
 pub const OPTION_NAME_CONFIG: &str = "config";
@@ -144,11 +143,7 @@ impl<'a> SignerConfig<'a> {
                     );
                     Some(p)
                 }
-                Err(e) => panic!(format!(
-                    "'{}' is invalid address. error msg: {:?}",
-                    s,
-                    e.description()
-                )),
+                Err(e) => panic!(format!("'{}' is invalid address. error msg: {:?}", s, e)),
             })
             .expect("Must be specified to_address.")
     }
@@ -208,8 +203,7 @@ impl<'a> SignerConfig<'a> {
                 Ok(p) => Some(p),
                 Err(e) => panic!(format!(
                     "'{}' is invalid WIF format!. error msg: {:?}",
-                    s,
-                    e.description()
+                    s, e
                 )),
             })
             .expect("Must be specified private_key.")
