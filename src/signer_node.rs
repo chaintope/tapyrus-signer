@@ -1266,7 +1266,7 @@ mod tests {
         assert_eq!(node.master_index, 0 as usize);
         let ss = stop_signal.clone();
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(16)); // 11s = 1 round (10s) + idle time(5s) + 1s
+            thread::sleep(Duration::from_secs(16)); // 16s = 1 round (10s) + idle time(5s) + 1s
             ss.send(1).unwrap();
         });
         node.start();
