@@ -31,6 +31,7 @@ use crate::sign::Sign;
 use crate::timer::RoundTimeOutObserver;
 use crate::util::*;
 use crate::signer_node::message_processor::process_candidateblock;
+use crate::signer_node::message_processor::process_completedblock;
 
 /// Round interval.
 pub static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
@@ -313,9 +314,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     pub fn process_message(&mut self, message: Message) -> NodeState {
         match message.message_type {
             MessageType::Candidateblock(block) => process_candidateblock(&message.sender_id, &block, self),
-            MessageType::Completedblock(block) => {
-                self.process_completedblock(&message.sender_id, &block)
-            }
+            MessageType::Completedblock(block) => process_completedblock(&message.sender_id, &block, self),
             MessageType::Nodevss(vss, secret_share) => {
                 self.process_nodevss(vss, secret_share, message.sender_id)
             }
@@ -379,13 +378,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             }
         };
         next_state
-    }
-    fn process_completedblock(&mut self, sender_id: &SignerID, _block: &Block) -> NodeState {
-        if self.is_master(sender_id) {
-            self.start_next_round(false)
-        } else {
-            self.current_state.clone()
-        }
     }
 
     fn process_nodevss(
@@ -849,6 +841,7 @@ mod tests {
     use crate::test_helper::{enable_log, get_block, TestKeys};
     use bitcoin::{Address, PrivateKey};
     use crate::signer_node::message_processor::process_candidateblock;
+    use crate::signer_node::message_processor::process_completedblock;
 
     type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
 
@@ -1194,7 +1187,7 @@ mod tests {
         // 4 -> 1
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
         assert_eq!(node.master_index, 0); // in begin, master_index is 0.
-        let next_state = node.process_completedblock(&sender_id, &get_block(0));
+        let next_state = process_completedblock(&sender_id, &get_block(0), &mut node);
         assert_eq!(node.master_index, 1); // should incremented.
         match next_state {
             NodeState::Member { .. } => assert!(true),
@@ -1203,7 +1196,7 @@ mod tests {
 
         node.master_index = 4;
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
-        let next_state = node.process_completedblock(&sender_id, &get_block(0));
+        let next_state = process_completedblock(&sender_id, &get_block(0), &mut node);
         assert_eq!(node.master_index, 0); // wrap back to 0.
         match next_state {
             NodeState::Member { .. } => assert!(true),
@@ -1212,7 +1205,7 @@ mod tests {
 
         node.master_index = 3;
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[2]);
-        let next_state = node.process_completedblock(&sender_id, &get_block(0));
+        let next_state = process_completedblock(&sender_id, &get_block(0), &mut node);
         assert_eq!(node.master_index, 4); // wrap back to 0.
         match next_state {
             NodeState::Master { .. } => {}
@@ -1242,7 +1235,7 @@ mod tests {
         // 4 -> 1
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
         assert_eq!(node.master_index, 0); // in begin, master_index is 0.
-        let next_state = node.process_completedblock(&sender_id, &get_block(0));
+        let next_state = process_completedblock(&sender_id, &get_block(0), &mut node);
         assert_eq!(node.master_index, 0); // should not incremented if not recorded master.
         match next_state {
             NodeState::Member { .. } => assert!(true),
