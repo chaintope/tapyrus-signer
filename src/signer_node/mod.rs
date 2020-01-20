@@ -34,6 +34,7 @@ use crate::signer_node::message_processor::process_candidateblock;
 use crate::signer_node::message_processor::process_completedblock;
 use crate::signer_node::message_processor::process_nodevss;
 use crate::signer_node::message_processor::process_blockvss;
+use crate::signer_node::message_processor::process_blocksig;
 
 /// Round interval.
 pub static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
@@ -319,9 +320,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             MessageType::Completedblock(block) => process_completedblock(&message.sender_id, &block, self),
             MessageType::Nodevss(vss, secret_share) => process_nodevss(&message.sender_id, vss, secret_share, self),
             MessageType::Blockvss(blockhash, vss_for_positive, secret_share_for_positive, vss_for_negative, secret_share_for_negative) => process_blockvss(&message.sender_id, blockhash, vss_for_positive, secret_share_for_positive, vss_for_negative, secret_share_for_negative, self),
-            MessageType::Blocksig(blockhash, gamma_i, e) => {
-                self.process_blocksig(blockhash, gamma_i, e, message.sender_id)
-            }
+            MessageType::Blocksig(blockhash, gamma_i, e) => process_blocksig(&message.sender_id, blockhash, gamma_i, e,self),
             MessageType::Roundfailure => self.process_roundfailure(&message.sender_id),
         }
     }
@@ -365,142 +364,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             }
         };
         next_state
-    }
-
-    fn process_blocksig(
-        &mut self,
-        blockhash: Hash,
-        gamma_i: FE,
-        e: FE,
-        from: SignerID,
-    ) -> NodeState {
-        match &self.current_state {
-            NodeState::Master {
-                block_key,
-                block_shared_keys,
-                shared_block_secrets,
-                candidate_block,
-                signatures,
-                round_is_done: false,
-            } => {
-                let mut new_signatures = signatures.clone();
-                new_signatures.insert(from, (gamma_i, e));
-                log::trace!(
-                    "number of signatures: {:?} (threshold: {:?})",
-                    new_signatures.len(),
-                    self.params.threshold
-                );
-                if candidate_block.sighash() != blockhash {
-                    log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", candidate_block.sighash(), blockhash);
-                    return self.current_state.clone();
-                }
-
-                if new_signatures.len() >= self.params.threshold as usize {
-                    if block_shared_keys.is_none() {
-                        log::error!("key is not shared.");
-                        return self.current_state.clone();
-                    }
-
-                    let parties = new_signatures
-                        .keys()
-                        .map(|k| sender_index(k, &self.params.pubkey_list))
-                        .collect::<Vec<usize>>();
-                    let key_gen_vss_vec: Vec<VerifiableSS> = self.shared_secrets.to_vss();
-                    let local_sigs: Vec<LocalSig> = new_signatures
-                        .values()
-                        .map(|s| LocalSig {
-                            gamma_i: s.0,
-                            e: s.1,
-                        })
-                        .collect();
-                    let eph_vss_vec: Vec<VerifiableSS> = if block_shared_keys.unwrap().0 {
-                        shared_block_secrets.for_positive().to_vss()
-                    } else {
-                        shared_block_secrets.for_negative().to_vss()
-                    };
-                    let sum_of_local_sigs = LocalSig::verify_local_sigs(
-                        &local_sigs,
-                        &parties[..],
-                        &key_gen_vss_vec,
-                        &eph_vss_vec,
-                    );
-
-                    let verification = match sum_of_local_sigs {
-                        Ok(vss_sum) => {
-                            let signature = Sign::aggregate(
-                                &vss_sum,
-                                &local_sigs,
-                                &parties[..],
-                                block_shared_keys.unwrap().2,
-                            );
-                            let public_key = self.priv_shared_keys.clone().unwrap().y;
-                            let hash = candidate_block.sighash().into_inner();
-                            match signature.verify(&hash, &public_key) {
-                                Ok(_) => Ok(signature),
-                                Err(e) => Err(e),
-                            }
-                        }
-                        Err(_) => {
-                            log::error!("local signature is invalid.");
-                            return self.current_state.clone();
-                        }
-                    };
-                    let result = match verification {
-                        Ok(signature) => {
-                            let sig_hex = Sign::format_signature(&signature);
-                            let new_block: Block =
-                                candidate_block.add_proof(hex::decode(sig_hex).unwrap());
-                            match self.params.rpc.submitblock(&new_block) {
-                                Ok(_) => Ok(new_block),
-                                Err(e) => Err(e),
-                            }
-                        }
-                        Err(_) => {
-                            log::error!("aggregated signature is invalid");
-                            return self.current_state.clone();
-                        }
-                    };
-                    match result {
-                        Ok(new_block) => {
-                            log::info!(
-                                "Round Success. caindateblock(block hash for sign)={:?} completedblock={:?}",
-                                candidate_block.sighash(),
-                                new_block.hash()
-                            );
-                            // send completeblock message
-                            log::info!("Broadcast CompletedBlock message. {:?}", new_block.hash());
-                            let message = Message {
-                                message_type: MessageType::Completedblock(new_block),
-                                sender_id: self.params.signer_id.clone(),
-                                receiver_id: None,
-                            };
-                            self.connection_manager.broadcast_message(message);
-
-                            return NodeState::Master {
-                                block_key: block_key.clone(),
-                                block_shared_keys: block_shared_keys.clone(),
-                                shared_block_secrets: shared_block_secrets.clone(),
-                                candidate_block: candidate_block.clone(),
-                                signatures: new_signatures,
-                                round_is_done: true,
-                            };
-                        }
-                        Err(e) => {
-                            log::error!("block rejected by Tapyrus Core: {:?}", e);
-                        }
-                    }
-                }
-                NodeState::Master {
-                    block_key: block_key.clone(),
-                    block_shared_keys: block_shared_keys.clone(),
-                    shared_block_secrets: shared_block_secrets.clone(),
-                    candidate_block: candidate_block.clone(),
-                    signatures: new_signatures,
-                    round_is_done: false,
-                }
-            }
-            state @ _ => state.clone(),
-        }
     }
 
     fn process_roundfailure(&self, _sender_id: &SignerID) -> NodeState {
