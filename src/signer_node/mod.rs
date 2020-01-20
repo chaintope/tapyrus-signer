@@ -32,6 +32,7 @@ use crate::timer::RoundTimeOutObserver;
 use crate::util::*;
 use crate::signer_node::message_processor::process_candidateblock;
 use crate::signer_node::message_processor::process_completedblock;
+use crate::signer_node::message_processor::process_nodevss;
 
 /// Round interval.
 pub static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
@@ -315,9 +316,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         match message.message_type {
             MessageType::Candidateblock(block) => process_candidateblock(&message.sender_id, &block, self),
             MessageType::Completedblock(block) => process_completedblock(&message.sender_id, &block, self),
-            MessageType::Nodevss(vss, secret_share) => {
-                self.process_nodevss(vss, secret_share, message.sender_id)
-            }
+            MessageType::Nodevss(vss, secret_share) => process_nodevss(&message.sender_id, vss, secret_share, self),
             MessageType::Blockvss(
                 blockhash,
                 vss_for_positive,
@@ -378,41 +377,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             }
         };
         next_state
-    }
-
-    fn process_nodevss(
-        &mut self,
-        vss: VerifiableSS,
-        secret_share: FE,
-        from: SignerID,
-    ) -> NodeState {
-        let params = self.sharing_params();
-
-        self.shared_secrets.insert(
-            from,
-            SharedSecret {
-                vss: vss.clone(),
-                secret_share,
-            },
-        );
-
-        if self.shared_secrets.len() == self.params.pubkey_list.len() {
-            let shared_keys = Sign::verify_vss_and_construct_key(
-                &params,
-                &self.shared_secrets,
-                &(self.params.self_node_index + 1),
-            )
-            .expect("invalid vss");
-
-            self.priv_shared_keys = Some(shared_keys.clone());
-            log::info!("All VSSs are collected. Ready to start Signature Issuing Protocol");
-            log::debug!(
-                "All VSSs are stored. My share for generating local sig: {:?}, Aggregated Pubkey: {:?}",
-                shared_keys.x_i,
-                shared_keys.y
-            );
-        }
-        self.current_state.clone()
     }
 
     fn process_blockvss_inner(
