@@ -84,11 +84,25 @@ impl<'de> Deserialize<'de> for SignerID {
     }
 }
 
+/// Messages which are sent to and received from other signer nodes
 #[derive(PartialEq, Debug, Serialize, Deserialize)]
 pub enum MessageType {
+    KeyGenerationMessage(KeyGenerationMessageType),
+    BlockGenerationRoundMessages(BlockGenerationRoundMessageType),
+}
+
+/// # Key Generation Protocol Messages
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
+pub enum KeyGenerationMessageType {
+    Nodevss(VerifiableSS, FE),
+}
+
+/// # Round Messages
+/// These messages are used in block generation rounds.
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
+pub enum BlockGenerationRoundMessageType {
     Candidateblock(Block),
     Completedblock(Block),
-    Nodevss(VerifiableSS, FE),
     Blockvss(Hash, VerifiableSS, FE, VerifiableSS, FE),
     Blocksig(Hash, FE, FE),
     Roundfailure,
@@ -325,7 +339,9 @@ mod test {
         };
 
         let message = Message {
-            message_type: MessageType::Roundfailure,
+            message_type: MessageType::BlockGenerationRoundMessages(
+                BlockGenerationRoundMessageType::Roundfailure,
+            ),
             sender_id,
             receiver_id: None,
         };
@@ -353,14 +369,21 @@ mod test {
         };
 
         let message_processor = move |message: Message| {
-            assert_eq!(message.message_type, MessageType::Roundfailure);
+            assert_eq!(
+                message.message_type,
+                MessageType::BlockGenerationRoundMessages(
+                    BlockGenerationRoundMessageType::Roundfailure
+                )
+            );
             ControlFlow::Break(())
         };
 
         let subscriber = connection_manager.subscribe(message_processor, sender_id);
 
         let message = Message {
-            message_type: MessageType::Roundfailure,
+            message_type: MessageType::BlockGenerationRoundMessages(
+                BlockGenerationRoundMessageType::Roundfailure,
+            ),
             sender_id,
             receiver_id: None,
         };

@@ -7,7 +7,11 @@ mod node_parameters;
 mod utils;
 
 use crate::blockdata::Block;
-use crate::net::{ConnectionManager, Message, MessageType, SignerID};
+use crate::net::MessageType::{BlockGenerationRoundMessages, KeyGenerationMessage};
+use crate::net::{
+    BlockGenerationRoundMessageType, ConnectionManager, KeyGenerationMessageType, Message,
+    MessageType, SignerID,
+};
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use crate::sign::Sign;
 use crate::signer_node::message_processor::process_blocksig;
@@ -204,10 +208,23 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             // Receiving message.
             log::trace!("Receiving messages...");
             match receiver.try_recv() {
-                Ok(msg) => {
-                    log::debug!("Got new message: {:?}", msg);
-                    let next = self.process_message(msg);
-                    self.current_state = next;
+                Ok(Message {
+                    message_type,
+                    sender_id,
+                    ..
+                }) => {
+                    log::debug!("Got new message: {:?}", message_type);
+
+                    match message_type {
+                        KeyGenerationMessage(msg) => {
+                            self.process_key_generation_message(sender_id, msg);
+                        }
+                        BlockGenerationRoundMessages(msg) => {
+                            let next = self.process_round_message(sender_id, msg);
+                            self.current_state = next;
+                        }
+                    }
+
                     log::debug!("Current state updated as {:?}", self.current_state);
                 }
                 Err(TryRecvError::Empty) => log::trace!("Nothing new messages."),
@@ -291,7 +308,9 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             block.sighash()
         );
         self.connection_manager.broadcast_message(Message {
-            message_type: MessageType::Candidateblock(block.clone()),
+            message_type: MessageType::BlockGenerationRoundMessages(
+                BlockGenerationRoundMessageType::Candidateblock(block.clone()),
+            ),
             sender_id: self.params.signer_id,
             receiver_id: None,
         });
@@ -306,25 +325,38 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
-    pub fn process_message(&mut self, message: Message) -> NodeState {
-        match message.message_type {
-            MessageType::Candidateblock(block) => {
-                process_candidateblock(&message.sender_id, &block, self)
+    pub fn process_key_generation_message(
+        &mut self,
+        sender_id: SignerID,
+        message: KeyGenerationMessageType,
+    ) {
+        match message {
+            KeyGenerationMessageType::Nodevss(vss, secret_share) => {
+                process_nodevss(&sender_id, vss, secret_share, self);
             }
-            MessageType::Completedblock(block) => {
-                process_completedblock(&message.sender_id, &block, self)
+        }
+    }
+
+    pub fn process_round_message(
+        &mut self,
+        sender_id: SignerID,
+        message: BlockGenerationRoundMessageType,
+    ) -> NodeState {
+        match message {
+            BlockGenerationRoundMessageType::Candidateblock(block) => {
+                process_candidateblock(&sender_id, &block, self)
             }
-            MessageType::Nodevss(vss, secret_share) => {
-                process_nodevss(&message.sender_id, vss, secret_share, self)
+            BlockGenerationRoundMessageType::Completedblock(block) => {
+                process_completedblock(&sender_id, &block, self)
             }
-            MessageType::Blockvss(
+            BlockGenerationRoundMessageType::Blockvss(
                 blockhash,
                 vss_for_positive,
                 secret_share_for_positive,
                 vss_for_negative,
                 secret_share_for_negative,
             ) => process_blockvss(
-                &message.sender_id,
+                &sender_id,
                 blockhash,
                 vss_for_positive,
                 secret_share_for_positive,
@@ -332,10 +364,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 secret_share_for_negative,
                 self,
             ),
-            MessageType::Blocksig(blockhash, gamma_i, e) => {
-                process_blocksig(&message.sender_id, blockhash, gamma_i, e, self)
+            BlockGenerationRoundMessageType::Blocksig(blockhash, gamma_i, e) => {
+                process_blocksig(&sender_id, blockhash, gamma_i, e, self)
             }
-            MessageType::Roundfailure => self.process_roundfailure(&message.sender_id),
+            BlockGenerationRoundMessageType::Roundfailure => self.process_roundfailure(&sender_id),
         }
     }
 
@@ -415,7 +447,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
         for i in 0..self.params.pubkey_list.len() {
             self.connection_manager.send_message(Message {
-                message_type: MessageType::Nodevss(vss_scheme.clone(), secret_shares[i]),
+                message_type: MessageType::KeyGenerationMessage(KeyGenerationMessageType::Nodevss(
+                    vss_scheme.clone(),
+                    secret_shares[i],
+                )),
                 sender_id: self.params.signer_id,
                 receiver_id: Some(SignerID {
                     pubkey: self.params.pubkey_list[i],
@@ -447,12 +482,14 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         );
         for i in 0..self.params.pubkey_list.len() {
             self.connection_manager.send_message(Message {
-                message_type: MessageType::Blockvss(
-                    block.sighash(),
-                    vss_scheme.clone(),
-                    secret_shares[i],
-                    vss_scheme_for_negative.clone(),
-                    secret_shares_for_negative[i],
+                message_type: MessageType::BlockGenerationRoundMessages(
+                    BlockGenerationRoundMessageType::Blockvss(
+                        block.sighash(),
+                        vss_scheme.clone(),
+                        secret_shares[i],
+                        vss_scheme_for_negative.clone(),
+                        secret_shares_for_negative[i],
+                    ),
                 ),
                 sender_id: self.params.signer_id,
                 receiver_id: Some(SignerID {
@@ -483,7 +520,10 @@ mod tests {
 
     use redis::ControlFlow;
 
-    use crate::net::{ConnectionManager, ConnectionManagerError, Message, MessageType, SignerID};
+    use crate::net::{
+        BlockGenerationRoundMessageType, ConnectionManager, ConnectionManagerError, Message,
+        MessageType, SignerID,
+    };
     use crate::rpc::tests::{safety, safety_error, MockRpc, SafetyBlock};
     use crate::rpc::TapyrusApi;
     use crate::signer_node::message_processor::process_candidateblock;
@@ -705,7 +745,7 @@ mod tests {
         });
         let arc_block = safety(get_block(0));
         let (_node, stop_signal, broadcaster) = setup_node(assertion, arc_block);
-        let message_str = r#"{"message_type": {"Candidateblock": [0, 0, 0, 32, 237, 101, 140, 196, 6, 112, 204, 237, 162, 59, 176, 182, 20, 130, 31, 230, 212, 138, 65, 209, 7, 209, 159, 63, 58, 86, 8, 173, 61, 72, 48, 146, 177, 81, 22, 10, 183, 17, 51, 180, 40, 225, 246, 46, 174, 181, 152, 174, 133, 143, 246, 96, 23, 201, 150, 1, 242, 144, 136, 183, 198, 74, 72, 29, 98, 132, 225, 69, 210, 155, 112, 191, 84, 57, 45, 41, 112, 16, 49, 210, 175, 159, 237, 95, 155, 178, 31, 187, 40, 79, 167, 28, 235, 35, 143, 105, 166, 212, 9, 93, 0, 1, 2, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 3, 92, 1, 1, 255, 255, 255, 255, 2, 0, 242, 5, 42, 1, 0, 0, 0, 25, 118, 169, 20, 207, 18, 219, 192, 75, 176, 222, 111, 182, 168, 122, 90, 235, 75, 46, 116, 201, 112, 6, 178, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 38, 106, 36, 170, 33, 169, 237, 226, 246, 28, 63, 113, 209, 222, 253, 63, 169, 153, 223, 163, 105, 83, 117, 92, 105, 6, 137, 121, 153, 98, 180, 139, 235, 216, 54, 151, 78, 140, 249, 1, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },"sender_id": [3, 131, 26, 105, 184, 0, 152, 51, 171, 91, 3, 38, 1, 46, 175, 72, 155, 254, 163, 90, 115, 33, 177, 202, 21, 177, 29, 136, 19, 20, 35, 250, 252],"receiver_id": null}"#;
+        let message_str = r#"{"message_type": {"BlockGenerationRoundMessages": {"Candidateblock": [0, 0, 0, 32, 237, 101, 140, 196, 6, 112, 204, 237, 162, 59, 176, 182, 20, 130, 31, 230, 212, 138, 65, 209, 7, 209, 159, 63, 58, 86, 8, 173, 61, 72, 48, 146, 177, 81, 22, 10, 183, 17, 51, 180, 40, 225, 246, 46, 174, 181, 152, 174, 133, 143, 246, 96, 23, 201, 150, 1, 242, 144, 136, 183, 198, 74, 72, 29, 98, 132, 225, 69, 210, 155, 112, 191, 84, 57, 45, 41, 112, 16, 49, 210, 175, 159, 237, 95, 155, 178, 31, 187, 40, 79, 167, 28, 235, 35, 143, 105, 166, 212, 9, 93, 0, 1, 2, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 3, 92, 1, 1, 255, 255, 255, 255, 2, 0, 242, 5, 42, 1, 0, 0, 0, 25, 118, 169, 20, 207, 18, 219, 192, 75, 176, 222, 111, 182, 168, 122, 90, 235, 75, 46, 116, 201, 112, 6, 178, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 38, 106, 36, 170, 33, 169, 237, 226, 246, 28, 63, 113, 209, 222, 253, 63, 169, 153, 223, 163, 105, 83, 117, 92, 105, 6, 137, 121, 153, 98, 180, 139, 235, 216, 54, 151, 78, 140, 249, 1, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }},"sender_id": [3, 131, 26, 105, 184, 0, 152, 51, 171, 91, 3, 38, 1, 46, 175, 72, 155, 254, 163, 90, 115, 33, 177, 202, 21, 177, 29, 136, 19, 20, 35, 250, 252],"receiver_id": null}"#;
         let message = serde_json::from_str::<Message>(message_str).unwrap();
 
         broadcaster.send(message).unwrap();
@@ -713,7 +753,8 @@ mod tests {
         for _ in 0..5 {
             let broadcast_message1 = broadcast_r.recv().unwrap();
             let actual1 = format!("{:?}", &broadcast_message1.message_type);
-            assert!(actual1.starts_with("Nodevss"));
+            println!("{:?}", actual1);
+            assert!(actual1.starts_with("KeyGenerationMessage(Nodevss"));
         }
         //TODO: receive vss messages.
 
@@ -728,7 +769,7 @@ mod tests {
         });
         let arc_block = safety_error("invalid block!".to_string());
         let (_node, stop_signal, bloadcaster) = setup_node(spy, arc_block);
-        let message_str = r#"{"message_type": {"Candidateblock": [0, 0, 0, 32, 237, 101, 140, 196, 6, 112, 204, 237, 162, 59, 176, 182, 20, 130, 31, 230, 212, 138, 65, 209, 7, 209, 159, 63, 58, 86, 8, 173, 61, 72, 48, 146, 177, 81, 22, 10, 183, 17, 51, 180, 40, 225, 246, 46, 174, 181, 152, 174, 133, 143, 246, 96, 23, 201, 150, 1, 242, 144, 136, 183, 198, 74, 72, 29, 98, 132, 225, 69, 210, 155, 112, 191, 84, 57, 45, 41, 112, 16, 49, 210, 175, 159, 237, 95, 155, 178, 31, 187, 40, 79, 167, 28, 235, 35, 143, 105, 166, 212, 9, 93, 0, 1, 2, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 3, 92, 1, 1, 255, 255, 255, 255, 2, 0, 242, 5, 42, 1, 0, 0, 0, 25, 118, 169, 20, 207, 18, 219, 192, 75, 176, 222, 111, 182, 168, 122, 90, 235, 75, 46, 116, 201, 112, 6, 178, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 38, 106, 36, 170, 33, 169, 237, 226, 246, 28, 63, 113, 209, 222, 253, 63, 169, 153, 223, 163, 105, 83, 117, 92, 105, 6, 137, 121, 153, 98, 180, 139, 235, 216, 54, 151, 78, 140, 249, 1, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },"sender_id": [3, 131, 26, 105, 184, 0, 152, 51, 171, 91, 3, 38, 1, 46, 175, 72, 155, 254, 163, 90, 115, 33, 177, 202, 21, 177, 29, 136, 19, 20, 35, 250, 252],"receiver_id": null}"#;
+        let message_str = r#"{"message_type": {"BlockGenerationRoundMessages": {"Candidateblock": [0, 0, 0, 32, 237, 101, 140, 196, 6, 112, 204, 237, 162, 59, 176, 182, 20, 130, 31, 230, 212, 138, 65, 209, 7, 209, 159, 63, 58, 86, 8, 173, 61, 72, 48, 146, 177, 81, 22, 10, 183, 17, 51, 180, 40, 225, 246, 46, 174, 181, 152, 174, 133, 143, 246, 96, 23, 201, 150, 1, 242, 144, 136, 183, 198, 74, 72, 29, 98, 132, 225, 69, 210, 155, 112, 191, 84, 57, 45, 41, 112, 16, 49, 210, 175, 159, 237, 95, 155, 178, 31, 187, 40, 79, 167, 28, 235, 35, 143, 105, 166, 212, 9, 93, 0, 1, 2, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 3, 92, 1, 1, 255, 255, 255, 255, 2, 0, 242, 5, 42, 1, 0, 0, 0, 25, 118, 169, 20, 207, 18, 219, 192, 75, 176, 222, 111, 182, 168, 122, 90, 235, 75, 46, 116, 201, 112, 6, 178, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 38, 106, 36, 170, 33, 169, 237, 226, 246, 28, 63, 113, 209, 222, 253, 63, 169, 153, 223, 163, 105, 83, 117, 92, 105, 6, 137, 121, 153, 98, 180, 139, 235, 216, 54, 151, 78, 140, 249, 1, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }},"sender_id": [3, 131, 26, 105, 184, 0, 152, 51, 171, 91, 3, 38, 1, 46, 175, 72, 155, 254, 163, 90, 115, 33, 177, 202, 21, 177, 29, 136, 19, 20, 35, 250, 252],"receiver_id": null}"#;
         let message = serde_json::from_str::<Message>(message_str).unwrap();
 
         bloadcaster.send(message).unwrap();
@@ -737,7 +778,10 @@ mod tests {
                 m
                 @
                 Message {
-                    message_type: MessageType::Blockvss { .. },
+                    message_type:
+                        MessageType::BlockGenerationRoundMessages(
+                            BlockGenerationRoundMessageType::Blockvss { .. },
+                        ),
                     ..
                 } => assert!(
                     false,

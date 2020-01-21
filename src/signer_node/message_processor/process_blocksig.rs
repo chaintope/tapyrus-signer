@@ -1,6 +1,8 @@
 use crate::blockdata::hash::Hash;
 use crate::blockdata::Block;
-use crate::net::{ConnectionManager, Message, MessageType, SignerID};
+use crate::net::{
+    BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
+};
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
 use crate::signer_node::utils::sender_index;
@@ -118,7 +120,9 @@ where
                         // send completeblock message
                         log::info!("Broadcast CompletedBlock message. {:?}", new_block.hash());
                         let message = Message {
-                            message_type: MessageType::Completedblock(new_block),
+                            message_type: MessageType::BlockGenerationRoundMessages(
+                                BlockGenerationRoundMessageType::Completedblock(new_block),
+                            ),
                             sender_id: signer_node.params.signer_id.clone(),
                             receiver_id: None,
                         };

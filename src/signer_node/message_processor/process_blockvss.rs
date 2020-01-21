@@ -1,6 +1,8 @@
 use crate::blockdata::hash::Hash;
 use crate::blockdata::Block;
-use crate::net::{ConnectionManager, Message, MessageType, SignerID};
+use crate::net::{
+    BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
+};
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
 use crate::signer_node::ToSharedSecretMap;
@@ -185,10 +187,12 @@ where
         match result {
             Ok(local_sig) => {
                 signer_node.connection_manager.broadcast_message(Message {
-                    message_type: MessageType::Blocksig(
-                        block_opt.clone().unwrap().sighash(),
-                        local_sig.gamma_i,
-                        local_sig.e,
+                    message_type: MessageType::BlockGenerationRoundMessages(
+                        BlockGenerationRoundMessageType::Blocksig(
+                            block_opt.clone().unwrap().sighash(),
+                            local_sig.gamma_i,
+                            local_sig.e,
+                        ),
                     ),
                     sender_id: signer_node.params.signer_id,
                     receiver_id: None,

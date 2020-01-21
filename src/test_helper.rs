@@ -3,7 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 use crate::blockdata::Block;
-use crate::net::{Message, MessageType, SignerID};
+use crate::net::{BlockGenerationRoundMessageType, Message, MessageType, SignerID};
 use bitcoin::{PrivateKey, PublicKey};
 use std::str::FromStr;
 
@@ -20,7 +20,9 @@ pub fn enable_log(log_level: Option<log::Level>) {
 pub fn create_message() -> Message {
     let signer_id = SignerID::new(TestKeys::new().pubkeys()[0]);
     Message {
-        message_type: MessageType::Roundfailure,
+        message_type: MessageType::BlockGenerationRoundMessages(
+            BlockGenerationRoundMessageType::Roundfailure,
+        ),
         sender_id: signer_id,
         receiver_id: None,
     }
