@@ -42,7 +42,6 @@ pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     params: NodeParameters<T>,
     current_state: NodeState,
     stop_signal: Option<Receiver<u32>>,
-    master_index: usize,
     /// ## Round Timer
     /// If the round duration is over, notify it and go through next round.
     ///
@@ -122,6 +121,7 @@ pub enum NodeState {
         shared_block_secrets: BidirectionalSharedSecretMap,
         block_shared_keys: Option<(bool, FE, GE)>,
         candidate_block: Option<Block>,
+        master_index: usize,
     },
 }
 
@@ -136,7 +136,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             params,
             current_state: NodeState::Joining,
             stop_signal: None,
-            master_index: 0,
             round_timer: RoundTimeOutObserver::new("round_timer", timer_limit),
             priv_shared_keys: None,
             shared_secrets: BTreeMap::new(),
@@ -175,7 +174,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
         // Start First Round
         log::info!("Start block creation rounds.");
-        self.current_state = self.start_next_round(true);
+        self.current_state = self.start_next_round();
 
         // get error_handler that is for catch error within connection_manager.
         let connection_manager_error_handler = self.connection_manager.error_handler();
@@ -237,7 +236,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 Ok(_) => {
                     // Round timeout. force round robin master node.
                     log::trace!("Round duration is timeout. Starting next round...");
-                    self.current_state = self.start_next_round(false);
+                    self.current_state = self.start_next_round();
                     log::debug!("Current state updated as {:?}", self.current_state);
                 }
                 Err(TryRecvError::Empty) => {
@@ -372,44 +371,56 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     }
 
     fn is_master(&self, sender_id: &SignerID) -> bool {
-        let master_id = self.params.pubkey_list[self.master_index];
-        master_id == sender_id.pubkey
+        match &self.current_state {
+            NodeState::Joining => false,
+            NodeState::Master { .. } => self.params.signer_id == *sender_id,
+            NodeState::Member { master_index, .. } => {
+                let master_id = self.params.pubkey_list[*master_index];
+                master_id == sender_id.pubkey
+            }
+        }
+    }
+
+    fn master_index(&self) -> Option<usize> {
+        match &self.current_state {
+            NodeState::Joining => None,
+            NodeState::Master { .. } => Some(self.params.self_node_index),
+            NodeState::Member { master_index, .. } => Some(*master_index),
+        }
+    }
+
+    fn next_master_index(&self) -> usize {
+        let next = match &self.current_state {
+            NodeState::Joining => 0,
+            NodeState::Master { .. } => self.params.self_node_index + 1,
+            NodeState::Member { master_index, .. } => master_index + 1,
+        };
+
+        next % self.params.pubkey_list.len()
     }
 
     /// Start next round.
     /// decide master of next round according to Round-robin.
-    fn start_next_round(&mut self, first_round: bool) -> NodeState {
+    fn start_next_round(&mut self) -> NodeState {
         self.round_timer.restart().unwrap();
+        let next_master_index = self.next_master_index();
+        log::info!(
+            "Start next round: self_index={}, master_index={}",
+            self.params.self_node_index,
+            next_master_index,
+        );
 
-        let next_index = if first_round {
-            self.master_index
-        } else {
-            (self.master_index + 1) % self.params.pubkey_list.len()
-        };
-
-        self.master_index = next_index;
-        let next_state = if self.params.self_node_index == next_index {
-            log::info!(
-                "Start next round as Master (my index: {}, master index: {})",
-                self.params.self_node_index,
-                self.master_index
-            );
-            // self node is master.
+        if self.params.self_node_index == next_master_index {
             self.start_new_round()
         } else {
-            log::info!(
-                "Start next round as Member (my index: {}, master index: {})",
-                self.params.self_node_index,
-                self.master_index
-            );
             NodeState::Member {
                 block_key: None,
                 block_shared_keys: None,
                 shared_block_secrets: BidirectionalSharedSecretMap::new(),
                 candidate_block: None,
+                master_index: next_master_index,
             }
-        };
-        next_state
+        }
     }
 
     fn process_roundfailure(&self, _sender_id: &SignerID) -> NodeState {
@@ -795,6 +806,20 @@ mod tests {
         stop_signal.send(1).unwrap(); // this line not necessary, but for manners.
     }
 
+    /// When a node's state is Member, the node receives candidateblock message from the other
+    /// node who are not assumed as a master of the round, the node change the assumption to
+    /// that the other node is master.
+    ///
+    /// The test scenario is below.
+    ///
+    /// *premise:*
+    /// * The node's status is Member and its index is 4.
+    /// * The round master's index is 0.
+    ///
+    /// 1. Send candidateblock message from index 0 node(array index is 1).
+    ///    It must not change master_index assumption.
+    /// 2. Send candidateblock message from index 4 node(array index is 0).
+    ///    It must change master_index assumption to 4.
     #[test]
     fn test_modify_master_index() {
         let initial_state = NodeState::Member {
@@ -802,6 +827,7 @@ mod tests {
             block_shared_keys: None,
             shared_block_secrets: BidirectionalSharedSecretMap::new(),
             candidate_block: None,
+            master_index: 0,
         };
         let arc_block = safety(get_block(0));
         let rpc = MockRpc {
@@ -809,20 +835,18 @@ mod tests {
         };
         let mut node = create_node(initial_state, rpc);
 
-        // pubkeys sorted index map;
-        // 0 -> 4
-        // 1 -> 0
-        // 2 -> 3
-        // 3 -> 2
-        // 4 -> 1
-        let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
-        assert_eq!(node.master_index, 0); // in begin, master_index is 0.
-        let _next_state = process_candidateblock(&sender_id, &get_block(0), &mut node);
-        assert_eq!(node.master_index, 0);
+        // Check premise. master_index is 0.
+        assert_eq!(node.master_index().unwrap(), 0);
 
+        // Step 1.
+        let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
+        node.current_state = process_candidateblock(&sender_id, &get_block(0), &mut node);
+        assert_eq!(node.master_index().unwrap(), 0);
+
+        // Step 2.
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
-        let _next_state = process_candidateblock(&sender_id, &get_block(0), &mut node);
-        assert_eq!(node.master_index, 4);
+        node.current_state = process_candidateblock(&sender_id, &get_block(0), &mut node);
+        assert_eq!(node.master_index().unwrap(), 4);
 
         node.round_timer.stop();
     }
@@ -831,12 +855,7 @@ mod tests {
     fn test_timeout_roundrobin() {
         enable_log(None);
         let closure: SpyMethod = Box::new(move |_message: Arc<Message>| {});
-        let initial_state = NodeState::Member {
-            block_key: None,
-            block_shared_keys: None,
-            shared_block_secrets: BidirectionalSharedSecretMap::new(),
-            candidate_block: None,
-        };
+        let initial_state = NodeState::Joining;
         let arc_block = safety(get_block(0));
         let rpc = MockRpc {
             return_block: arc_block.clone(),
@@ -847,7 +866,6 @@ mod tests {
         let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
         node.stop_handler(stop_handler);
 
-        assert_eq!(node.master_index, 0 as usize);
         let ss = stop_signal.clone();
         thread::spawn(move || {
             thread::sleep(Duration::from_secs(16)); // 16s = 1 round (10s) + idle time(5s) + 1s
@@ -855,7 +873,7 @@ mod tests {
         });
         node.start();
 
-        assert_eq!(node.master_index, 1 as usize);
+        assert_eq!(node.master_index().unwrap(), 1 as usize);
     }
 
     #[test]
@@ -865,6 +883,7 @@ mod tests {
             block_shared_keys: None,
             shared_block_secrets: BidirectionalSharedSecretMap::new(),
             candidate_block: None,
+            master_index: 0,
         };
         let arc_block = safety(get_block(0));
         let rpc = MockRpc {
@@ -879,30 +898,42 @@ mod tests {
         // 3 -> 2
         // 4 -> 1
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
-        assert_eq!(node.master_index, 0); // in begin, master_index is 0.
-        let next_state = process_completedblock(&sender_id, &get_block(0), &mut node);
-        assert_eq!(node.master_index, 1); // should incremented.
-        match next_state {
+        assert_eq!(node.master_index().unwrap(), 0); // in begin, master_index is 0.
+        node.current_state = process_completedblock(&sender_id, &get_block(0), &mut node);
+        assert_eq!(node.master_index().unwrap(), 1); // should incremented.
+        match &node.current_state {
             NodeState::Member { .. } => assert!(true),
-            n => panic!("Should be Member, but state:{:?}", n),
+            n => assert!(false, "Should be Member, but state:{:?}", n),
         }
 
-        node.master_index = 4;
+        node.current_state = NodeState::Member {
+            block_key: None,
+            block_shared_keys: None,
+            shared_block_secrets: BidirectionalSharedSecretMap::new(),
+            candidate_block: None,
+            master_index: 4,
+        };
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
-        let next_state = process_completedblock(&sender_id, &get_block(0), &mut node);
-        assert_eq!(node.master_index, 0); // wrap back to 0.
-        match next_state {
+        node.current_state = process_completedblock(&sender_id, &get_block(0), &mut node);
+        assert_eq!(node.master_index().unwrap(), 0); // wrap back to 0.
+        match &node.current_state {
             NodeState::Member { .. } => assert!(true),
-            n => panic!("Should be Member, but state:{:?}", n),
+            n => assert!(false, "Should be Member, but state:{:?}", n),
         }
 
-        node.master_index = 3;
+        node.current_state = NodeState::Member {
+            block_key: None,
+            block_shared_keys: None,
+            shared_block_secrets: BidirectionalSharedSecretMap::new(),
+            candidate_block: None,
+            master_index: 3,
+        };
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[2]);
-        let next_state = process_completedblock(&sender_id, &get_block(0), &mut node);
-        assert_eq!(node.master_index, 4); // wrap back to 0.
-        match next_state {
+        node.current_state = process_completedblock(&sender_id, &get_block(0), &mut node);
+        assert_eq!(node.master_index().unwrap(), 4); // wrap back to 0.
+        match &node.current_state {
             NodeState::Master { .. } => {}
-            n => panic!("Should be Master, but state:{:?}", n),
+            n => assert!(false, "Should be Master, but state:{:?}", n),
         }
     }
 
@@ -913,6 +944,7 @@ mod tests {
             block_shared_keys: None,
             shared_block_secrets: BidirectionalSharedSecretMap::new(),
             candidate_block: None,
+            master_index: 0,
         };
         let arc_block = safety(get_block(0));
         let rpc = MockRpc {
@@ -927,9 +959,9 @@ mod tests {
         // 3 -> 2
         // 4 -> 1
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
-        assert_eq!(node.master_index, 0); // in begin, master_index is 0.
+        assert_eq!(node.master_index().unwrap(), 0); // in begin, master_index is 0.
         let next_state = process_completedblock(&sender_id, &get_block(0), &mut node);
-        assert_eq!(node.master_index, 0); // should not incremented if not recorded master.
+        assert_eq!(node.master_index().unwrap(), 0); // should not incremented if not recorded master.
         match next_state {
             NodeState::Member { .. } => assert!(true),
             n => panic!("Should be Member, but state:{:?}", n),
@@ -948,17 +980,21 @@ mod tests {
                 block_shared_keys: None,
                 shared_block_secrets: BidirectionalSharedSecretMap::new(),
                 candidate_block: None,
+                master_index: 0,
             },
             rpc,
         );
 
-        assert_eq!(node.master_index, 0);
+        assert_eq!(node.master_index().unwrap(), 0);
 
-        node.start_next_round(true);
-        assert_eq!(node.master_index, 0);
+        node.current_state = node.start_next_round();
+        assert_eq!(node.master_index().unwrap(), 1);
 
-        node.start_next_round(false);
-        assert_eq!(node.master_index, 1);
+        // When the state is Joining, next round should be started as first round, so that,
+        // the master index is 0.
+        node.current_state = NodeState::Joining;
+        node.current_state = node.start_next_round();
+        assert_eq!(node.master_index().unwrap(), 0);
     }
 
     mod test_for_waiting_ibd_finish {
@@ -1015,6 +1051,7 @@ mod tests {
                     block_shared_keys: None,
                     shared_block_secrets: BidirectionalSharedSecretMap::new(),
                     candidate_block: None,
+                    master_index: 0,
                 },
                 rpc,
             );

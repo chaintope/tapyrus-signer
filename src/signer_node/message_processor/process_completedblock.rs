@@ -13,7 +13,7 @@ where
     C: ConnectionManager,
 {
     if signer_node.is_master(sender_id) {
-        signer_node.start_next_round(false)
+        signer_node.start_next_round()
     } else {
         signer_node.current_state.clone()
     }

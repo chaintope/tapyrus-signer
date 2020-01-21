@@ -22,12 +22,11 @@ where
         NodeState::Member {
             shared_block_secrets,
             block_shared_keys,
+            master_index,
             ..
         } => {
             match signer_node.params.rpc.testproposedblock(&block) {
                 Ok(_) => {
-                    signer_node.master_index =
-                        sender_index(sender_id, &signer_node.params.pubkey_list);
                     let key = signer_node.create_block_vss(block.clone());
                     // TODO: Errorを処理する必要あるかな？
                     NodeState::Member {
@@ -35,6 +34,7 @@ where
                         shared_block_secrets: shared_block_secrets.clone(),
                         block_shared_keys: block_shared_keys.clone(),
                         candidate_block: Some(block.clone()),
+                        master_index: sender_index(sender_id, &signer_node.params.pubkey_list),
                     }
                 }
                 Err(_e) => {
@@ -44,6 +44,7 @@ where
                         shared_block_secrets: shared_block_secrets.clone(),
                         block_shared_keys: block_shared_keys.clone(),
                         candidate_block: Some(block.clone()),
+                        master_index: *master_index,
                     }
                 }
             }

@@ -127,6 +127,13 @@ impl TestKeys {
         // ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e -p=02d111519ba1f3013a7a613ecdcc17f4d53fbcb558b70404b5fb0c84ebb90a8d3c -p=02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506 --privatekey=cTJoBBwQbcY3Y789SxNMy9d4EJovpMBrf4RBbizuJXFokQCAxyqq -t 3 --rpcport=12381 --rpcuser=user --rpcpass=pass
         // ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e -p=02d111519ba1f3013a7a613ecdcc17f4d53fbcb558b70404b5fb0c84ebb90a8d3c -p=02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506 --privatekey=cV3NmyH9j6hihac1omKENYVUaa7UFAyvSj7A7GMrp5WYgfv3W5fN -t 3 --rpcport=12381 --rpcuser=user --rpcpass=pass
 
+        // TestKeys Array index and publickey dictionary order mapping is below
+        // array index -> ordered index
+        //      0      ->     4
+        //      1      ->     0
+        //      2      ->     3
+        //      3      ->     2
+        //      4      ->     1
         let key: [PrivateKey; 5] = [
             PrivateKey::from_wif("cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA").unwrap(),
             PrivateKey::from_wif("cTRkG8i8PP7imvryqQwcYm787WHRdMmUqBvi1Z456gHvVoKnJ9TK").unwrap(),

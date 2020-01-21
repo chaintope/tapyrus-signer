@@ -75,6 +75,7 @@ where
             block_key,
             shared_block_secrets,
             candidate_block,
+            master_index,
             ..
         } => {
             let mut new_shared_block_secrets = shared_block_secrets.clone();
@@ -100,12 +101,14 @@ where
                     shared_block_secrets: new_shared_block_secrets,
                     block_shared_keys: Some((keys.0, keys.1.x_i, keys.1.y)),
                     candidate_block: candidate_block.clone(),
+                    master_index: *master_index,
                 },
                 None => NodeState::Member {
                     block_key: block_key.clone(),
                     shared_block_secrets: new_shared_block_secrets,
                     block_shared_keys: None,
                     candidate_block: candidate_block.clone(),
+                    master_index: *master_index,
                 },
             }
         }
