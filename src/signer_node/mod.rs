@@ -122,6 +122,10 @@ pub enum NodeState {
         candidate_block: Option<Block>,
         master_index: usize,
     },
+    RoundComplete {
+        master_index: usize,
+        next_master_index: usize,
+    },
 }
 
 impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
@@ -173,7 +177,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
         // Start First Round
         log::info!("Start block creation rounds.");
-        self.current_state = self.start_next_round();
+        self.start_next_round(0);
 
         // get error_handler that is for catch error within connection_manager.
         let connection_manager_error_handler = self.connection_manager.error_handler();
@@ -220,6 +224,14 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         BlockGenerationRoundMessages(msg) => {
                             let next = self.process_round_message(&sender_id, msg);
                             self.current_state = next;
+
+                            if let NodeState::RoundComplete {
+                                next_master_index, ..
+                            } = &self.current_state
+                            {
+                                let v = *next_master_index;
+                                self.start_next_round(v)
+                            }
                         }
                     }
 
@@ -235,7 +247,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 Ok(_) => {
                     // Round timeout. force round robin master node.
                     log::trace!("Round duration is timeout. Starting next round...");
-                    self.current_state = self.start_next_round();
+                    let next_master_index = next_master_index(&self.current_state, &self.params);
+                    self.start_next_round(next_master_index);
                     log::debug!("Current state updated as {:?}", self.current_state);
                 }
                 Err(TryRecvError::Empty) => {
@@ -349,7 +362,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 &self.params,
             ),
             BlockGenerationRoundMessageType::Completedblock(block) => {
-                process_completedblock(&sender_id, &block, self)
+                process_completedblock(&sender_id, &block, &self.current_state, &self.params)
             }
             BlockGenerationRoundMessageType::Blockvss(
                 blockhash,
@@ -373,40 +386,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
-    fn is_master(&self, sender_id: &SignerID) -> bool {
-        match &self.current_state {
-            NodeState::Joining => false,
-            NodeState::Master { .. } => self.params.signer_id == *sender_id,
-            NodeState::Member { master_index, .. } => {
-                let master_id = self.params.pubkey_list[*master_index];
-                master_id == sender_id.pubkey
-            }
-        }
-    }
-
-    fn master_index(&self) -> Option<usize> {
-        match &self.current_state {
-            NodeState::Joining => None,
-            NodeState::Master { .. } => Some(self.params.self_node_index),
-            NodeState::Member { master_index, .. } => Some(*master_index),
-        }
-    }
-
-    fn next_master_index(&self) -> usize {
-        let next = match &self.current_state {
-            NodeState::Joining => 0,
-            NodeState::Master { .. } => self.params.self_node_index + 1,
-            NodeState::Member { master_index, .. } => master_index + 1,
-        };
-
-        next % self.params.pubkey_list.len()
-    }
-
     /// Start next round.
     /// decide master of next round according to Round-robin.
-    fn start_next_round(&mut self) -> NodeState {
+    fn start_next_round(&mut self, next_master_index: usize) {
         self.round_timer.restart().unwrap();
-        let next_master_index = self.next_master_index();
+
         log::info!(
             "Start next round: self_index={}, master_index={}",
             self.params.self_node_index,
@@ -414,15 +398,15 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         );
 
         if self.params.self_node_index == next_master_index {
-            self.start_new_round()
+            self.current_state = self.start_new_round();
         } else {
-            NodeState::Member {
+            self.current_state = NodeState::Member {
                 block_key: None,
                 block_shared_keys: None,
                 shared_block_secrets: BidirectionalSharedSecretMap::new(),
                 candidate_block: None,
                 master_index: next_master_index,
-            }
+            };
         }
     }
 
@@ -474,6 +458,48 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     }
 }
 
+pub fn master_index<T>(state: &NodeState, params: &NodeParameters<T>) -> Option<usize>
+where
+    T: TapyrusApi,
+{
+    match state {
+        NodeState::Master { .. } => Some(params.self_node_index),
+        NodeState::Member { master_index, .. } => Some(*master_index),
+        NodeState::RoundComplete { master_index, .. } => Some(*master_index),
+        _ => None,
+    }
+}
+
+pub fn next_master_index<T>(state: &NodeState, params: &NodeParameters<T>) -> usize
+where
+    T: TapyrusApi,
+{
+    let next = match state {
+        NodeState::Joining => 0,
+        NodeState::Master { .. } => params.self_node_index + 1,
+        NodeState::Member { master_index, .. } => master_index + 1,
+        NodeState::RoundComplete {
+            next_master_index, ..
+        } => *next_master_index,
+    };
+
+    next % params.pubkey_list.len()
+}
+
+pub fn is_master<T>(sender_id: &SignerID, state: &NodeState, params: &NodeParameters<T>) -> bool
+where
+    T: TapyrusApi,
+{
+    match state {
+        NodeState::Master { .. } => params.signer_id == *sender_id,
+        NodeState::Member { master_index, .. } => {
+            let master_id = params.pubkey_list[*master_index];
+            master_id == sender_id.pubkey
+        }
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::mpsc::{channel, Receiver, Sender};
@@ -492,7 +518,10 @@ mod tests {
     use crate::rpc::TapyrusApi;
     use crate::signer_node::message_processor::process_candidateblock;
     use crate::signer_node::message_processor::process_completedblock;
-    use crate::signer_node::{BidirectionalSharedSecretMap, NodeParameters, NodeState, SignerNode};
+    use crate::signer_node::{
+        master_index, next_master_index, BidirectionalSharedSecretMap, NodeParameters, NodeState,
+        SignerNode,
+    };
     use crate::test_helper::{enable_log, get_block, TestKeys};
     use bitcoin::{Address, PrivateKey};
 
@@ -789,7 +818,7 @@ mod tests {
         let mut node = create_node(initial_state, rpc);
 
         // Check premise. master_index is 0.
-        assert_eq!(node.master_index().unwrap(), 0);
+        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
 
         // Step 1.
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
@@ -800,7 +829,7 @@ mod tests {
             &node.connection_manager,
             &node.params,
         );
-        assert_eq!(node.master_index().unwrap(), 0);
+        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
 
         // Step 2.
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
@@ -811,7 +840,7 @@ mod tests {
             &node.connection_manager,
             &node.params,
         );
-        assert_eq!(node.master_index().unwrap(), 4);
+        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 4);
 
         node.round_timer.stop();
     }
@@ -838,7 +867,10 @@ mod tests {
         });
         node.start();
 
-        assert_eq!(node.master_index().unwrap(), 1 as usize);
+        assert_eq!(
+            master_index(&node.current_state, &node.params).unwrap(),
+            1 as usize
+        );
     }
 
     #[test]
@@ -856,21 +888,22 @@ mod tests {
         };
         let mut node = create_node(initial_state, rpc);
 
-        // pubkeys sorted index map;
-        // 0 -> 4
-        // 1 -> 0
-        // 2 -> 3
-        // 3 -> 2
-        // 4 -> 1
+        // check 1, next_master_index should be incremented after process completeblock message.
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
-        assert_eq!(node.master_index().unwrap(), 0); // in begin, master_index is 0.
-        node.current_state = process_completedblock(&sender_id, &get_block(0), &mut node);
-        assert_eq!(node.master_index().unwrap(), 1); // should incremented.
+        // in begin, master_index is 0.
+        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
+
+        node.current_state =
+            process_completedblock(&sender_id, &get_block(0), &node.current_state, &node.params);
+
         match &node.current_state {
-            NodeState::Member { .. } => assert!(true),
+            NodeState::RoundComplete {
+                next_master_index, ..
+            } => assert_eq!(*next_master_index, 1),
             n => assert!(false, "Should be Member, but state:{:?}", n),
         }
 
+        // check 2, next master index should be back to 0 if the previous master index is the last number.
         node.current_state = NodeState::Member {
             block_key: None,
             block_shared_keys: None,
@@ -879,26 +912,14 @@ mod tests {
             master_index: 4,
         };
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
-        node.current_state = process_completedblock(&sender_id, &get_block(0), &mut node);
-        assert_eq!(node.master_index().unwrap(), 0); // wrap back to 0.
-        match &node.current_state {
-            NodeState::Member { .. } => assert!(true),
-            n => assert!(false, "Should be Member, but state:{:?}", n),
-        }
+        node.current_state =
+            process_completedblock(&sender_id, &get_block(0), &node.current_state, &node.params);
 
-        node.current_state = NodeState::Member {
-            block_key: None,
-            block_shared_keys: None,
-            shared_block_secrets: BidirectionalSharedSecretMap::new(),
-            candidate_block: None,
-            master_index: 3,
-        };
-        let sender_id = SignerID::new(TestKeys::new().pubkeys()[2]);
-        node.current_state = process_completedblock(&sender_id, &get_block(0), &mut node);
-        assert_eq!(node.master_index().unwrap(), 4); // wrap back to 0.
         match &node.current_state {
-            NodeState::Master { .. } => {}
-            n => assert!(false, "Should be Master, but state:{:?}", n),
+            NodeState::RoundComplete {
+                next_master_index, ..
+            } => assert_eq!(*next_master_index, 0),
+            n => assert!(false, "Should be Member, but state:{:?}", n),
         }
     }
 
@@ -915,7 +936,7 @@ mod tests {
         let rpc = MockRpc {
             return_block: arc_block.clone(),
         };
-        let mut node = create_node(initial_state, rpc);
+        let node = create_node(initial_state, rpc);
 
         // pubkeys sorted index map;
         // 0 -> 4
@@ -924,9 +945,10 @@ mod tests {
         // 3 -> 2
         // 4 -> 1
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
-        assert_eq!(node.master_index().unwrap(), 0); // in begin, master_index is 0.
-        let next_state = process_completedblock(&sender_id, &get_block(0), &mut node);
-        assert_eq!(node.master_index().unwrap(), 0); // should not incremented if not recorded master.
+        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0); // in begin, master_index is 0.
+        let next_state =
+            process_completedblock(&sender_id, &get_block(0), &node.current_state, &node.params);
+        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0); // should not incremented if not recorded master.
         match next_state {
             NodeState::Member { .. } => assert!(true),
             n => panic!("Should be Member, but state:{:?}", n),
@@ -950,16 +972,16 @@ mod tests {
             rpc,
         );
 
-        assert_eq!(node.master_index().unwrap(), 0);
+        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
 
-        node.current_state = node.start_next_round();
-        assert_eq!(node.master_index().unwrap(), 1);
+        node.start_next_round(next_master_index(&node.current_state, &node.params));
+        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 1);
 
         // When the state is Joining, next round should be started as first round, so that,
         // the master index is 0.
         node.current_state = NodeState::Joining;
-        node.current_state = node.start_next_round();
-        assert_eq!(node.master_index().unwrap(), 0);
+        node.start_next_round(next_master_index(&node.current_state, &node.params));
+        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
     }
 
     mod test_for_waiting_ibd_finish {
