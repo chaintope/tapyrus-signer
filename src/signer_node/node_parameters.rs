@@ -2,6 +2,8 @@ use super::utils::sender_index;
 use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
 use bitcoin::{Address, PrivateKey, PublicKey};
+use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::Parameters;
+use std::convert::TryInto;
 use std::sync::Arc;
 
 pub struct NodeParameters<T: TapyrusApi> {
@@ -45,6 +47,15 @@ impl<T: TapyrusApi> NodeParameters<T> {
             self_node_index,
             round_duration,
             skip_waiting_ibd,
+        }
+    }
+
+    pub fn sharing_params(&self) -> Parameters {
+        let t = (self.threshold - 1 as u8).try_into().unwrap();
+        let n: usize = (self.pubkey_list.len() as u8).try_into().unwrap();
+        Parameters {
+            threshold: t,
+            share_count: n.clone(),
         }
     }
 }

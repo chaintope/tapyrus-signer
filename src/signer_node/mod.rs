@@ -23,12 +23,11 @@ use crate::timer::RoundTimeOutObserver;
 use crate::util::*;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::*;
-use curv::{BigInt, FE, GE};
+use curv::{FE, GE};
 use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
 pub use node_parameters::NodeParameters;
 use redis::ControlFlow;
 use std::collections::BTreeMap;
-use std::convert::TryInto;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::time::Duration;
 
@@ -342,9 +341,13 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         message: BlockGenerationRoundMessageType,
     ) -> NodeState {
         match message {
-            BlockGenerationRoundMessageType::Candidateblock(block) => {
-                process_candidateblock(&sender_id, &block, self)
-            }
+            BlockGenerationRoundMessageType::Candidateblock(block) => process_candidateblock(
+                &sender_id,
+                &block,
+                &self.current_state,
+                &self.connection_manager,
+                &self.params,
+            ),
             BlockGenerationRoundMessageType::Completedblock(block) => {
                 process_completedblock(&sender_id, &block, self)
             }
@@ -428,7 +431,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     }
 
     fn create_node_share(&mut self) {
-        let params = self.sharing_params();
+        let params = self.params.sharing_params();
         let key = Sign::create_key(
             self.params.self_node_index + 1,
             Sign::private_key_to_big_int(self.params.private_key.key),
@@ -467,56 +470,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     pubkey: self.params.pubkey_list[i],
                 }),
             });
-        }
-    }
-
-    fn create_block_vss(&self, block: Block) -> Keys {
-        let params = self.sharing_params();
-        let key = Sign::create_key(self.params.self_node_index + 1, None);
-
-        let parties = (0..params.share_count)
-            .map(|i| i + 1)
-            .collect::<Vec<usize>>();
-
-        let (vss_scheme, secret_shares) = VerifiableSS::share_at_indices(
-            params.threshold,
-            params.share_count,
-            &key.u_i,
-            &parties,
-        );
-        let order: BigInt = FE::q();
-        let (vss_scheme_for_negative, secret_shares_for_negative) = VerifiableSS::share_at_indices(
-            params.threshold,
-            params.share_count,
-            &(ECScalar::from(&(order - key.u_i.to_big_int()))),
-            &parties,
-        );
-        for i in 0..self.params.pubkey_list.len() {
-            self.connection_manager.send_message(Message {
-                message_type: MessageType::BlockGenerationRoundMessages(
-                    BlockGenerationRoundMessageType::Blockvss(
-                        block.sighash(),
-                        vss_scheme.clone(),
-                        secret_shares[i],
-                        vss_scheme_for_negative.clone(),
-                        secret_shares_for_negative[i],
-                    ),
-                ),
-                sender_id: self.params.signer_id,
-                receiver_id: Some(SignerID {
-                    pubkey: self.params.pubkey_list[i],
-                }),
-            });
-        }
-        key
-    }
-
-    fn sharing_params(&self) -> Parameters {
-        let t = (self.params.threshold - 1 as u8).try_into().unwrap();
-        let n: usize = (self.params.pubkey_list.len() as u8).try_into().unwrap();
-        Parameters {
-            threshold: t,
-            share_count: n.clone(),
         }
     }
 }
@@ -840,12 +793,24 @@ mod tests {
 
         // Step 1.
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
-        node.current_state = process_candidateblock(&sender_id, &get_block(0), &mut node);
+        node.current_state = process_candidateblock(
+            &sender_id,
+            &get_block(0),
+            &node.current_state,
+            &node.connection_manager,
+            &node.params,
+        );
         assert_eq!(node.master_index().unwrap(), 0);
 
         // Step 2.
         let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
-        node.current_state = process_candidateblock(&sender_id, &get_block(0), &mut node);
+        node.current_state = process_candidateblock(
+            &sender_id,
+            &get_block(0),
+            &node.current_state,
+            &node.connection_manager,
+            &node.params,
+        );
         assert_eq!(node.master_index().unwrap(), 4);
 
         node.round_timer.stop();

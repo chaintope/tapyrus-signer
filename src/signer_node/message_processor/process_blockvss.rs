@@ -125,7 +125,7 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
-    let params = signer_node.sharing_params();
+    let params = signer_node.params.sharing_params();
     log::trace!(
         "number of shared_block_secrets: {:?}",
         shared_block_secrets.len()

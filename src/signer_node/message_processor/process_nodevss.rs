@@ -15,7 +15,7 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
-    let params = signer_node.sharing_params();
+    let params = signer_node.params.sharing_params();
 
     signer_node.shared_secrets.insert(
         sender_id.clone(),
