@@ -6,25 +6,29 @@ use crate::net::{
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
 use crate::signer_node::utils::sender_index;
-use crate::signer_node::ToSharedSecretMap;
+use crate::signer_node::NodeState;
 use crate::signer_node::ToVerifiableSS;
-use crate::signer_node::{NodeState, SignerNode};
+use crate::signer_node::{NodeParameters, SharedSecretMap, ToSharedSecretMap};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::FE;
-use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::LocalSig;
+use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::{LocalSig, SharedKeys};
 
 pub fn process_blocksig<T, C>(
     sender_id: &SignerID,
     blockhash: Hash,
     gamma_i: FE,
     e: FE,
-    signer_node: &mut SignerNode<T, C>,
+    priv_shared_keys: &SharedKeys,
+    shared_secrets: &SharedSecretMap,
+    prev_state: &NodeState,
+    conman: &C,
+    params: &NodeParameters<T>,
 ) -> NodeState
 where
     T: TapyrusApi,
     C: ConnectionManager,
 {
-    match &signer_node.current_state {
+    match prev_state {
         NodeState::Master {
             block_key,
             block_shared_keys,
@@ -38,24 +42,24 @@ where
             log::trace!(
                 "number of signatures: {:?} (threshold: {:?})",
                 new_signatures.len(),
-                signer_node.params.threshold
+                params.threshold
             );
             if candidate_block.sighash() != blockhash {
                 log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", candidate_block.sighash(), blockhash);
-                return signer_node.current_state.clone();
+                return prev_state.clone();
             }
 
-            if new_signatures.len() >= signer_node.params.threshold as usize {
+            if new_signatures.len() >= params.threshold as usize {
                 if block_shared_keys.is_none() {
                     log::error!("key is not shared.");
-                    return signer_node.current_state.clone();
+                    return prev_state.clone();
                 }
 
                 let parties = new_signatures
                     .keys()
-                    .map(|k| sender_index(k, &signer_node.params.pubkey_list))
+                    .map(|k| sender_index(k, &params.pubkey_list))
                     .collect::<Vec<usize>>();
-                let key_gen_vss_vec: Vec<VerifiableSS> = signer_node.shared_secrets.to_vss();
+                let key_gen_vss_vec: Vec<VerifiableSS> = shared_secrets.to_vss();
                 let local_sigs: Vec<LocalSig> = new_signatures
                     .values()
                     .map(|s| LocalSig {
@@ -83,7 +87,7 @@ where
                             &parties[..],
                             block_shared_keys.unwrap().2,
                         );
-                        let public_key = signer_node.priv_shared_keys.clone().unwrap().y;
+                        let public_key = priv_shared_keys.y;
                         let hash = candidate_block.sighash().into_inner();
                         match signature.verify(&hash, &public_key) {
                             Ok(_) => Ok(signature),
@@ -92,7 +96,7 @@ where
                     }
                     Err(_) => {
                         log::error!("local signature is invalid.");
-                        return signer_node.current_state.clone();
+                        return prev_state.clone();
                     }
                 };
                 let result = match verification {
@@ -100,14 +104,14 @@ where
                         let sig_hex = Sign::format_signature(&signature);
                         let new_block: Block =
                             candidate_block.add_proof(hex::decode(sig_hex).unwrap());
-                        match signer_node.params.rpc.submitblock(&new_block) {
+                        match params.rpc.submitblock(&new_block) {
                             Ok(_) => Ok(new_block),
                             Err(e) => Err(e),
                         }
                     }
                     Err(_) => {
                         log::error!("aggregated signature is invalid");
-                        return signer_node.current_state.clone();
+                        return prev_state.clone();
                     }
                 };
                 match result {
@@ -123,10 +127,10 @@ where
                             message_type: MessageType::BlockGenerationRoundMessages(
                                 BlockGenerationRoundMessageType::Completedblock(new_block),
                             ),
-                            sender_id: signer_node.params.signer_id.clone(),
+                            sender_id: params.signer_id.clone(),
                             receiver_id: None,
                         };
-                        signer_node.connection_manager.broadcast_message(message);
+                        conman.broadcast_message(message);
 
                         return NodeState::Master {
                             block_key: block_key.clone(),

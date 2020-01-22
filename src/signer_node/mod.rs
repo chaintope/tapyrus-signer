@@ -383,7 +383,17 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 &self.params,
             ),
             BlockGenerationRoundMessageType::Blocksig(blockhash, gamma_i, e) => {
-                process_blocksig(&sender_id, blockhash, gamma_i, e, self)
+                process_blocksig(
+                    &sender_id,
+                    blockhash,
+                    gamma_i,
+                    e,
+                    &self.priv_shared_keys.as_ref().expect("priv_share_keys should be stored by when the blocksig message communication starts."),
+                    &self.shared_secrets,
+                    &self.current_state,
+                    &self.connection_manager,
+                    &self.params,
+                )
             }
             BlockGenerationRoundMessageType::Roundfailure => self.process_roundfailure(&sender_id),
         }
