@@ -377,7 +377,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 secret_share_for_positive,
                 vss_for_negative,
                 secret_share_for_negative,
-                self,
+                &self.priv_shared_keys.as_ref().expect("priv_share_keys should be stored by when the blockvss message communication starts."),
+                &self.current_state,
+                &self.connection_manager,
+                &self.params,
             ),
             BlockGenerationRoundMessageType::Blocksig(blockhash, gamma_i, e) => {
                 process_blocksig(&sender_id, blockhash, gamma_i, e, self)

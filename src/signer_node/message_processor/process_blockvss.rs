@@ -5,8 +5,8 @@ use crate::net::{
 };
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
-use crate::signer_node::ToSharedSecretMap;
-use crate::signer_node::{BidirectionalSharedSecretMap, NodeState, SharedSecret, SignerNode};
+use crate::signer_node::{BidirectionalSharedSecretMap, NodeState, SharedSecret};
+use crate::signer_node::{NodeParameters, ToSharedSecretMap};
 use crate::util::jacobi;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::ECPoint;
@@ -20,13 +20,16 @@ pub fn process_blockvss<T, C>(
     secret_share_for_positive: FE,
     vss_for_negative: VerifiableSS,
     secret_share_for_negative: FE,
-    signer_node: &mut SignerNode<T, C>,
+    priv_shared_keys: &SharedKeys,
+    prev_state: &NodeState,
+    conman: &C,
+    params: &NodeParameters<T>,
 ) -> NodeState
 where
     T: TapyrusApi,
     C: ConnectionManager,
 {
-    match &signer_node.current_state {
+    match prev_state {
         NodeState::Master {
             block_key,
             shared_block_secrets,
@@ -49,8 +52,14 @@ where
                     },
                 ),
             );
-            let shared_keys =
-                process_blockvss_inner(signer_node, blockhash, &new_shared_block_secrets);
+            let shared_keys = process_blockvss_inner(
+                blockhash,
+                &new_shared_block_secrets,
+                priv_shared_keys,
+                prev_state,
+                conman,
+                params,
+            );
 
             match shared_keys {
                 Some(keys) => NodeState::Master {
@@ -92,8 +101,14 @@ where
                     },
                 ),
             );
-            let shared_keys =
-                process_blockvss_inner(signer_node, blockhash, &new_shared_block_secrets);
+            let shared_keys = process_blockvss_inner(
+                blockhash,
+                &new_shared_block_secrets,
+                priv_shared_keys,
+                prev_state,
+                conman,
+                params,
+            );
 
             match shared_keys {
                 Some(keys) => NodeState::Member {
@@ -112,25 +127,28 @@ where
                 },
             }
         }
-        _ => signer_node.current_state.clone(),
+        _ => prev_state.clone(),
     }
 }
 
 fn process_blockvss_inner<T, C>(
-    signer_node: &SignerNode<T, C>,
     blockhash: Hash,
     shared_block_secrets: &BidirectionalSharedSecretMap,
+    priv_shared_keys: &SharedKeys,
+    prev_state: &NodeState,
+    conman: &C,
+    params: &NodeParameters<T>,
 ) -> Option<(bool, SharedKeys)>
 where
     T: TapyrusApi,
     C: ConnectionManager,
 {
-    let params = signer_node.params.sharing_params();
+    let sharing_params = params.sharing_params();
     log::trace!(
         "number of shared_block_secrets: {:?}",
         shared_block_secrets.len()
     );
-    let block_opt: Option<Block> = match &signer_node.current_state {
+    let block_opt: Option<Block> = match prev_state {
         NodeState::Master {
             candidate_block, ..
         } => Some(candidate_block.clone()),
@@ -149,29 +167,29 @@ where
         log::error!("Invalid blockvss message received. candidateblock was not received in this round yet, but got VSS.");
         return None;
     }
-    if shared_block_secrets.len() == signer_node.params.pubkey_list.len() {
+    if shared_block_secrets.len() == params.pubkey_list.len() {
         let shared_keys_for_positive = Sign::verify_vss_and_construct_key(
-            &params,
+            &sharing_params,
             &shared_block_secrets.for_positive(),
-            &(signer_node.params.self_node_index + 1),
+            &(params.self_node_index + 1),
         )
         .expect("invalid vss");
 
         let result_for_positive = Sign::sign(
             &shared_keys_for_positive,
-            &signer_node.priv_shared_keys.clone().unwrap(),
+            priv_shared_keys,
             block_opt.clone().unwrap().sighash(),
         );
 
         let shared_keys_for_negative = Sign::verify_vss_and_construct_key(
-            &params,
+            &sharing_params,
             &shared_block_secrets.for_negative(),
-            &(signer_node.params.self_node_index + 1),
+            &(params.self_node_index + 1),
         )
         .expect("invalid vss");
         let result_for_negative = Sign::sign(
             &shared_keys_for_negative,
-            &signer_node.priv_shared_keys.clone().unwrap(),
+            priv_shared_keys,
             block_opt.clone().unwrap().sighash(),
         );
 
@@ -189,7 +207,7 @@ where
 
         match result {
             Ok(local_sig) => {
-                signer_node.connection_manager.broadcast_message(Message {
+                conman.broadcast_message(Message {
                     message_type: MessageType::BlockGenerationRoundMessages(
                         BlockGenerationRoundMessageType::Blocksig(
                             block_opt.clone().unwrap().sighash(),
@@ -197,7 +215,7 @@ where
                             local_sig.e,
                         ),
                     ),
-                    sender_id: signer_node.params.signer_id,
+                    sender_id: params.signer_id,
                     receiver_id: None,
                 });
             }
