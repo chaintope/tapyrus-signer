@@ -21,6 +21,8 @@ pub mod rpc;
 pub mod serialize;
 pub mod sign;
 pub mod signer_node;
-pub mod test_helper;
 pub mod timer;
 pub mod util;
+
+#[cfg(test)]
+pub mod tests;

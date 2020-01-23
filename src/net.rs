@@ -325,7 +325,7 @@ impl ConnectionManager for RedisManager {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_helper::TestKeys;
+    use crate::tests::helper::keys::TEST_KEYS;
     use std::collections::BTreeMap;
     use std::str::FromStr;
 
@@ -335,7 +335,7 @@ mod test {
         // create un-usable connection
         let mut connection_manager = RedisManager::new("0.0.0.0".to_string(), "999".to_string());
         let sender_id = SignerID {
-            pubkey: TestKeys::new().pubkeys()[0],
+            pubkey: TEST_KEYS.pubkeys()[0],
         };
 
         let message = Message {
@@ -365,7 +365,7 @@ mod test {
             "6379".to_string(),
         ));
         let sender_id = SignerID {
-            pubkey: TestKeys::new().pubkeys()[0],
+            pubkey: TEST_KEYS.pubkeys()[0],
         };
 
         let message_processor = move |message: Message| {
@@ -394,7 +394,7 @@ mod test {
 
     #[test]
     fn signer_id_serialize_test() {
-        let pubkey = TestKeys::new().pubkeys()[0];
+        let pubkey = TEST_KEYS.pubkeys()[0];
         let signer_id: SignerID = SignerID { pubkey };
         let serialized = serde_json::to_string(&signer_id).unwrap();
         assert_eq!("[3,131,26,105,184,0,152,51,171,91,3,38,1,46,175,72,155,254,163,90,115,33,177,202,21,177,29,136,19,20,35,250,252]", serialized);
@@ -405,7 +405,7 @@ mod test {
         let serialized = "[3,131,26,105,184,0,152,51,171,91,3,38,1,46,175,72,155,254,163,90,115,33,177,202,21,177,29,136,19,20,35,250,252]";
         let signer_id = serde_json::from_str::<SignerID>(serialized).unwrap();
 
-        let pubkey = TestKeys::new().pubkeys()[0];
+        let pubkey = TEST_KEYS.pubkeys()[0];
         let expected: SignerID = SignerID { pubkey };
         assert_eq!(expected, signer_id);
     }

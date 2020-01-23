@@ -517,14 +517,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::mpsc::{channel, Receiver, Sender};
-    use std::sync::{Arc, Mutex};
-    use std::thread;
-    use std::thread::JoinHandle;
-    use std::time::Duration;
-
-    use redis::ControlFlow;
-
     use crate::net::{
         BlockGenerationRoundMessageType, ConnectionManager, ConnectionManagerError, Message,
         MessageType, SignerID,
@@ -537,80 +529,22 @@ mod tests {
         master_index, next_master_index, BidirectionalSharedSecretMap, NodeParameters, NodeState,
         SignerNode,
     };
-    use crate::test_helper::{enable_log, get_block, TestKeys};
+    use crate::tests::helper::blocks::get_block;
+    use crate::tests::helper::enable_log;
+    use crate::tests::helper::keys::TEST_KEYS;
+    use crate::tests::helper::net::{SpyMethod, TestConnectionManager};
     use bitcoin::{Address, PrivateKey};
-
-    type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
-
-    /// ConnectionManager for testing.
-    pub struct TestConnectionManager {
-        /// This is count of messages. TestConnectionManager waits for receiving the number of message.
-        pub receive_count: u32,
-        /// sender of message
-        pub sender: Sender<Message>,
-        /// receiver of message
-        pub receiver: Receiver<Message>,
-        /// A function which is called when the node try to broadcast messages.
-        pub broadcast_assert: SpyMethod,
-    }
+    use redis::ControlFlow;
+    use std::sync::mpsc::{channel, Receiver, Sender};
+    use std::sync::{Arc, Mutex};
+    use std::thread;
+    use std::thread::JoinHandle;
+    use std::time::Duration;
 
     fn address(private_key: &PrivateKey) -> Address {
         let secp = secp256k1::Secp256k1::new();
         let self_pubkey = private_key.public_key(&secp);
         Address::p2pkh(&self_pubkey, private_key.network)
-    }
-
-    impl TestConnectionManager {
-        pub fn new(receive_count: u32, broadcast_assert: SpyMethod) -> Self {
-            let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
-            TestConnectionManager {
-                receive_count,
-                sender,
-                receiver,
-                broadcast_assert,
-            }
-        }
-    }
-
-    impl ConnectionManager for TestConnectionManager {
-        type ERROR = crate::errors::Error;
-        fn broadcast_message(&self, message: Message) {
-            let rc_message = Arc::new(message);
-            (self.broadcast_assert)(rc_message.clone());
-        }
-
-        fn send_message(&self, message: Message) {
-            let rc_message = Arc::new(message);
-            (self.broadcast_assert)(rc_message.clone());
-        }
-
-        fn start(
-            &self,
-            mut message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
-            _id: SignerID,
-        ) -> JoinHandle<()> {
-            for _count in 0..self.receive_count {
-                match self.receiver.recv() {
-                    Ok(message) => {
-                        log::debug!("Test message receiving!! {:?}", message.message_type);
-                        message_processor(message);
-                    }
-                    Err(e) => log::warn!("happend receiver error: {:?}", e),
-                }
-            }
-            thread::Builder::new()
-                .name("TestConnectionManager start Thread".to_string())
-                .spawn(|| {
-                    thread::sleep(Duration::from_millis(300));
-                })
-                .unwrap()
-        }
-
-        fn error_handler(
-            &mut self,
-        ) -> Option<Receiver<ConnectionManagerError<crate::errors::Error>>> {
-            None::<Receiver<ConnectionManagerError<crate::errors::Error>>>
-        }
     }
 
     fn create_node<T: TapyrusApi>(
@@ -628,10 +562,9 @@ mod tests {
         spy: SpyMethod,
         publish_count: u32,
     ) -> (SignerNode<T, TestConnectionManager>, Sender<Message>) {
-        let testkeys = TestKeys::new();
-        let pubkey_list = testkeys.pubkeys();
+        let pubkey_list = TEST_KEYS.pubkeys();
         let threshold = 3;
-        let private_key = testkeys.key[0];
+        let private_key = TEST_KEYS.key[0];
         let to_address = address(&private_key);
 
         let mut params = NodeParameters::new(
@@ -660,10 +593,9 @@ mod tests {
         Sender<u32>,
         Sender<Message>,
     ) {
-        let testkeys = TestKeys::new();
-        let pubkey_list = testkeys.pubkeys();
+        let pubkey_list = TEST_KEYS.pubkeys();
         let threshold = 2;
-        let private_key = testkeys.key[0];
+        let private_key = TEST_KEYS.key[0];
         let to_address = address(&private_key);
 
         let con = TestConnectionManager::new(1, spy);
@@ -702,7 +634,6 @@ mod tests {
         use bitcoin::util::key::PublicKey;
         use std::str::FromStr;
 
-        let testkeys = TestKeys::new();
         let pubkey_list = vec![
             PublicKey::from_str(
                 "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
@@ -726,7 +657,7 @@ mod tests {
             .unwrap(),
         ];
         let threshold = 3;
-        let private_key = testkeys.key[0];
+        let private_key = TEST_KEYS.key[0];
         let to_address = address(&private_key);
 
         let params = NodeParameters::new(
@@ -836,7 +767,7 @@ mod tests {
         assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
 
         // Step 1.
-        let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[1]);
         node.current_state = process_candidateblock(
             &sender_id,
             &get_block(0),
@@ -847,7 +778,7 @@ mod tests {
         assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
 
         // Step 2.
-        let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
         node.current_state = process_candidateblock(
             &sender_id,
             &get_block(0),
@@ -901,7 +832,7 @@ mod tests {
         let mut node = create_node(initial_state, rpc);
 
         // check 1, next_master_index should be incremented after process completeblock message.
-        let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[1]);
         // in begin, master_index is 0.
         assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
 
@@ -923,7 +854,7 @@ mod tests {
             candidate_block: None,
             master_index: 4,
         };
-        let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
         node.current_state =
             process_completedblock(&sender_id, &get_block(0), &node.current_state, &node.params);
 
@@ -956,7 +887,7 @@ mod tests {
         // 2 -> 3
         // 3 -> 2
         // 4 -> 1
-        let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
         assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0); // in begin, master_index is 0.
         let next_state =
             process_completedblock(&sender_id, &get_block(0), &node.current_state, &node.params);

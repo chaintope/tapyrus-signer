@@ -118,7 +118,7 @@ impl TapyrusApi for Rpc {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::test_helper::TestKeys;
+    use crate::tests::helper::keys::TEST_KEYS;
     use secp256k1::Secp256k1;
 
     pub fn get_rpc_client() -> Rpc {
@@ -132,7 +132,7 @@ pub mod tests {
     pub fn call_getnewblock() -> Result<Block, Error> {
         let rpc = get_rpc_client();
 
-        let private_key = TestKeys::new().key[0];
+        let private_key = TEST_KEYS.key[0];
         let secp = Secp256k1::new();
         let address = Address::p2pkh(&private_key.public_key(&secp), private_key.network);
         rpc.getnewblock(&address)
