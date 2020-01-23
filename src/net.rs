@@ -108,7 +108,7 @@ pub enum BlockGenerationRoundMessageType {
     Roundfailure,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
 pub struct Message {
     pub message_type: MessageType,
     pub sender_id: SignerID,

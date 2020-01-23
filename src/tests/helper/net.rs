@@ -1,46 +1,62 @@
 use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
 use redis::ControlFlow;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::Arc;
+use std::cell::RefCell;
+use std::sync::mpsc::Receiver;
 use std::thread;
 use std::thread::JoinHandle;
 
-pub type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
-
-/// ConnectionManager for testing.
 pub struct TestConnectionManager {
-    /// This is count of messages. TestConnectionManager waits for receiving the number of message.
-    pub receive_count: u32,
-    /// sender of message
-    pub sender: Sender<Message>,
-    /// receiver of message
-    pub receiver: Receiver<Message>,
-    /// A function which is called when the node try to broadcast messages.
-    pub broadcast_assert: SpyMethod,
+    should_broadcast: Vec<Message>,
+    pub broadcasted: RefCell<Vec<Message>>,
+
+    should_send: Vec<Message>,
+    pub sent: RefCell<Vec<Message>>,
 }
 
 impl TestConnectionManager {
-    pub fn new(receive_count: u32, broadcast_assert: SpyMethod) -> Self {
-        let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
-        TestConnectionManager {
-            receive_count,
-            sender,
-            receiver,
-            broadcast_assert,
+    pub fn new() -> Self {
+        Self {
+            should_broadcast: vec![],
+            broadcasted: RefCell::new(vec![]),
+
+            should_send: vec![],
+            sent: RefCell::new(vec![]),
         }
+    }
+
+    pub fn assert(self) {
+        if let TestConnectionManager {
+            should_broadcast,
+            broadcasted,
+            should_send,
+            sent,
+        } = self
+        {
+            assert_eq!(should_broadcast, broadcasted.into_inner());
+            assert_eq!(should_send, sent.into_inner());
+        }
+    }
+
+    pub fn should_broadcast(&mut self, message: Message) {
+        self.should_broadcast.push(message);
+    }
+
+    pub fn should_send(&mut self, message: Message) {
+        self.should_send.push(message);
     }
 }
 
 impl ConnectionManager for TestConnectionManager {
     type ERROR = crate::errors::Error;
+
     fn broadcast_message(&self, message: Message) {
-        let rc_message = Arc::new(message);
-        (self.broadcast_assert)(rc_message.clone());
+        let mut list = self.broadcasted.borrow_mut();
+        list.push(message);
     }
 
     fn send_message(&self, message: Message) {
-        let rc_message = Arc::new(message);
-        (self.broadcast_assert)(rc_message.clone());
+        let mut list = self.sent.borrow_mut();
+        list.push(message);
     }
 
     fn start(
@@ -48,24 +64,13 @@ impl ConnectionManager for TestConnectionManager {
         mut message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
         _id: SignerID,
     ) -> JoinHandle<()> {
-        for _count in 0..self.receive_count {
-            match self.receiver.recv() {
-                Ok(message) => {
-                    log::debug!("Test message receiving!! {:?}", message.message_type);
-                    message_processor(message);
-                }
-                Err(e) => log::warn!("happend receiver error: {:?}", e),
-            }
-        }
-        thread::Builder::new()
-            .name("TestConnectionManager start Thread".to_string())
-            .spawn(|| {
-                thread::sleep(Duration::from_millis(300));
-            })
-            .unwrap()
+        // do nothing.
+
+        // This is for just returns JoinHandle instance.
+        thread::Builder::new().spawn(|| {}).unwrap()
     }
 
-    fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<crate::errors::Error>>> {
+    fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<Self::ERROR>>> {
         None::<Receiver<ConnectionManagerError<crate::errors::Error>>>
     }
 }
