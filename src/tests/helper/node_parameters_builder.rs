@@ -1,4 +1,3 @@
-use crate::net::SignerID;
 use crate::signer_node::NodeParameters;
 use crate::tests::helper::address;
 use crate::tests::helper::keys::TEST_KEYS;

@@ -131,14 +131,14 @@ mod tests {
     use crate::errors::Error;
     use crate::net::MessageType::BlockGenerationRoundMessages;
     use crate::net::{BlockGenerationRoundMessageType, Message, SignerID};
-    use crate::signer_node::{master_index, NodeParameters, NodeState};
+    use crate::signer_node::{master_index, NodeState};
     use crate::tests::helper::blocks::get_block;
+    use crate::tests::helper::enable_log;
     use crate::tests::helper::keys::TEST_KEYS;
     use crate::tests::helper::net::TestConnectionManager;
     use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
     use crate::tests::helper::node_state_builder::{Builder, Member};
     use crate::tests::helper::rpc::MockRpc;
-    use crate::tests::helper::{address, enable_log};
 
     /// This network consists 5 signers and threshold 3.
     #[test]
