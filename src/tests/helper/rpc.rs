@@ -5,10 +5,38 @@ use bitcoin::Address;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 
+/// Mock for Rpc
+///
+/// ## Example
+///
+/// ```
+/// use tapyrus_signer::tests::helper::rpc::MockRpc;
+/// use tapyrus_signer::errors::Error;
+///
+/// // create instance.
+/// let mut rpc = MockRpc::new();
+///
+/// // set stubs
+/// rpc.should_call_testproposedblock(Ok(true));
+///
+/// // error responce stub can be set.
+/// let err = Error::JsonRpc(jsonrpc::error::Error::Rpc(jsonrpc::error::RpcError {
+///     code: -25,
+///     message: "proposal was not based on our best chain".to_string(),
+///     data: None,
+/// }));
+/// rpc.should_call_testproposedblock(Err(err));
+///
+/// // use rpc here ...
+///
+/// // check are there any remaining stub
+/// rpc.assert();
+/// ```
+#[derive(Debug)]
 pub struct MockRpc {
     getnewblock_results: RefCell<VecDeque<Block>>,
     getblockchaininfo_results: RefCell<VecDeque<GetBlockchainInfoResult>>,
-    testproposedblock_results: RefCell<VecDeque<bool>>,
+    testproposedblock_results: RefCell<VecDeque<Result<bool, Error>>>,
     submitblock_results: RefCell<VecDeque<()>>,
 }
 
@@ -51,10 +79,7 @@ impl MockRpc {
 
     pub fn should_call_testproposedblock(&mut self, result: Result<bool, Error>) {
         let mut list = self.testproposedblock_results.borrow_mut();
-        match result {
-            Ok(r) => list.push_front(r),
-            Err(_) => unimplemented!("MockRpc not support testing Error result yet."),
-        }
+        list.push_front(result);
     }
 
     pub fn should_call_getblockchaininfo(
@@ -89,11 +114,10 @@ impl TapyrusApi for MockRpc {
 
     fn testproposedblock(&self, block: &Block) -> Result<bool, Error> {
         let mut list = self.testproposedblock_results.borrow_mut();
-        let result = list.pop_back().expect(&format!(
+        list.pop_back().expect(&format!(
             "Unexpected RPC call method=testproposedblock, args(block={:?})",
             block
-        ));
-        Ok(result)
+        ))
     }
 
     fn submitblock(&self, block: &Block) -> Result<(), Error> {
