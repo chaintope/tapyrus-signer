@@ -5,6 +5,7 @@ use bitcoin::{Address, PrivateKey};
 pub mod blocks;
 pub mod keys;
 pub mod net;
+pub mod node_parameters_builder;
 pub mod node_state_builder;
 pub mod rpc;
 
