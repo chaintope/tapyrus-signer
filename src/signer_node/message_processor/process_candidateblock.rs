@@ -52,7 +52,7 @@ where
                         block_key: None,
                         shared_block_secrets: shared_block_secrets.clone(),
                         block_shared_keys: block_shared_keys.clone(),
-                        candidate_block: Some(block.clone()),
+                        candidate_block: None,
                         master_index: *master_index,
                     }
                 }
@@ -203,14 +203,8 @@ mod tests {
         let next_state =
             process_candidateblock(&sender_id, &candidate_block, &prev_state, &conman, &params);
 
-        // It should set candidate_block into return state.
-        match next_state {
-            NodeState::Member {
-                candidate_block: Some(block),
-                ..
-            } => assert_eq!(candidate_block, block),
-            _ => assert!(false),
-        }
+        // It should not set candidate_block into return state.
+        assert_eq!(prev_state, next_state);
 
         // It should not send any blockvss messages to each signer.
         assert_eq!(conman.sent.borrow().len(), 0);
