@@ -22,49 +22,133 @@ cargo build --release
 ```
 
 ### Run Manually
- 
-Example command option for launch one of node in 3 of 5 Signer network.
 
-Must launch `tapyrus-core` and `redis` ahead.
+Here, we build a Tapyrus Signer Network that can generate a block if 2 of 3 signers agree. 
+(Current implementation has an [issue](https://github.com/chaintope/tapyrus-signer/issues/29) for that threshold process.)
+For build this network, there are following steps. 
 
-Example for run `tapyrus-core`:
+#### 1. Generate singing keys.
+
+There are 3 signers named Alice, Bob, Carol. Each signer needs own private key and public key on secp256k1 elliptic curve.
+
+Here we use below key pairs. Don't use these keys for serious use.
+
 ```
--regtest
--debug
--rpcuser=user
--rpcpassword=pass
--signblockpubkeys=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b90002785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e02d111519ba1f3013a7a613ecdcc17f4d53fbcb558b70404b5fb0c84ebb90a8d3c02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506
--signblockthreshold=3
+Key pair for Alice:
+private key: 53f0d2efbc1e6aae7bcfc762a20a3df0b700cf9808dbdc0855dca6481486ed61
+WIF: cQPsVjpiP35ceNqLWDohBdnxedsMzCoX3NFaiSjYvSyFysNEKyBt
+public key: 0341c6dc48817c840e17428c50cc9fe71802a2d3a2a36519f63dabc10b5713acf2
+
+Key pair for Bob:
+private key: ad11db5745d909cf5bb769fe45acdd435884637fb1fca2cfb6e212deff62fe17
+WIF: cTP8JDfEp6s7UYnyexESXSMYi3XSmxRCxS4wFbYwU5eMgvC1kHXk
+public key: 03cf6ababa85c0687f1d04bb3446ad24da879519f72ef037e900667cc3cdf1e904
+
+Key pair for Carol:
+private key: 74431a3cdb2cc82dfc32a691d9f7e68da7675ba81e6833e00d744169d74faae6 
+WIF: cRUhZ5WxmiJ5f87gFoztWRztUwSk7cTfRick4z2Qg7zJnZjdnuJj
+public key: 02d7facf8f7b3182dc03d5888fdf78cc5c2d0a5ce14559ffbaa3bab9f86272c591
 ```
 
-and example for run `tapyrus signer node`:
+#### 2. Create aggregated key pair.
+
+In general, private Key is confidential. Essentially, such a data as a private key should not be exist in real Tapyrus 
+Blockchain Network. This key is created only for test temporally. In a future version, it is going not to need to 
+generate aggregated private key.
+
 ```
-./target/release/node \
- -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc \
- -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 \
- -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e \
- -p=02d111519ba1f3013a7a613ecdcc17f4d53fbcb558b70404b5fb0c84ebb90a8d3c \
- -p=02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506 \
- --privatekey=<private key that the pair of one of above publickeys> \
- -t 3 \
- --rpcport=12381 --rpcuser=user --rpcpass=pass
+private key: 7545c883dd243cabd3b9d7f2c1af01c2fc3db1d929f8127c5a609c041b03551d
+WIF: cRWfUjQ27DPx2BQ3WgyFt8qSdjtMtFLS6oeyj1mwPHk4ef4PfaBt
+public key: 0366262690cbdf648132ce0c088962c6361112582364ede120f3780ab73438fc4b
 ```
 
-Example for If launch as master node.
-```
-./target/release/node \
- -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc \
- -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 \
- -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e \
- -p=02d111519ba1f3013a7a613ecdcc17f4d53fbcb558b70404b5fb0c84ebb90a8d3c \
- -p=02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506 \
- --privatekey=<private key that the pair of one of above publickeys> \
- -t 3 \
- --rpcport=12381 --rpcuser=user --rpcpass=pass
-```
-And helpful comment is in `src/test_helper.rs`.
+#### 3. Create a payment address what coinbase transaction in the genesis-block pay to.
 
-You can find all command options in `src/bin/node.rs`.
+```
+Address: mpuyVwM2YjEMuZKrhtcRkaJxpbqTGAsFHF
+
+Private key: 8637f5a8927d401bcacaa38e9b8b09cab7406936b785570d129367a08e2d9d11
+WIF: cS5c3d9MUDKht7PaKs5Wc3oDHSnbjyDtEZLrJK8LEKmTrFnPGADP
+Public key: 030fba1efd87aa426f65b979e536eec4626b5e292a9616fe88558560c3a76c3353
+```
+
+#### 4. Generate genesis block for this network
+
+We can use `tapyrus-genesis` utility from [Tapyrus Core](https://github.com/chaintope/tapyrus-core).
+
+```
+$ tapyrus-genesis -regtest \
+                  -address=mpuyVwM2YjEMuZKrhtcRkaJxpbqTGAsFHF \
+                  -signblockpubkey=0366262690cbdf648132ce0c088962c6361112582364ede120f3780ab73438fc4b \
+                  -signblockprivatekey=cRWfUjQ27DPx2BQ3WgyFt8qSdjtMtFLS6oeyj1mwPHk4ef4PfaBt
+```
+
+Generated genesis block data is here.
+```
+010000000000000000000000000000000000000000000000000000000000000000000000c1457ff3e5c527e69858108edf0ff1f49eea9c58d8d37300a164b3b4f8c8c7cef1a2e72770d547feae29f2dd40123a97c580d44fd4493de072416d53331997617b96f05d210366262690cbdf648132ce0c088962c6361112582364ede120f3780ab73438fc4b403a4c09253c7b583e5260074380c9b99b895f938e37799d326ded984fb707e91fa4df2e0524a4ccf5fe224945b4fb94784b411a760eb730d95402d3383dd7ffdc01010000000100000000000000000000000000000000000000000000000000000000000000000000000022210366262690cbdf648132ce0c088962c6361112582364ede120f3780ab73438fc4bffffffff0100f2052a010000002776a9226d70757956774d32596a454d755a4b72687463526b614a787062715447417346484688ac00000000
+```
+
+#### 5. Run Tapyrus Core
+
+Run Tapyrus Core daemon. You can refer Tapyrus Core's [Getting Started document](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/getting_started.md#how-to-start-tapyrus-in-regtest-mode).
+
+#### 6. Run redis
+
+TSN uses redis pub/sub functionality for to relay messages among each signer. We recommend to use Docker.
+```
+$ docker pull redis:5.0-alpine
+$ docker run --name tapyrus-signer-hub -p 6379:6379 redis:5.0-alpine 
+```
+
+#### 7. Create config file for each signer.
+
+In this step, we need to create 3 files for each signer like alice.toml, bob.toml, carol.toml. Each file's contents are 
+almost same, but private key part should be specify each own private key.
+This config assumes tapyrus core allows RPC connection with basic authentication (user name: user, password: pass).
+
+```toml
+[signer]
+to_address ="mwekxAgQpqQPwD2yUCohhw6NQxpUmXnGsu"
+publickeys = [
+"0374332fb4ade39e518f8d7146e77a4a9a0715fd0036ef88c402cbcf1f51f9073d",
+"0279b2fb0c5122728d9ea040550a3c0d97384ba5d0d52cec227f19d72bb51a6165",
+"03309ba18c5c2763dbd35d90c6bb481a508e1f51c9036db8076deb9fdf5090d4da"
+]
+
+privatekey = "[SET_OWN_PRIVATE_KEY_WIF]"
+threshold = 2
+
+[rpc]
+rpc_endpoint_host = "localhost"
+rpc_endpoint_port = 12381
+rpc_endpoint_user = "user"
+rpc_endpoint_pass = "pass"
+
+[redis]
+redis_host = "127.0.0.1"
+redis_port =  6379
+
+[general]
+round_duration = 290
+log_level = "trace"
+log_file = "/var/log/tapyrus-signer.log"
+```   
+
+#### 8. Run signer nodes.
+
+Run signer nodes. All processes should be started at same time.
+
+```
+$ tapyrus-signer-node -c alice.toml --skip-waiting-ibd
+$ tapyrus-signer-node -c bob.toml --skip-waiting-ibd
+$ tapyrus-signer-node -c carol.toml --skip-waiting-ibd
+```
+
+If the TSN start well, block will be generated in each 5 minutes(round_duration was set 290s in config file and adding 
+10s for actual round communication time limit for it, result is 300s).
+
+Using Tapyrus Core wallet, you can check the balance of issued coins. However there are limitation which block coinbase 
+tx's output is not available until generated 100 blocks after the coinbase block generated.   
 
 # Signer Network Specification
 
