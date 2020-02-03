@@ -2,19 +2,20 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use curv::arithmetic::traits::*;
-use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-use curv::elliptic::curves::traits::*;
-use curv::{BigInt, FE, GE};
-use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
-use multi_party_schnorr::Error::InvalidSS;
-
 use crate::blockdata::hash::Hash;
 use crate::errors::Error;
 use crate::signer_node::SharedSecretMap;
 use crate::signer_node::ToShares;
 use crate::signer_node::ToVerifiableSS;
-use crate::util::*;
+use crate::util::sum_point;
+use curv::arithmetic::traits::Converter;
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
+use curv::elliptic::curves::traits::{ECPoint, ECScalar};
+use curv::{BigInt, FE, GE};
+use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::{
+    Keys, LocalSig, Parameters, SharedKeys, Signature,
+};
+use multi_party_schnorr::Error::InvalidSS;
 
 pub struct Sign;
 
@@ -99,73 +100,78 @@ impl Sign {
     }
 }
 
-#[test]
-fn test_private_key_to_big_int() {
-    use std::str::FromStr;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let key = secp256k1::SecretKey::from_str(
-        "657440783dd10977c49f87c51dc68b63508e88c7ea9371dc19e6fcd0f5f8639e",
-    )
-    .unwrap();
-    assert_eq!(
-        Sign::private_key_to_big_int(key).unwrap(),
-        BigInt::from_str(
-            "45888996919894035081237286108090342830506757770293597094224988299678468039582"
+    #[test]
+    fn test_private_key_to_big_int() {
+        use std::str::FromStr;
+
+        let key = secp256k1::SecretKey::from_str(
+            "657440783dd10977c49f87c51dc68b63508e88c7ea9371dc19e6fcd0f5f8639e",
         )
-        .unwrap()
-    );
-}
+        .unwrap();
+        assert_eq!(
+            Sign::private_key_to_big_int(key).unwrap(),
+            BigInt::from_str(
+                "45888996919894035081237286108090342830506757770293597094224988299678468039582"
+            )
+            .unwrap()
+        );
+    }
 
-#[test]
-fn test_create_key() {
-    use curv::elliptic::curves::secp256_k1::*;
-    use std::str::FromStr;
+    #[test]
+    fn test_create_key() {
+        use curv::elliptic::curves::secp256_k1::*;
+        use std::str::FromStr;
 
-    let pk = BigInt::from_str(
-        "45888996919894035081237286108090342830506757770293597094224988299678468039582",
-    )
-    .unwrap();
-    let key = Sign::create_key(0, Some(pk.clone()));
-    assert_eq!(key.party_index, 0);
-    assert_eq!(key.u_i, ECScalar::from(&pk));
-    let x = BigInt::from_str(
-        "59785365775367791548524849652375710528443431367690667459926784930515989662882",
-    )
-    .unwrap();
-    let y = BigInt::from_str(
-        "90722439330137878450843117102075228343061266416912046868469127729012019088799",
-    )
-    .unwrap();
-    assert_eq!(key.y_i, Secp256k1Point::from_coor(&x, &y));
-}
+        let pk = BigInt::from_str(
+            "45888996919894035081237286108090342830506757770293597094224988299678468039582",
+        )
+        .unwrap();
+        let key = Sign::create_key(0, Some(pk.clone()));
+        assert_eq!(key.party_index, 0);
+        assert_eq!(key.u_i, ECScalar::from(&pk));
+        let x = BigInt::from_str(
+            "59785365775367791548524849652375710528443431367690667459926784930515989662882",
+        )
+        .unwrap();
+        let y = BigInt::from_str(
+            "90722439330137878450843117102075228343061266416912046868469127729012019088799",
+        )
+        .unwrap();
+        assert_eq!(key.y_i, Secp256k1Point::from_coor(&x, &y));
+    }
 
-#[test]
-fn test_format_signature() {
-    use curv::elliptic::curves::secp256_k1::*;
-    use std::str::FromStr;
+    #[test]
+    fn test_format_signature() {
+        use curv::elliptic::curves::secp256_k1::*;
+        use std::str::FromStr;
 
-    let pk = BigInt::from_str(
-        "109776030561885333132557262259067839518424530456572565024242550494358478943987",
-    )
-    .unwrap();
-    let x = BigInt::from_str(
-        "90077539296702276303134969795375843753866389548876542277234805612812650094225",
-    )
-    .unwrap();
-    let y = BigInt::from_str(
-        "87890325134225311191847774682692230651684221898402757774563799733641956930425",
-    )
-    .unwrap();
+        let pk = BigInt::from_str(
+            "109776030561885333132557262259067839518424530456572565024242550494358478943987",
+        )
+        .unwrap();
+        let x = BigInt::from_str(
+            "90077539296702276303134969795375843753866389548876542277234805612812650094225",
+        )
+        .unwrap();
+        let y = BigInt::from_str(
+            "87890325134225311191847774682692230651684221898402757774563799733641956930425",
+        )
+        .unwrap();
 
-    let sig = Signature {
-        sigma: ECScalar::from(&pk),
-        v: Secp256k1Point::from_coor(&x, &y),
-    };
-    assert_eq!(Sign::format_signature(&sig), "40c726149bfb2d4ab64823e0cfd8245645a7950e605ef9222735d821ae570b1e91f2b3080d94faf40969c08b663ff1556fe7fbbcfcb648ac2763c16a15a08676f3");
+        let sig = Signature {
+            sigma: ECScalar::from(&pk),
+            v: Secp256k1Point::from_coor(&x, &y),
+        };
+        assert_eq!(Sign::format_signature(&sig), "40c726149bfb2d4ab64823e0cfd8245645a7950e605ef9222735d821ae570b1e91f2b3080d94faf40969c08b663ff1556fe7fbbcfcb648ac2763c16a15a08676f3");
 
-    let sig_0 = Signature {
-        sigma: ECScalar::from(&BigInt::one()),
-        v: Secp256k1Point::from_coor(&x, &y),
-    };
-    assert_eq!(Sign::format_signature(&sig_0), "40c726149bfb2d4ab64823e0cfd8245645a7950e605ef9222735d821ae570b1e910000000000000000000000000000000000000000000000000000000000000001");
+        let sig_0 = Signature {
+            sigma: ECScalar::from(&BigInt::one()),
+            v: Secp256k1Point::from_coor(&x, &y),
+        };
+        assert_eq!(Sign::format_signature(&sig_0), "40c726149bfb2d4ab64823e0cfd8245645a7950e605ef9222735d821ae570b1e910000000000000000000000000000000000000000000000000000000000000001");
+    }
 }
