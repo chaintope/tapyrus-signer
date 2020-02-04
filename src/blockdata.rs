@@ -2,7 +2,6 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use crate::errors::Error;
 use bitcoin_hashes::{sha256d, Hash};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
