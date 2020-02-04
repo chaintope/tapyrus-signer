@@ -1,8 +1,8 @@
 use super::utils::sender_index;
+use crate::crypto::multi_party_schnorr::Parameters;
 use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
 use bitcoin::{Address, PrivateKey, PublicKey};
-use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::Parameters;
 use std::convert::TryInto;
 use std::sync::Arc;
 

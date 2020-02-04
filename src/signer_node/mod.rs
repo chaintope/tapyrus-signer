@@ -7,6 +7,7 @@ mod node_parameters;
 mod utils;
 
 use crate::blockdata::Block;
+use crate::crypto::multi_party_schnorr::*;
 use crate::net::MessageType::{BlockGenerationRoundMessages, KeyGenerationMessage};
 use crate::net::{
     BlockGenerationRoundMessageType, ConnectionManager, KeyGenerationMessageType, Message,
@@ -24,7 +25,6 @@ use crate::util::*;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::*;
 use curv::{FE, GE};
-use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
 pub use node_parameters::NodeParameters;
 use redis::ControlFlow;
 use std::collections::BTreeMap;

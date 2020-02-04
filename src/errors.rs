@@ -16,7 +16,9 @@ pub enum Error {
     DuplicatedMessage,
     InvalidLocalSignature,
     InvalidAggregatedSignature,
-    InvalidSignature(secp256k1::Error),
+    InvalidKey,
+    InvalidSS,
+    InvalidSig,
     TimerAlreadyStarted,
     InvalidTomlFormat(toml::de::Error),
     ConfigFileIOError(std::io::Error),
@@ -43,12 +45,6 @@ impl From<jsonrpc::error::Error> for Error {
 impl From<serde_json::error::Error> for Error {
     fn from(e: serde_json::error::Error) -> Error {
         Error::Json(e)
-    }
-}
-
-impl From<secp256k1::Error> for Error {
-    fn from(e: secp256k1::Error) -> Error {
-        Error::InvalidSignature(e)
     }
 }
 

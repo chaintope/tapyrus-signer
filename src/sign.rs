@@ -2,12 +2,11 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+use crate::crypto::multi_party_schnorr::*;
 use curv::arithmetic::traits::*;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::*;
 use curv::{BigInt, FE, GE};
-use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::*;
-use multi_party_schnorr::Error::InvalidSS;
 
 use crate::blockdata::hash::Hash;
 use crate::errors::Error;
@@ -45,7 +44,7 @@ impl Sign {
         params: &Parameters,
         secret_shares: &SharedSecretMap,
         index: &usize,
-    ) -> Result<SharedKeys, multi_party_schnorr::Error> {
+    ) -> Result<SharedKeys, Error> {
         assert_eq!(secret_shares.len(), params.share_count);
 
         let correct_ss = secret_shares
@@ -66,7 +65,7 @@ impl Sign {
                     .fold(FE::zero(), |acc, x| acc + x);
                 Ok(SharedKeys { y, x_i })
             }
-            false => Err(InvalidSS),
+            false => Err(Error::InvalidSS),
         }
     }
 
