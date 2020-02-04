@@ -27,6 +27,7 @@ use curv::cryptographic_primitives::hashing::hash_sha256::HSha256;
 use curv::cryptographic_primitives::hashing::traits::Hash;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::{BigInt, FE, GE};
+use sha2::{Digest, Sha256};
 
 const SECURITY: usize = 256;
 
@@ -181,12 +182,7 @@ impl LocalSig {
         let beta_i = local_ephemaral_key.x_i.clone();
         let alpha_i = local_private_key.x_i.clone();
 
-        let e_bn = HSha256::create_hash(&[
-            &local_ephemaral_key.y.x_coor().unwrap(),
-            &local_private_key.y.bytes_compressed_to_big_int(),
-            &BigInt::from(message),
-        ]);
-        let e: FE = ECScalar::from(&e_bn);
+        let e: FE = compute_e(&local_ephemaral_key.y, &local_private_key.y, message);
         let gamma_i = beta_i + e.clone() * alpha_i;
         //   let gamma_i = e.clone() * alpha_i ;
 
@@ -272,13 +268,7 @@ impl Signature {
     }
 
     pub fn verify(&self, message: &[u8], pubkey_y: &GE) -> Result<(), Error> {
-        let e_bn = HSha256::create_hash(&[
-            &self.v.x_coor().unwrap(),
-            &pubkey_y.bytes_compressed_to_big_int(),
-            &BigInt::from(message),
-        ]);
-        let e: FE = ECScalar::from(&e_bn);
-
+        let e: FE = compute_e(&self.v, pubkey_y, message);
         let g: GE = GE::generator();
         let sigma_g = g * &self.sigma;
         let e_y = pubkey_y * &e;
@@ -290,4 +280,14 @@ impl Signature {
             Err(InvalidSig)
         }
     }
+}
+
+fn compute_e(r: &GE, y: &GE, message: &[u8]) -> FE {
+    let mut hasher = Sha256::new();
+    hasher.input(&r.get_element().serialize()[1..33]);
+    hasher.input(&y.get_element().serialize()[..]);
+    hasher.input(message);
+    let e_bn = BigInt::from(&hasher.result()[..]);
+
+    ECScalar::from(&e_bn)
 }

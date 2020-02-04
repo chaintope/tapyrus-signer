@@ -175,3 +175,95 @@ pub fn keygen_t_n_parties(
 
     (party_keys_vec, shared_keys_vec, y_sum, vss_scheme_vec)
 }
+
+use curv::arithmetic::traits::Converter;
+use curv::elliptic::curves::secp256_k1::Secp256k1Scalar;
+use curv::elliptic::curves::traits::{ECPoint, ECScalar};
+use curv::BigInt;
+use std::borrow::Borrow;
+
+const STR_SECRET1: &str = "12b004fff7f4b69ef8650e767f18f11ede158148b425660723b9f9a66e61f747";
+const STR_SECRET2: &str = "b524c28b61c9b2c49b2c7dd4c2d75887abb78768c054bd7c01af4029f6c0d117";
+const STR_SECRET1C: &str = "12b004fff7f4b69ef8650e767f18f11ede158148b425660723b9f9a66e61f747";
+const STR_SECRET2C: &str = "b524c28b61c9b2c49b2c7dd4c2d75887abb78768c054bd7c01af4029f6c0d117";
+
+fn get_shared_keys(wif: &str) -> SharedKeys {
+    let privkey: FE = ECScalar::from(&BigInt::from_hex(STR_SECRET1));
+
+    SharedKeys {
+        y: &ECPoint::generator() * &privkey,
+        x_i: privkey,
+    }
+}
+
+fn get_random_shared_keys() -> SharedKeys {
+    let privkey = Secp256k1Scalar::new_random();
+
+    SharedKeys {
+        y: &ECPoint::generator() * &privkey,
+        x_i: privkey,
+    }
+}
+
+/// returns sha256 value from input.
+fn hash(data: &[u8]) -> [u8; 32] {
+    use bitcoin_hashes::Hash;
+    let hash = bitcoin_hashes::sha256::Hash::hash(data);
+    hash.into_inner()
+}
+
+#[test]
+fn test_sign() {
+    for n in 0..16 {
+        let msg = {
+            let m = format!("Very secret message {}: 11", n);
+            hash(m.as_bytes())
+        };
+
+        let v = get_random_shared_keys();
+
+        let sign1 = {
+            let s = LocalSig::compute(&msg[..], &v, &get_shared_keys(STR_SECRET1));
+            Signature {
+                sigma: s.gamma_i,
+                v: v.y,
+            }
+        };
+        assert!(sign1
+            .verify(&msg[..], &get_shared_keys(STR_SECRET1).y)
+            .is_ok());
+
+        let sign2 = {
+            let s = LocalSig::compute(&msg[..], &v, &get_shared_keys(STR_SECRET2));
+            Signature {
+                sigma: s.gamma_i,
+                v: v.y,
+            }
+        };
+        assert!(sign2
+            .verify(&msg[..], &get_shared_keys(STR_SECRET2).y)
+            .is_ok());
+
+        let sign1c = {
+            let s = LocalSig::compute(&msg[..], &v, &get_shared_keys(STR_SECRET1C));
+            Signature {
+                sigma: s.gamma_i,
+                v: v.y,
+            }
+        };
+        assert!(sign1c
+            .verify(&msg[..], &get_shared_keys(STR_SECRET1C).y)
+            .is_ok());
+
+        let sign2c = {
+            let s = LocalSig::compute(&msg[..], &v, &get_shared_keys(STR_SECRET2C));
+            Signature {
+                sigma: s.gamma_i,
+                v: v.y,
+            }
+        };
+        assert!(sign2c
+            .verify(&msg[..], &get_shared_keys(STR_SECRET2C).y)
+            .is_ok());
+    }
+}
