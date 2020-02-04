@@ -104,6 +104,8 @@ impl ToShares for SharedSecretMap {
     }
 }
 
+static INITIAL_MASTER_INDEX: usize = 0;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeState {
     Joining,
@@ -177,7 +179,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
         // Start First Round
         log::info!("Start block creation rounds.");
-        self.start_next_round(0);
+        self.start_next_round(INITIAL_MASTER_INDEX);
 
         // get error_handler that is for catch error within connection_manager.
         let connection_manager_error_handler = self.connection_manager.error_handler();
@@ -880,10 +882,7 @@ mod tests {
         });
         node.start();
 
-        assert_eq!(
-            master_index(&node.current_state, &node.params).unwrap(),
-            1 as usize
-        );
+        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 1);
     }
 
     #[test]

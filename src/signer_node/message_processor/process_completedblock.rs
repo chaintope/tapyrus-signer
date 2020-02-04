@@ -13,7 +13,7 @@ where
     T: TapyrusApi,
 {
     if !is_master(sender_id, prev_state, params) {
-        log::warn!("Peer {} may be vicious node. It might swindle as master or your node is behind from others.", sender_id);
+        log::warn!("Peer {} may be malicious node. It might impersonate as master or your node might be behind from others.", sender_id);
         return prev_state.clone(); // Ignore message
     }
 
