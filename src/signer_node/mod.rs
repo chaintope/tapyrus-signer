@@ -215,10 +215,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
                     match message_type {
                         KeyGenerationMessage(msg) => {
-                            self.process_key_generation_message(sender_id, msg);
+                            self.process_key_generation_message(&sender_id, msg);
                         }
                         BlockGenerationRoundMessages(msg) => {
-                            let next = self.process_round_message(sender_id, msg);
+                            let next = self.process_round_message(&sender_id, msg);
                             self.current_state = next;
                         }
                     }
@@ -325,7 +325,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     pub fn process_key_generation_message(
         &mut self,
-        sender_id: SignerID,
+        sender_id: &SignerID,
         message: KeyGenerationMessageType,
     ) {
         match message {
@@ -337,7 +337,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     pub fn process_round_message(
         &mut self,
-        sender_id: SignerID,
+        sender_id: &SignerID,
         message: BlockGenerationRoundMessageType,
     ) -> NodeState {
         match message {
