@@ -9,8 +9,8 @@ Tapyrus Signer Node is provide and deploy federation signer network.
 ## Requirement
 Building `node` requires Rust following version.
 ```
-stable-x86_64-apple-darwin (default)
-rustc 1.35.0 (3c235d560 2019-05-20)
+$ rustc --version
+rustc 1.41.0 (5e1a79984 2020-01-27)
 ```
 And [Tapyrus-core](https://bitbucket.org/chaintope/tapyrus-core/src/master/) of latest version for run node.
 
