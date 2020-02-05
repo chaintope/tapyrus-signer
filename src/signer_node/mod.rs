@@ -517,30 +517,24 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::mpsc::{channel, Receiver, Sender};
-    use std::sync::{Arc, Mutex};
-    use std::thread;
-    use std::thread::JoinHandle;
-    use std::time::Duration;
-
-    use redis::ControlFlow;
-
-    use crate::net::{
-        BlockGenerationRoundMessageType, ConnectionManager, ConnectionManagerError, Message,
-        MessageType, SignerID,
-    };
-    use crate::rpc::tests::{safety, safety_error, MockRpc, SafetyBlock};
+    use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
+    use crate::rpc::tests::{safety, safety_error, MockRpc};
     use crate::rpc::TapyrusApi;
-    use crate::signer_node::message_processor::process_candidateblock;
-    use crate::signer_node::message_processor::process_completedblock;
     use crate::signer_node::{
         master_index, next_master_index, BidirectionalSharedSecretMap, NodeParameters, NodeState,
         SignerNode,
     };
-    use crate::test_helper::{enable_log, get_block, TestKeys};
-    use bitcoin::{Address, PrivateKey};
+    use crate::tests::helper::blocks::get_block;
+    use crate::tests::helper::keys::TEST_KEYS;
+    use crate::tests::helper::{address, enable_log};
+    use redis::ControlFlow;
+    use std::sync::mpsc::{channel, Receiver, Sender};
+    use std::sync::Arc;
+    use std::thread;
+    use std::thread::JoinHandle;
+    use std::time::Duration;
 
-    type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
+    pub type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
 
     /// ConnectionManager for testing.
     pub struct TestConnectionManager {
@@ -552,12 +546,6 @@ mod tests {
         pub receiver: Receiver<Message>,
         /// A function which is called when the node try to broadcast messages.
         pub broadcast_assert: SpyMethod,
-    }
-
-    fn address(private_key: &PrivateKey) -> Address {
-        let secp = secp256k1::Secp256k1::new();
-        let self_pubkey = private_key.public_key(&secp);
-        Address::p2pkh(&self_pubkey, private_key.network)
     }
 
     impl TestConnectionManager {
@@ -628,10 +616,9 @@ mod tests {
         spy: SpyMethod,
         publish_count: u32,
     ) -> (SignerNode<T, TestConnectionManager>, Sender<Message>) {
-        let testkeys = TestKeys::new();
-        let pubkey_list = testkeys.pubkeys();
+        let pubkey_list = TEST_KEYS.pubkeys();
         let threshold = 3;
-        let private_key = testkeys.key[0];
+        let private_key = TEST_KEYS.key[0];
         let to_address = address(&private_key);
 
         let mut params = NodeParameters::new(
@@ -651,58 +638,11 @@ mod tests {
         (node, broadcaster)
     }
 
-    /// Run node on other thread.
-    pub fn setup_node(
-        spy: SpyMethod,
-        arc_block: SafetyBlock,
-    ) -> (
-        Arc<Mutex<SignerNode<MockRpc, TestConnectionManager>>>,
-        Sender<u32>,
-        Sender<Message>,
-    ) {
-        let testkeys = TestKeys::new();
-        let pubkey_list = testkeys.pubkeys();
-        let threshold = 2;
-        let private_key = testkeys.key[0];
-        let to_address = address(&private_key);
-
-        let con = TestConnectionManager::new(1, spy);
-        let rpc = MockRpc {
-            return_block: arc_block.clone(),
-        };
-        let broadcaster = con.sender.clone();
-
-        let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
-        let mut params = NodeParameters::new(
-            to_address,
-            pubkey_list,
-            private_key,
-            threshold,
-            rpc,
-            0,
-            true,
-        );
-        params.round_duration = 0;
-        let arc_node = Arc::new(Mutex::new(SignerNode::new(con, params)));
-        let node = arc_node.clone();
-        let _handle = thread::Builder::new()
-            .name("NodeMainThread".to_string())
-            .spawn(move || {
-                let mut node = node.lock().unwrap();
-                node.stop_handler(stop_handler);
-                node.start();
-            })
-            .unwrap();
-
-        (arc_node, stop_signal, broadcaster)
-    }
-
     #[test]
     fn test_pubkey_list_sort() {
         use bitcoin::util::key::PublicKey;
         use std::str::FromStr;
 
-        let testkeys = TestKeys::new();
         let pubkey_list = vec![
             PublicKey::from_str(
                 "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
@@ -726,7 +666,7 @@ mod tests {
             .unwrap(),
         ];
         let threshold = 3;
-        let private_key = testkeys.key[0];
+        let private_key = TEST_KEYS.key[0];
         let to_address = address(&private_key);
 
         let params = NodeParameters::new(
@@ -743,121 +683,6 @@ mod tests {
 
         assert_ne!(params.pubkey_list[0], pubkey_list[0]);
         assert_eq!(params.pubkey_list[1], pubkey_list[4]);
-    }
-
-    #[test]
-    fn test_candidate_process() {
-        let (broadcast_s, broadcast_r): (Sender<Arc<Message>>, Receiver<Arc<Message>>) = channel();
-        let assertion = Box::new(move |message: Arc<Message>| {
-            broadcast_s.send(message).unwrap();
-        });
-        let arc_block = safety(get_block(0));
-        let (_node, stop_signal, broadcaster) = setup_node(assertion, arc_block);
-        let message_str = r#"{"message_type": {"BlockGenerationRoundMessages": {"Candidateblock": [0, 0, 0, 32, 237, 101, 140, 196, 6, 112, 204, 237, 162, 59, 176, 182, 20, 130, 31, 230, 212, 138, 65, 209, 7, 209, 159, 63, 58, 86, 8, 173, 61, 72, 48, 146, 177, 81, 22, 10, 183, 17, 51, 180, 40, 225, 246, 46, 174, 181, 152, 174, 133, 143, 246, 96, 23, 201, 150, 1, 242, 144, 136, 183, 198, 74, 72, 29, 98, 132, 225, 69, 210, 155, 112, 191, 84, 57, 45, 41, 112, 16, 49, 210, 175, 159, 237, 95, 155, 178, 31, 187, 40, 79, 167, 28, 235, 35, 143, 105, 166, 212, 9, 93, 0, 1, 2, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 3, 92, 1, 1, 255, 255, 255, 255, 2, 0, 242, 5, 42, 1, 0, 0, 0, 25, 118, 169, 20, 207, 18, 219, 192, 75, 176, 222, 111, 182, 168, 122, 90, 235, 75, 46, 116, 201, 112, 6, 178, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 38, 106, 36, 170, 33, 169, 237, 226, 246, 28, 63, 113, 209, 222, 253, 63, 169, 153, 223, 163, 105, 83, 117, 92, 105, 6, 137, 121, 153, 98, 180, 139, 235, 216, 54, 151, 78, 140, 249, 1, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }},"sender_id": [3, 131, 26, 105, 184, 0, 152, 51, 171, 91, 3, 38, 1, 46, 175, 72, 155, 254, 163, 90, 115, 33, 177, 202, 21, 177, 29, 136, 19, 20, 35, 250, 252],"receiver_id": null}"#;
-        let message = serde_json::from_str::<Message>(message_str).unwrap();
-
-        broadcaster.send(message).unwrap();
-        //first, node receives 5 Nodevss messages.
-        for _ in 0..5 {
-            let broadcast_message1 = broadcast_r.recv().unwrap();
-            let actual1 = format!("{:?}", &broadcast_message1.message_type);
-            println!("{:?}", actual1);
-            assert!(actual1.starts_with("KeyGenerationMessage(Nodevss"));
-        }
-        //TODO: receive vss messages.
-
-        stop_signal.send(1).unwrap(); // this line not necessary, but for manners.
-    }
-
-    #[test]
-    fn test_candidate_process_invalid_block() {
-        let (broadcast_s, broadcast_r): (Sender<Arc<Message>>, Receiver<Arc<Message>>) = channel();
-        let spy = Box::new(move |message: Arc<Message>| {
-            broadcast_s.send(message).unwrap();
-        });
-        let arc_block = safety_error("invalid block!".to_string());
-        let (_node, stop_signal, bloadcaster) = setup_node(spy, arc_block);
-        let message_str = r#"{"message_type": {"BlockGenerationRoundMessages": {"Candidateblock": [0, 0, 0, 32, 237, 101, 140, 196, 6, 112, 204, 237, 162, 59, 176, 182, 20, 130, 31, 230, 212, 138, 65, 209, 7, 209, 159, 63, 58, 86, 8, 173, 61, 72, 48, 146, 177, 81, 22, 10, 183, 17, 51, 180, 40, 225, 246, 46, 174, 181, 152, 174, 133, 143, 246, 96, 23, 201, 150, 1, 242, 144, 136, 183, 198, 74, 72, 29, 98, 132, 225, 69, 210, 155, 112, 191, 84, 57, 45, 41, 112, 16, 49, 210, 175, 159, 237, 95, 155, 178, 31, 187, 40, 79, 167, 28, 235, 35, 143, 105, 166, 212, 9, 93, 0, 1, 2, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 3, 92, 1, 1, 255, 255, 255, 255, 2, 0, 242, 5, 42, 1, 0, 0, 0, 25, 118, 169, 20, 207, 18, 219, 192, 75, 176, 222, 111, 182, 168, 122, 90, 235, 75, 46, 116, 201, 112, 6, 178, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 38, 106, 36, 170, 33, 169, 237, 226, 246, 28, 63, 113, 209, 222, 253, 63, 169, 153, 223, 163, 105, 83, 117, 92, 105, 6, 137, 121, 153, 98, 180, 139, 235, 216, 54, 151, 78, 140, 249, 1, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }},"sender_id": [3, 131, 26, 105, 184, 0, 152, 51, 171, 91, 3, 38, 1, 46, 175, 72, 155, 254, 163, 90, 115, 33, 177, 202, 21, 177, 29, 136, 19, 20, 35, 250, 252],"receiver_id": null}"#;
-        let message = serde_json::from_str::<Message>(message_str).unwrap();
-
-        bloadcaster.send(message).unwrap();
-        match broadcast_r.recv_timeout(Duration::from_millis(500)) {
-            Ok(m) => match unsafe { &*Arc::into_raw(m) } {
-                m
-                @
-                Message {
-                    message_type:
-                        MessageType::BlockGenerationRoundMessages(
-                            BlockGenerationRoundMessageType::Blockvss { .. },
-                        ),
-                    ..
-                } => assert!(
-                    false,
-                    "A node should not broadcast Signature message: {:?}",
-                    m
-                ),
-                _ => {}
-            },
-            Err(_e) => {}
-        }
-        stop_signal.send(1).unwrap(); // this line not necessary, but for manners.
-    }
-
-    /// When a node's state is Member, the node receives candidateblock message from the other
-    /// node who are not assumed as a master of the round, the node change the assumption to
-    /// that the other node is master.
-    ///
-    /// The test scenario is below.
-    ///
-    /// *premise:*
-    /// * The node's status is Member and its index is 4.
-    /// * The round master's index is 0.
-    ///
-    /// 1. Send candidateblock message from index 0 node(array index is 1).
-    ///    It must not change master_index assumption.
-    /// 2. Send candidateblock message from index 4 node(array index is 0).
-    ///    It must change master_index assumption to 4.
-    #[test]
-    fn test_modify_master_index() {
-        let initial_state = NodeState::Member {
-            block_key: None,
-            block_shared_keys: None,
-            shared_block_secrets: BidirectionalSharedSecretMap::new(),
-            candidate_block: None,
-            master_index: 0,
-        };
-        let arc_block = safety(get_block(0));
-        let rpc = MockRpc {
-            return_block: arc_block.clone(),
-        };
-        let mut node = create_node(initial_state, rpc);
-
-        // Check premise. master_index is 0.
-        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
-
-        // Step 1.
-        let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
-        node.current_state = process_candidateblock(
-            &sender_id,
-            &get_block(0),
-            &node.current_state,
-            &node.connection_manager,
-            &node.params,
-        );
-        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
-
-        // Step 2.
-        let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
-        node.current_state = process_candidateblock(
-            &sender_id,
-            &get_block(0),
-            &node.current_state,
-            &node.connection_manager,
-            &node.params,
-        );
-        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 4);
-
-        node.round_timer.stop();
     }
 
     #[test]
@@ -883,88 +708,6 @@ mod tests {
         node.start();
 
         assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 1);
-    }
-
-    #[test]
-    fn test_process_completedblock() {
-        let initial_state = NodeState::Member {
-            block_key: None,
-            block_shared_keys: None,
-            shared_block_secrets: BidirectionalSharedSecretMap::new(),
-            candidate_block: None,
-            master_index: 0,
-        };
-        let arc_block = safety(get_block(0));
-        let rpc = MockRpc {
-            return_block: arc_block.clone(),
-        };
-        let mut node = create_node(initial_state, rpc);
-
-        // check 1, next_master_index should be incremented after process completeblock message.
-        let sender_id = SignerID::new(TestKeys::new().pubkeys()[1]);
-        // in begin, master_index is 0.
-        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
-
-        node.current_state =
-            process_completedblock(&sender_id, &get_block(0), &node.current_state, &node.params);
-
-        match &node.current_state {
-            NodeState::RoundComplete {
-                next_master_index, ..
-            } => assert_eq!(*next_master_index, 1),
-            n => assert!(false, "Should be Member, but state:{:?}", n),
-        }
-
-        // check 2, next master index should be back to 0 if the previous master index is the last number.
-        node.current_state = NodeState::Member {
-            block_key: None,
-            block_shared_keys: None,
-            shared_block_secrets: BidirectionalSharedSecretMap::new(),
-            candidate_block: None,
-            master_index: 4,
-        };
-        let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
-        node.current_state =
-            process_completedblock(&sender_id, &get_block(0), &node.current_state, &node.params);
-
-        match &node.current_state {
-            NodeState::RoundComplete {
-                next_master_index, ..
-            } => assert_eq!(*next_master_index, 0),
-            n => assert!(false, "Should be Member, but state:{:?}", n),
-        }
-    }
-
-    #[test]
-    fn test_process_completedblock_ignore_different_master() {
-        let initial_state = NodeState::Member {
-            block_key: None,
-            block_shared_keys: None,
-            shared_block_secrets: BidirectionalSharedSecretMap::new(),
-            candidate_block: None,
-            master_index: 0,
-        };
-        let arc_block = safety(get_block(0));
-        let rpc = MockRpc {
-            return_block: arc_block.clone(),
-        };
-        let node = create_node(initial_state, rpc);
-
-        // pubkeys sorted index map;
-        // 0 -> 4
-        // 1 -> 0
-        // 2 -> 3
-        // 3 -> 2
-        // 4 -> 1
-        let sender_id = SignerID::new(TestKeys::new().pubkeys()[0]);
-        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0); // in begin, master_index is 0.
-        let next_state =
-            process_completedblock(&sender_id, &get_block(0), &node.current_state, &node.params);
-        assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0); // should not incremented if not recorded master.
-        match next_state {
-            NodeState::Member { .. } => assert!(true),
-            n => panic!("Should be Member, but state:{:?}", n),
-        }
     }
 
     #[test]
