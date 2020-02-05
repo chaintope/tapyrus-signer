@@ -25,16 +25,14 @@ impl TestConnectionManager {
     }
 
     pub fn assert(self) {
-        if let TestConnectionManager {
+        let TestConnectionManager {
             should_broadcast,
             broadcasted,
             should_send,
             sent,
-        } = self
-        {
-            assert_eq!(should_broadcast, broadcasted.into_inner());
-            assert_eq!(should_send, sent.into_inner());
-        }
+        } = self;
+        assert_eq!(should_broadcast, broadcasted.into_inner());
+        assert_eq!(should_send, sent.into_inner());
     }
 
     pub fn should_broadcast(&mut self, message: Message) {
@@ -61,7 +59,7 @@ impl ConnectionManager for TestConnectionManager {
 
     fn start(
         &self,
-        mut message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
+        _message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
         _id: SignerID,
     ) -> JoinHandle<()> {
         // do nothing.
