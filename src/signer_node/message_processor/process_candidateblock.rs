@@ -1,4 +1,5 @@
 use crate::blockdata::Block;
+use crate::crypto::multi_party_schnorr::Keys;
 use crate::net::{
     BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
 };
@@ -9,7 +10,6 @@ use crate::signer_node::{NodeParameters, NodeState};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::ECScalar;
 use curv::{BigInt, FE};
-use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::Keys;
 
 pub fn process_candidateblock<T, C>(
     sender_id: &SignerID,

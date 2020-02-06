@@ -1,5 +1,6 @@
 use crate::blockdata::hash::Hash;
 use crate::blockdata::Block;
+use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
 use crate::net::{
     BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
 };
@@ -11,7 +12,6 @@ use crate::signer_node::ToVerifiableSS;
 use crate::signer_node::{NodeParameters, SharedSecretMap, ToSharedSecretMap};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::FE;
-use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::{LocalSig, SharedKeys};
 
 pub fn process_blocksig<T, C>(
     sender_id: &SignerID,

@@ -1,5 +1,6 @@
 use crate::blockdata::hash::Hash;
 use crate::blockdata::Block;
+use crate::crypto::multi_party_schnorr::SharedKeys;
 use crate::net::{
     BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
 };
@@ -11,7 +12,6 @@ use crate::util::jacobi;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::ECPoint;
 use curv::{BigInt, FE};
-use multi_party_schnorr::protocols::thresholdsig::bitcoin_schnorr::SharedKeys;
 
 pub fn process_blockvss<T, C>(
     sender_id: &SignerID,
