@@ -184,11 +184,9 @@ use std::borrow::Borrow;
 
 const STR_SECRET1: &str = "12b004fff7f4b69ef8650e767f18f11ede158148b425660723b9f9a66e61f747";
 const STR_SECRET2: &str = "b524c28b61c9b2c49b2c7dd4c2d75887abb78768c054bd7c01af4029f6c0d117";
-const STR_SECRET1C: &str = "12b004fff7f4b69ef8650e767f18f11ede158148b425660723b9f9a66e61f747";
-const STR_SECRET2C: &str = "b524c28b61c9b2c49b2c7dd4c2d75887abb78768c054bd7c01af4029f6c0d117";
 
-fn get_shared_keys(wif: &str) -> SharedKeys {
-    let privkey: FE = ECScalar::from(&BigInt::from_hex(STR_SECRET1));
+fn get_shared_keys(str_secret_key: &str) -> SharedKeys {
+    let privkey: FE = ECScalar::from(&BigInt::from_hex(str_secret_key));
 
     SharedKeys {
         y: &ECPoint::generator() * &privkey,
@@ -242,28 +240,6 @@ fn test_sign() {
         };
         assert!(sign2
             .verify(&msg[..], &get_shared_keys(STR_SECRET2).y)
-            .is_ok());
-
-        let sign1c = {
-            let s = LocalSig::compute(&msg[..], &v, &get_shared_keys(STR_SECRET1C));
-            Signature {
-                sigma: s.gamma_i,
-                v: v.y,
-            }
-        };
-        assert!(sign1c
-            .verify(&msg[..], &get_shared_keys(STR_SECRET1C).y)
-            .is_ok());
-
-        let sign2c = {
-            let s = LocalSig::compute(&msg[..], &v, &get_shared_keys(STR_SECRET2C));
-            Signature {
-                sigma: s.gamma_i,
-                v: v.y,
-            }
-        };
-        assert!(sign2c
-            .verify(&msg[..], &get_shared_keys(STR_SECRET2C).y)
             .is_ok());
     }
 }
