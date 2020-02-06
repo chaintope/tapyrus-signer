@@ -291,3 +291,56 @@ fn compute_e(r: &GE, y: &GE, message: &[u8]) -> FE {
 
     ECScalar::from(&e_bn)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::compute_e;
+    use curv::elliptic::curves::secp256_k1::Secp256k1Scalar;
+    use curv::elliptic::curves::traits::{ECPoint, ECScalar};
+    use curv::{BigInt, FE, GE};
+    use serde::Serialize;
+    use sha2::Digest;
+
+    #[test]
+    fn test_compute_e() {
+        let g: GE = ECPoint::generator();
+
+        let v: GE = {
+            // Public key from this secret key is '02008459be0a43dee493998b3e5e186323b9c1f1590765c82f650e425fcf074063'. Its x coordinate starts with "00".
+            let bn = BigInt::from_str_radix(
+                "8c36e52e1d9f5c62634001393e81c65d427e8dd60f9eeac866d2c46adcc65107",
+                16,
+            )
+            .unwrap();
+            let fe: FE = ECScalar::from(&bn);
+            g * fe
+        };
+        let y: GE = {
+            // Just random secret key
+            let bn = BigInt::from_str_radix(
+                "1d11656e57924a03cd12d5f3517e286bf697255642565405d78eeebcc20d43c0",
+                16,
+            )
+            .unwrap();
+            let fe: FE = ECScalar::from(&bn);
+            g * fe
+        };
+
+        // It should be equal to expected when the message started with "00" byte.
+        let message =
+            hex::decode("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f")
+                .unwrap();
+
+        let expected: FE = {
+            let bn = BigInt::from(
+                &vec![
+                    0_u8, 220, 239, 27, 2, 169, 72, 198, 246, 203, 60, 29, 33, 4, 45, 45, 116, 78,
+                    14, 99, 132, 151, 24, 148, 213, 219, 76, 18, 200, 223, 98, 93,
+                ][..],
+            );
+            ECScalar::from(&bn)
+        };
+
+        assert_eq!(expected, compute_e(&v, &y, &message[..]));
+    }
+}
