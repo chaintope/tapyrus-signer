@@ -69,4 +69,8 @@ impl TestKeys {
     pub fn signer_id(&self) -> SignerID {
         SignerID::new(self.pubkeys()[0])
     }
+
+    pub fn signer_ids(&self) -> Vec<SignerID> {
+        self.pubkeys().iter().map(|&pk| SignerID::new(pk)).collect()
+    }
 }
