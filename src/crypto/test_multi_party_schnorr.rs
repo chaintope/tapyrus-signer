@@ -180,7 +180,6 @@ use curv::arithmetic::traits::Converter;
 use curv::elliptic::curves::secp256_k1::Secp256k1Scalar;
 use curv::elliptic::curves::traits::{ECPoint, ECScalar};
 use curv::BigInt;
-use std::borrow::Borrow;
 
 const STR_SECRET1: &str = "12b004fff7f4b69ef8650e767f18f11ede158148b425660723b9f9a66e61f747";
 const STR_SECRET2: &str = "b524c28b61c9b2c49b2c7dd4c2d75887abb78768c054bd7c01af4029f6c0d117";
