@@ -1,6 +1,7 @@
 use crate::blockdata::hash::Hash;
 use crate::blockdata::Block;
 use crate::crypto::multi_party_schnorr::SharedKeys;
+use crate::errors::Error;
 use crate::net::{
     BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
 };
@@ -52,7 +53,7 @@ where
                     },
                 ),
             );
-            let shared_keys = process_blockvss_inner(
+            let result = process_blockvss_inner(
                 blockhash,
                 &new_shared_block_secrets,
                 priv_shared_keys,
@@ -61,8 +62,9 @@ where
                 params,
             );
 
-            match shared_keys {
-                Some(keys) => NodeState::Master {
+            match result {
+                Err(_) => prev_state.clone(),
+                Ok(Some(keys)) => NodeState::Master {
                     block_key: block_key.clone(),
                     shared_block_secrets: new_shared_block_secrets,
                     block_shared_keys: Some((keys.0, keys.1.x_i, keys.1.y)),
@@ -70,7 +72,7 @@ where
                     signatures: signatures.clone(),
                     round_is_done: false,
                 },
-                None => NodeState::Master {
+                Ok(_) => NodeState::Master {
                     block_key: block_key.clone(),
                     shared_block_secrets: new_shared_block_secrets,
                     block_shared_keys: None,
@@ -101,7 +103,7 @@ where
                     },
                 ),
             );
-            let shared_keys = process_blockvss_inner(
+            let result = process_blockvss_inner(
                 blockhash,
                 &new_shared_block_secrets,
                 priv_shared_keys,
@@ -109,16 +111,16 @@ where
                 conman,
                 params,
             );
-
-            match shared_keys {
-                Some(keys) => NodeState::Member {
+            match result {
+                Err(_) => prev_state.clone(),
+                Ok(Some(keys)) => NodeState::Member {
                     block_key: block_key.clone(),
                     shared_block_secrets: new_shared_block_secrets,
                     block_shared_keys: Some((keys.0, keys.1.x_i, keys.1.y)),
                     candidate_block: candidate_block.clone(),
                     master_index: *master_index,
                 },
-                None => NodeState::Member {
+                Ok(_) => NodeState::Member {
                     block_key: block_key.clone(),
                     shared_block_secrets: new_shared_block_secrets,
                     block_shared_keys: None,
@@ -138,7 +140,7 @@ fn process_blockvss_inner<T, C>(
     prev_state: &NodeState,
     conman: &C,
     params: &NodeParameters<T>,
-) -> Option<(bool, SharedKeys)>
+) -> Result<Option<(bool, SharedKeys)>, Error>
 where
     T: TapyrusApi,
     C: ConnectionManager,
@@ -160,20 +162,19 @@ where
     if let Some(block) = block_opt.clone() {
         if block.sighash() != blockhash {
             log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", block.sighash(), blockhash);
-            return None;
+            return Err(Error::InvalidBlock);
         }
     } else {
         // Signer node need to receive candidateblock before receiving VSS.
         log::error!("Invalid blockvss message received. candidateblock was not received in this round yet, but got VSS.");
-        return None;
+        return Err(Error::InvalidBlock);
     }
     if shared_block_secrets.len() == params.pubkey_list.len() {
         let shared_keys_for_positive = Sign::verify_vss_and_construct_key(
             &sharing_params,
             &shared_block_secrets.for_positive(),
             &(params.self_node_index + 1),
-        )
-        .expect("invalid vss");
+        )?;
 
         let result_for_positive = Sign::sign(
             &shared_keys_for_positive,
@@ -185,8 +186,7 @@ where
             &sharing_params,
             &shared_block_secrets.for_negative(),
             &(params.self_node_index + 1),
-        )
-        .expect("invalid vss");
+        )?;
         let result_for_negative = Sign::sign(
             &shared_keys_for_negative,
             priv_shared_keys,
@@ -221,9 +221,9 @@ where
             }
             _ => (),
         }
-        return Some((is_positive, shared_keys));
+        return Ok(Some((is_positive, shared_keys)));
     } else {
-        return None;
+        return Ok(None);
     }
 }
 
