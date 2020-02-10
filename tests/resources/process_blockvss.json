@@ -15,6 +15,10 @@
         "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
         "block_hash": "0000000000000000000000000000000000000000000000000000000000000000",
         "vss_for_positive": {
+          "parameters": {
+            "threshold": 1,
+            "share_count": 3
+          },
           "commitments": [
             {
               "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
@@ -28,6 +32,10 @@
         },
         "secret_share_for_positive": "14fd1161c8002904b7e92ba6919b96435ce9e1eb73a8f368a3b4032d93623d7b",
         "vss_for_negative": {
+          "parameters": {
+            "threshold": 1,
+            "share_count": 3
+          },
           "commitments": [
             {
               "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
@@ -52,6 +60,10 @@
         "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2": [
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "97e149ffa1529c0e892c5063b96a134a8449ff39e86d0ee02474cbdffb965c52",
@@ -67,6 +79,10 @@
           },
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "97e149ffa1529c0e892c5063b96a134a8449ff39e86d0ee02474cbdffb965c52",
@@ -84,6 +100,10 @@
         "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1": [
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "02af9cd3ad3cc79ad2283b20b2a5b52ed9c6f30d91ec8cc490c122b04328759c",
@@ -99,6 +119,10 @@
           },
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "02af9cd3ad3cc79ad2283b20b2a5b52ed9c6f30d91ec8cc490c122b04328759c",
@@ -138,6 +162,10 @@
         "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
         "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
         "vss_for_positive": {
+          "parameters": {
+            "threshold": 1,
+            "share_count": 3
+          },
           "commitments": [
             {
               "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
@@ -151,6 +179,10 @@
         },
         "secret_share_for_positive": "14fd1161c8002904b7e92ba6919b96435ce9e1eb73a8f368a3b4032d93623d7b",
         "vss_for_negative": {
+          "parameters": {
+            "threshold": 1,
+            "share_count": 3
+          },
           "commitments": [
             {
               "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
@@ -175,6 +207,10 @@
         "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2": [
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "97e149ffa1529c0e892c5063b96a134a8449ff39e86d0ee02474cbdffb965c52",
@@ -190,6 +226,10 @@
           },
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "97e149ffa1529c0e892c5063b96a134a8449ff39e86d0ee02474cbdffb965c52",
@@ -229,6 +269,10 @@
         "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
         "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
         "vss_for_positive": {
+          "parameters": {
+            "threshold": 1,
+            "share_count": 3
+          },
           "commitments": [
             {
               "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
@@ -242,6 +286,10 @@
         },
         "secret_share_for_positive": "14fd1161c8002904b7e92ba6919b96435ce9e1eb73a8f368a3b4032d93623d7b",
         "vss_for_negative": {
+          "parameters": {
+            "threshold": 1,
+            "share_count": 3
+          },
           "commitments": [
             {
               "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
@@ -266,6 +314,10 @@
         "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2": [
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "97e149ffa1529c0e892c5063b96a134a8449ff39e86d0ee02474cbdffb965c52",
@@ -281,6 +333,10 @@
           },
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "97e149ffa1529c0e892c5063b96a134a8449ff39e86d0ee02474cbdffb965c52",
@@ -298,6 +354,10 @@
         "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1": [
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "02af9cd3ad3cc79ad2283b20b2a5b52ed9c6f30d91ec8cc490c122b04328759c",
@@ -313,6 +373,10 @@
           },
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "02af9cd3ad3cc79ad2283b20b2a5b52ed9c6f30d91ec8cc490c122b04328759c",
@@ -352,6 +416,10 @@
         "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
         "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
         "vss_for_positive": {
+          "parameters": {
+            "threshold": 1,
+            "share_count": 3
+          },
           "commitments": [
             {
               "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
@@ -365,6 +433,10 @@
         },
         "secret_share_for_positive": "14fd1161c8002904b7e92ba6919b96435ce9e1eb73a8f368a3b4032d93623d7b",
         "vss_for_negative": {
+          "parameters": {
+            "threshold": 1,
+            "share_count": 3
+          },
           "commitments": [
             {
               "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
@@ -389,6 +461,10 @@
         "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2": [
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "97e149ffa1529c0e892c5063b96a134a8449ff39e86d0ee02474cbdffb965c52",
@@ -404,6 +480,10 @@
           },
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "97e149ffa1529c0e892c5063b96a134a8449ff39e86d0ee02474cbdffb965c52",
@@ -421,6 +501,10 @@
         "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1": [
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "02af9cd3ad3cc79ad2283b20b2a5b52ed9c6f30d91ec8cc490c122b04328759c",
@@ -436,6 +520,10 @@
           },
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "02af9cd3ad3cc79ad2283b20b2a5b52ed9c6f30d91ec8cc490c122b04328759c",
@@ -475,6 +563,10 @@
         "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
         "block_hash": "0000000000000000000000000000000000000000000000000000000000000000",
         "vss_for_positive": {
+          "parameters": {
+            "threshold": 1,
+            "share_count": 3
+          },
           "commitments": [
             {
               "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
@@ -488,6 +580,10 @@
         },
         "secret_share_for_positive": "14fd1161c8002904b7e92ba6919b96435ce9e1eb73a8f368a3b4032d93623d7b",
         "vss_for_negative": {
+          "parameters": {
+            "threshold": 1,
+            "share_count": 3
+          },
           "commitments": [
             {
               "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
@@ -512,6 +608,10 @@
         "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2": [
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "97e149ffa1529c0e892c5063b96a134a8449ff39e86d0ee02474cbdffb965c52",
@@ -527,6 +627,10 @@
           },
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "97e149ffa1529c0e892c5063b96a134a8449ff39e86d0ee02474cbdffb965c52",
@@ -544,6 +648,10 @@
         "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1": [
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "02af9cd3ad3cc79ad2283b20b2a5b52ed9c6f30d91ec8cc490c122b04328759c",
@@ -559,6 +667,10 @@
           },
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "02af9cd3ad3cc79ad2283b20b2a5b52ed9c6f30d91ec8cc490c122b04328759c",
@@ -598,6 +710,10 @@
         "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
         "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
         "vss_for_positive": {
+          "parameters": {
+            "threshold": 1,
+            "share_count": 3
+          },
           "commitments": [
             {
               "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
@@ -611,6 +727,10 @@
         },
         "secret_share_for_positive": "14fd1161c8002904b7e92ba6919b96435ce9e1eb73a8f368a3b4032d93623d7b",
         "vss_for_negative": {
+          "parameters": {
+            "threshold": 1,
+            "share_count": 3
+          },
           "commitments": [
             {
               "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
@@ -635,6 +755,10 @@
         "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2": [
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "97e149ffa1529c0e892c5063b96a134a8449ff39e86d0ee02474cbdffb965c52",
@@ -650,6 +774,10 @@
           },
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "97e149ffa1529c0e892c5063b96a134a8449ff39e86d0ee02474cbdffb965c52",
@@ -689,6 +817,10 @@
         "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
         "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
         "vss_for_positive": {
+          "parameters": {
+            "threshold": 1,
+            "share_count": 3
+          },
           "commitments": [
             {
               "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
@@ -702,6 +834,10 @@
         },
         "secret_share_for_positive": "14fd1161c8002904b7e92ba6919b96435ce9e1eb73a8f368a3b4032d93623d7b",
         "vss_for_negative": {
+          "parameters": {
+            "threshold": 1,
+            "share_count": 3
+          },
           "commitments": [
             {
               "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
@@ -726,6 +862,10 @@
         "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2": [
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "97e149ffa1529c0e892c5063b96a134a8449ff39e86d0ee02474cbdffb965c52",
@@ -741,6 +881,10 @@
           },
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "97e149ffa1529c0e892c5063b96a134a8449ff39e86d0ee02474cbdffb965c52",
@@ -758,6 +902,10 @@
         "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1": [
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "02af9cd3ad3cc79ad2283b20b2a5b52ed9c6f30d91ec8cc490c122b04328759c",
@@ -773,6 +921,10 @@
           },
           {
             "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
               "commitments": [
                 {
                   "x": "02af9cd3ad3cc79ad2283b20b2a5b52ed9c6f30d91ec8cc490c122b04328759c",

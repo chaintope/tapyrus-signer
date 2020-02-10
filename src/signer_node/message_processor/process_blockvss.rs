@@ -234,11 +234,9 @@ mod tests {
     use crate::crypto::multi_party_schnorr::SharedKeys;
     use crate::signer_node::*;
     use crate::tests::helper::net::TestConnectionManager;
-    use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
     use crate::tests::helper::node_state_builder::{Builder, Master, Member};
     use crate::tests::helper::rpc::MockRpc;
     use crate::tests::helper::test_vectors::*;
-    use bitcoin::PublicKey;
     use curv::cryptographic_primitives::secret_sharing::feldman_vss::*;
     use curv::FE;
     use serde_json::Value;
@@ -591,48 +589,23 @@ mod tests {
     ) {
         let v = &contents["cases"][case];
 
-        let private_key = private_key_from_wif(&v["node_private_key"]);
-        let public_keys: Vec<PublicKey> = v["public_keys"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|pk| to_public_key(pk))
-            .collect();
-        let threshold = v["threshold"].as_u64().unwrap();
-        let sharing_params = ShamirSecretSharing {
-            threshold: (threshold - 1) as usize,
-            share_count: public_keys.len(),
-        };
-        let params = NodeParametersBuilder::new()
-            .rpc(rpc)
-            .threshold(threshold as u8)
-            .pubkey_list(public_keys.clone())
-            .private_key(private_key)
-            .build();
+        let params = to_node_parameters(&v, rpc);
 
-        let block_key = if v["block_key"].is_null() {
-            None
-        } else {
-            Some(to_fe(&v["block_key"]))
-        };
-        let block = if v["candidate_block"].is_null() {
-            None
-        } else {
-            Some(to_block(&v["candidate_block"]))
-        };
+        let block_key: Option<FE> = serde_json::from_value(v["block_key"].clone()).unwrap();
+        let block = to_block(&v["candidate_block"]);
 
         let sender = to_signer_id(&v["received"]["sender"].as_str().unwrap().to_string());
         let hex = hex::decode(v["received"]["block_hash"].as_str().unwrap()).unwrap();
         let blockhash = Hash::from_slice(&hex[..]).unwrap();
-        let vss_for_positive = to_vss(&v["received"]["vss_for_positive"], sharing_params.clone());
+        let vss_for_positive: VerifiableSS =
+            serde_json::from_value(v["received"]["vss_for_positive"].clone()).unwrap();
         let secret_share_for_positive = to_fe(&v["received"]["secret_share_for_positive"]);
-        let vss_for_negative = to_vss(&v["received"]["vss_for_negative"], sharing_params.clone());
+        let vss_for_negative =
+            serde_json::from_value(v["received"]["vss_for_negative"].clone()).unwrap();
         let secret_share_for_negative = to_fe(&v["received"]["secret_share_for_negative"]);
 
-        let priv_shared_key = SharedKeys {
-            x_i: to_fe(&v["priv_shared_key"]["x_i"]),
-            y: to_point(&v["priv_shared_key"]["y"]),
-        };
+        let priv_shared_key: SharedKeys =
+            serde_json::from_value(v["priv_shared_key"].clone()).unwrap();
 
         let shared_block_secrets = v["shared_block_secrets"]
             .as_object()
@@ -641,10 +614,7 @@ mod tests {
             .map(|(k, value)| {
                 (
                     to_signer_id(k),
-                    (
-                        to_shared_secret(&value[0], sharing_params.clone()),
-                        to_shared_secret(&value[1], sharing_params.clone()),
-                    ),
+                    (to_shared_secret(&value[0]), to_shared_secret(&value[1])),
                 )
             })
             .collect();

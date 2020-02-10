@@ -39,7 +39,10 @@ pub fn address(private_key: &PrivateKey) -> Address {
 pub mod test_vectors {
     use crate::blockdata::Block;
     use crate::net::SignerID;
+    use crate::signer_node::NodeParameters;
     use crate::signer_node::SharedSecret;
+    use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
+    use crate::tests::helper::rpc::MockRpc;
     use bitcoin::{PrivateKey, PublicKey};
     use curv::{FE, GE};
     use serde_json::Value;
@@ -81,12 +84,34 @@ pub mod test_vectors {
         serde_json::from_value(ge.clone()).unwrap()
     }
 
-    pub fn to_block(block: &Value) -> Block {
-        let hex = hex::decode(block.as_str().unwrap()).unwrap();
-        Block::new(hex)
+    pub fn to_block(block: &Value) -> Option<Block> {
+        if block.is_null() {
+            None
+        } else {
+            let hex = hex::decode(block.as_str().unwrap()).unwrap();
+            let block = Block::new(hex);
+            Some(block)
+        }
     }
 
     pub fn to_shared_secret(value: &Value) -> SharedSecret {
         serde_json::from_value(value.clone()).unwrap()
+    }
+
+    pub fn to_node_parameters(value: &Value, rpc: MockRpc) -> NodeParameters<MockRpc> {
+        let private_key = private_key_from_wif(&value["node_private_key"]);
+        let public_keys: Vec<PublicKey> = value["public_keys"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|pk| to_public_key(pk))
+            .collect();
+        let threshold = value["threshold"].as_u64().unwrap();
+        NodeParametersBuilder::new()
+            .rpc(rpc)
+            .threshold(threshold as u8)
+            .pubkey_list(public_keys.clone())
+            .private_key(private_key)
+            .build()
     }
 }
