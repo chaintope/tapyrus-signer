@@ -180,7 +180,7 @@ mod tests {
     #[test]
     fn test_process_blocksig_for_member() {
         // if node state is Member, process_blocksig should return Member state(it is same as prev_state).
-        let contents = load_test_vector("./tests/resources/test_vectors.json").unwrap();
+        let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
@@ -206,7 +206,7 @@ mod tests {
     fn test_process_blocksig_invalid_block() {
         // if node receives invalid block (that means block is not the same as candidate block),
         // node should return prev_state immediately.
-        let contents = load_test_vector("./tests/resources/test_vectors.json").unwrap();
+        let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
@@ -234,7 +234,7 @@ mod tests {
         //  - but the number of signatures(1) is not enough (2) to generate a aggregated signature,
         // node should return new Master state which has signatures.
 
-        let contents = load_test_vector("./tests/resources/test_vectors.json").unwrap();
+        let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
@@ -283,7 +283,7 @@ mod tests {
         //  - but block shared key is not supplied.
         // node should return prev_state.
 
-        let contents = load_test_vector("./tests/resources/test_vectors.json").unwrap();
+        let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
@@ -313,7 +313,7 @@ mod tests {
         //  - but received gamma_i and e is invalid.
         // node should return prev_state.
 
-        let contents = load_test_vector("./tests/resources/test_vectors.json").unwrap();
+        let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
@@ -348,7 +348,7 @@ mod tests {
         //  - but node already received invalid signature from other node
         // node should return prev_state.
 
-        let contents = load_test_vector("./tests/resources/test_vectors.json").unwrap();
+        let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
@@ -381,7 +381,7 @@ mod tests {
         //  - send message `Completedblock`
         //  - return Master
 
-        let contents = load_test_vector("./tests/resources/test_vectors.json").unwrap();
+        let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
 
         let conman = TestConnectionManager::new();
         let mut rpc = MockRpc::new();
