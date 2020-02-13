@@ -100,6 +100,15 @@ impl MockRpc {
             Err(_) => unimplemented!("MockRpc not support testing Error result yet."),
         }
     }
+
+    pub fn should_call_testproposedblock_and_returns_invalid_block_error(&mut self) {
+        let err = Error::JsonRpc(jsonrpc::error::Error::Rpc(jsonrpc::error::RpcError {
+            code: -25,
+            message: "proposal was not based on our best chain".to_string(),
+            data: None,
+        }));
+        self.should_call_testproposedblock(Err(err));
+    }
 }
 
 impl TapyrusApi for MockRpc {
