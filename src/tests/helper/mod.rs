@@ -41,10 +41,7 @@ pub mod test_vectors {
     use crate::net::SignerID;
     use crate::signer_node::SharedSecret;
     use bitcoin::{PrivateKey, PublicKey};
-    use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
-    use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-    use curv::elliptic::curves::traits::{ECPoint, ECScalar};
-    use curv::{BigInt, FE, GE};
+    use curv::{FE, GE};
     use serde_json::Value;
     use std::fs::read_to_string;
     use std::str::FromStr;
@@ -77,14 +74,11 @@ pub mod test_vectors {
     }
 
     pub fn to_fe(fe: &Value) -> FE {
-        ECScalar::from(&BigInt::from_str_radix(fe.as_str().unwrap(), 16).unwrap())
+        serde_json::from_value(fe.clone()).unwrap()
     }
 
     pub fn to_point(ge: &Value) -> GE {
-        ECPoint::from_coor(
-            &BigInt::from_str_radix(ge["x"].as_str().unwrap(), 16).unwrap(),
-            &BigInt::from_str_radix(ge["y"].as_str().unwrap(), 16).unwrap(),
-        )
+        serde_json::from_value(ge.clone()).unwrap()
     }
 
     pub fn to_block(block: &Value) -> Block {
@@ -92,19 +86,7 @@ pub mod test_vectors {
         Block::new(hex)
     }
 
-    pub fn to_shared_secret(value: &Value, sharing_params: ShamirSecretSharing) -> SharedSecret {
-        let commitments = value["vss"]["commitments"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|commitments| to_point(commitments))
-            .collect();
-        SharedSecret {
-            vss: VerifiableSS {
-                parameters: sharing_params,
-                commitments: commitments,
-            },
-            secret_share: to_fe(&value["secret_share"]),
-        }
+    pub fn to_shared_secret(value: &Value) -> SharedSecret {
+        serde_json::from_value(value.clone()).unwrap()
     }
 }

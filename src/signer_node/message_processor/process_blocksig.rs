@@ -171,7 +171,6 @@ mod tests {
     use crate::tests::helper::rpc::MockRpc;
     use crate::tests::helper::test_vectors::*;
     use bitcoin::PublicKey;
-    use curv::cryptographic_primitives::secret_sharing::feldman_vss::*;
     use curv::FE;
     use serde_json::Value;
     use std::collections::BTreeMap;
@@ -441,10 +440,6 @@ mod tests {
             .map(|pk| to_public_key(pk))
             .collect();
         let threshold = v["threshold"].as_u64().unwrap();
-        let sharing_params = ShamirSecretSharing {
-            threshold: (threshold - 1) as usize,
-            share_count: public_keys.len(),
-        };
         let params = NodeParametersBuilder::new()
             .rpc(rpc)
             .threshold(threshold as u8)
@@ -452,11 +447,7 @@ mod tests {
             .private_key(private_key)
             .build();
 
-        let block_key = if v["block_key"].is_null() {
-            None
-        } else {
-            Some(to_fe(&v["block_key"]))
-        };
+        let block_key: Option<FE> = serde_json::from_value(v["block_key"].clone()).unwrap();
         let block = to_block(&v["candidate_block"]);
         let signers: Vec<SignerID> = public_keys
             .iter()
@@ -468,20 +459,16 @@ mod tests {
         let gamma_i = to_fe(&v["received"]["gamma_i"]);
         let e = to_fe(&v["received"]["e"]);
 
-        let priv_shared_key = SharedKeys {
-            x_i: to_fe(&v["priv_shared_key"]["x_i"]),
-            y: to_point(&v["priv_shared_key"]["y"]),
-        };
+        let priv_shared_key: SharedKeys =
+            serde_json::from_value(v["priv_shared_key"].clone()).unwrap();
 
-        let shared_secrets: SharedSecretMap =
-            BTreeMap::from_iter(v["shared_secrets"].as_object().unwrap().iter().map(
-                |(k, value)| {
-                    (
-                        to_signer_id(k),
-                        to_shared_secret(&value, sharing_params.clone()),
-                    )
-                },
-            ));
+        let shared_secrets: SharedSecretMap = BTreeMap::from_iter(
+            v["shared_secrets"]
+                .as_object()
+                .unwrap()
+                .iter()
+                .map(|(k, value)| (to_signer_id(k), to_shared_secret(&value))),
+        );
 
         let block_shared_keys = if v["block_shared_keys"].is_null() {
             None
@@ -500,10 +487,7 @@ mod tests {
             .map(|(k, value)| {
                 (
                     to_signer_id(k),
-                    (
-                        to_shared_secret(&value[0], sharing_params.clone()),
-                        to_shared_secret(&value[1], sharing_params.clone()),
-                    ),
+                    (to_shared_secret(&value[0]), to_shared_secret(&value[1])),
                 )
             })
             .collect();
