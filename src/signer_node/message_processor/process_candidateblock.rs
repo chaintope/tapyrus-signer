@@ -27,7 +27,7 @@ where
         block.sighash()
     );
 
-    if let Err(e) = params.rpc.testproposedblock(&block) {
+    if let Err(_e) = params.rpc.testproposedblock(&block) {
         log::warn!("Received Invalid candidate block sender: {}", sender_id);
         return prev_state.clone();
     }
@@ -38,7 +38,6 @@ where
         NodeState::Member {
             shared_block_secrets,
             block_shared_keys,
-            master_index,
             ..
         } => NodeState::Member {
             block_key: Some(key.u_i),
@@ -115,7 +114,6 @@ where
 mod tests {
     use super::process_candidateblock;
     use crate::blockdata::Block;
-    use crate::errors::Error;
     use crate::net::MessageType::BlockGenerationRoundMessages;
     use crate::net::{BlockGenerationRoundMessageType, Message, SignerID};
     use crate::signer_node::{master_index, NodeState};
@@ -186,22 +184,31 @@ mod tests {
 
         // It should be set block_key and other field not changed.
         if let NodeState::Master {
-            block_key,
             shared_block_secrets,
             block_shared_keys,
             candidate_block,
             signatures,
             round_is_done,
+            ..
         } = prev_state
         {
-            assert_matches!(next_state, NodeState::Master {
-              block_key: Some(_),
-              shared_block_secrets,
-              block_shared_keys,
-              candidate_block,
-              signatures,
-              round_is_done,
-            });
+            match next_state {
+                NodeState::Master {
+                    block_key: Some(_),
+                    shared_block_secrets: shared_block_secrets_target ,
+                    block_shared_keys: block_shared_keys_target ,
+                    candidate_block: candidate_block_target ,
+                    signatures: signatures_target ,
+                    round_is_done: round_is_done_target ,
+                } if shared_block_secrets_target == shared_block_secrets
+                    && block_shared_keys_target == block_shared_keys
+                    && candidate_block_target == candidate_block
+                    && signatures_target == signatures
+                    && round_is_done_target == round_is_done => (),
+                ref _e => panic!("assertion failed"),
+            }
+        } else {
+            panic!("prev_state should be a Master");
         }
 
         // It should send 5 blockvss messages to each signer (includes myself).
