@@ -195,16 +195,19 @@ mod tests {
             match next_state {
                 NodeState::Master {
                     block_key: Some(_),
-                    shared_block_secrets: shared_block_secrets_target ,
-                    block_shared_keys: block_shared_keys_target ,
-                    candidate_block: candidate_block_target ,
-                    signatures: signatures_target ,
-                    round_is_done: round_is_done_target ,
+                    shared_block_secrets: shared_block_secrets_target,
+                    block_shared_keys: block_shared_keys_target,
+                    candidate_block: candidate_block_target,
+                    signatures: signatures_target,
+                    round_is_done: round_is_done_target,
                 } if shared_block_secrets_target == shared_block_secrets
                     && block_shared_keys_target == block_shared_keys
                     && candidate_block_target == candidate_block
                     && signatures_target == signatures
-                    && round_is_done_target == round_is_done => (),
+                    && round_is_done_target == round_is_done =>
+                {
+                    ()
+                }
                 ref _e => panic!("assertion failed"),
             }
         } else {
