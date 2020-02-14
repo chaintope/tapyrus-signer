@@ -44,11 +44,20 @@ pub struct Parameters {
     pub threshold: usize,   //t
     pub share_count: usize, //n
 }
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SharedKeys {
     pub y: GE,
     pub x_i: FE,
 }
+
+impl PartialEq for SharedKeys {
+    fn eq(&self, other: &SharedKeys) -> bool {
+        self.x_i.get_element() == other.x_i.get_element()
+            && self.y.get_element() == other.y.get_element()
+    }
+}
+
+impl Eq for SharedKeys {}
 
 impl Keys {
     pub fn phase1_create(index: usize) -> Keys {
