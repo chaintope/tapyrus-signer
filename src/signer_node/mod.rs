@@ -324,7 +324,15 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             Ok(block) => block,
             Err(e) => {
                 log::error!("RPC getnewblock failed. reason={:?}", e);
-                return self.current_state.clone();
+                //Behave as master with dummy block.
+                return NodeState::Master {
+                    block_key: None,
+                    block_shared_keys: None,
+                    shared_block_secrets: BTreeMap::new(),
+                    candidate_block: Block::new(vec![]),
+                    signatures: BTreeMap::new(),
+                    round_is_done: false,
+                };
             }
         };
 
