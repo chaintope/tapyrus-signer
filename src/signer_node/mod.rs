@@ -320,7 +320,14 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     pub fn start_new_round(&mut self) -> NodeState {
         std::thread::sleep(Duration::from_secs(self.params.round_duration));
 
-        let block = self.params.rpc.getnewblock(&self.params.address).unwrap();
+        let block = match self.params.rpc.getnewblock(&self.params.address) {
+            Ok(block) => block,
+            Err(e) => {
+                log::error!("RPC getnewblock failed. reason={:?}", e);
+                return self.current_state.clone();
+            }
+        };
+
         log::info!(
             "Broadcast candidate block. block hash for signing: {:?}",
             block.sighash()
