@@ -191,12 +191,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         // get error_handler that is for catch error within connection_manager.
         let connection_manager_error_handler = self.connection_manager.error_handler();
         loop {
-            log::trace!("Main Loop Start...");
             // After process when received message. Get message from receiver,
             // then change that state in main thread side.
             // messageを受け取った後の処理。receiverからmessageを受け取り、
             // stateの変更はmain thread側で行う。
-            log::trace!("Stop signal process...");
             match &self.stop_signal {
                 Some(ref r) => match r.try_recv() {
                     Ok(_) => {
@@ -205,19 +203,18 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         break;
                     }
                     Err(std::sync::mpsc::TryRecvError::Empty) => {
-                        log::trace!("Stop signal empty. Continue to run.");
+                        // Stop signal is empty. Continue to run. Do nothing.
                     }
                     Err(e) => {
                         panic!("{:?}", e);
                     }
                 },
                 None => {
-                    log::trace!("Stop signal receiver is not set.");
+                    // Stop signal receiver is not set. Do nothing.
                 }
             }
 
             // Receiving message.
-            log::trace!("Receiving messages...");
             match receiver.try_recv() {
                 Ok(Message {
                     message_type,
@@ -246,44 +243,45 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
                     log::debug!("Current state updated as {:?}", self.current_state);
                 }
-                Err(TryRecvError::Empty) => log::trace!("Nothing new messages."),
+                Err(TryRecvError::Empty) => {
+                    // No new messages. Do nothing.
+                }
                 Err(e) => log::debug!("{:?}", e),
             }
 
-            // Process for exceed time limit of Round.
-            log::trace!("Checking round duration timeout...");
+            // Checking whether the time limit of a round exceeds.
             match self.round_timer.receiver.try_recv() {
                 Ok(_) => {
-                    // Round timeout. force round robin master node.
-                    log::trace!("Round duration is timeout. Starting next round...");
+                    // Round duration is timeout. Starting next round.
                     let next_master_index = next_master_index(&self.current_state, &self.params);
                     self.start_next_round(next_master_index);
                     log::debug!("Current state updated as {:?}", self.current_state);
                 }
                 Err(TryRecvError::Empty) => {
-                    log::trace!("Still waiting round duration interval.");
+                    // Still waiting round duration interval. Do nothing.
                 }
                 Err(e) => {
                     log::debug!("{:?}", e);
                 }
             }
-            // Should be panic, if happened error in connection_manager.
-            log::trace!("Checking network connection error...");
+            // Checking network connection error
             match connection_manager_error_handler {
                 Some(ref receiver) => match receiver.try_recv() {
                     Ok(e) => {
                         self.round_timer.stop();
                         panic!(e.to_string());
                     }
-                    Err(TryRecvError::Empty) => log::trace!("No errors."),
+                    Err(TryRecvError::Empty) => {
+                        // No errors.
+                    }
                     Err(e) => log::debug!("{:?}", e),
                 },
                 None => {
                     log::warn!("Failed to get error_handler of connection_manager!");
                 }
             }
-            // wait loop
-            log::trace!("Wait for next loop 300 ms...");
+
+            // Wait for next loop 300 ms.
             std::thread::sleep(Duration::from_millis(300));
         }
     }
