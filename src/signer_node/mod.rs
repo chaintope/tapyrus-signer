@@ -27,6 +27,7 @@ use curv::elliptic::curves::traits::*;
 use curv::{FE, GE};
 pub use node_parameters::NodeParameters;
 use redis::ControlFlow;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::time::Duration;
@@ -53,7 +54,7 @@ pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     shared_secrets: SharedSecretMap,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SharedSecret {
     pub vss: VerifiableSS,
     pub secret_share: FE,

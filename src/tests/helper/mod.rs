@@ -35,3 +35,58 @@ pub fn address(private_key: &PrivateKey) -> Address {
     let self_pubkey = private_key.public_key(&secp);
     Address::p2pkh(&self_pubkey, private_key.network)
 }
+
+pub mod test_vectors {
+    use crate::blockdata::Block;
+    use crate::net::SignerID;
+    use crate::signer_node::SharedSecret;
+    use bitcoin::{PrivateKey, PublicKey};
+    use curv::{FE, GE};
+    use serde_json::Value;
+    use std::fs::read_to_string;
+    use std::str::FromStr;
+
+    pub fn load_test_vector(file: &str) -> Result<Value, LoadJsonFileError> {
+        let content = read_to_string(file).or(Err(LoadJsonFileError {
+            path: file.to_string(),
+        }))?;
+        serde_json::from_str(&content).or(Err(LoadJsonFileError {
+            path: file.to_string(),
+        }))
+    }
+    #[derive(Debug)]
+    pub struct LoadJsonFileError {
+        pub path: String,
+    }
+
+    pub fn to_signer_id(hex: &String) -> SignerID {
+        SignerID {
+            pubkey: PublicKey::from_str(&hex[..]).unwrap(),
+        }
+    }
+
+    pub fn to_public_key(hex: &Value) -> PublicKey {
+        PublicKey::from_str(hex.as_str().unwrap()).unwrap()
+    }
+
+    pub fn private_key_from_wif(wif: &Value) -> PrivateKey {
+        PrivateKey::from_wif(wif.as_str().unwrap()).unwrap()
+    }
+
+    pub fn to_fe(fe: &Value) -> FE {
+        serde_json::from_value(fe.clone()).unwrap()
+    }
+
+    pub fn to_point(ge: &Value) -> GE {
+        serde_json::from_value(ge.clone()).unwrap()
+    }
+
+    pub fn to_block(block: &Value) -> Block {
+        let hex = hex::decode(block.as_str().unwrap()).unwrap();
+        Block::new(hex)
+    }
+
+    pub fn to_shared_secret(value: &Value) -> SharedSecret {
+        serde_json::from_value(value.clone()).unwrap()
+    }
+}

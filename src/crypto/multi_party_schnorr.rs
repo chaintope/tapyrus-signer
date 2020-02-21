@@ -23,8 +23,6 @@ use curv::elliptic::curves::traits::*;
 
 use curv::cryptographic_primitives::commitments::hash_commitment::HashCommitment;
 use curv::cryptographic_primitives::commitments::traits::Commitment;
-use curv::cryptographic_primitives::hashing::hash_sha256::HSha256;
-use curv::cryptographic_primitives::hashing::traits::Hash;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::{BigInt, FE, GE};
 use sha2::{Digest, Sha256};
@@ -196,7 +194,7 @@ impl LocalSig {
         parties_index_vec: &[usize],
         vss_private_keys: &Vec<VerifiableSS>,
         vss_ephemeral_keys: &Vec<VerifiableSS>,
-    ) -> Result<(VerifiableSS), Error> {
+    ) -> Result<VerifiableSS, Error> {
         //parties_index_vec is a vector with indices of the parties that are participating and provided gamma_i for this step
         // test that enough parties are in this round
         assert!(parties_index_vec.len() > vss_private_keys[0].parameters.threshold);
@@ -295,11 +293,8 @@ fn compute_e(r: &GE, y: &GE, message: &[u8]) -> FE {
 #[cfg(test)]
 mod tests {
     use super::compute_e;
-    use curv::elliptic::curves::secp256_k1::Secp256k1Scalar;
     use curv::elliptic::curves::traits::{ECPoint, ECScalar};
     use curv::{BigInt, FE, GE};
-    use serde::Serialize;
-    use sha2::Digest;
 
     #[test]
     fn test_compute_e() {
