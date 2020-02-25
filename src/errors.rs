@@ -16,6 +16,7 @@ pub enum Error {
     DuplicatedMessage,
     InvalidLocalSignature,
     InvalidAggregatedSignature,
+    InvalidBlock,
     InvalidKey,
     InvalidSS,
     InvalidSig,

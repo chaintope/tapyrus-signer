@@ -166,11 +166,9 @@ mod tests {
     use crate::crypto::multi_party_schnorr::SharedKeys;
     use crate::signer_node::*;
     use crate::tests::helper::net::TestConnectionManager;
-    use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
     use crate::tests::helper::node_state_builder::{Builder, Master, Member};
     use crate::tests::helper::rpc::MockRpc;
     use crate::tests::helper::test_vectors::*;
-    use bitcoin::PublicKey;
     use curv::FE;
     use serde_json::Value;
     use std::collections::BTreeMap;
@@ -183,12 +181,12 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (signers, blockhash, gamma_i, e, priv_shared_key, shared_secrets, _, params) =
+        let (sender, blockhash, gamma_i, e, priv_shared_key, shared_secrets, _, params) =
             load_test_case(&contents, "process_blocksig_for_member", rpc);
 
         let prev_state = Member::new().master_index(0).build();
         let next = process_blocksig(
-            &signers[0],
+            &sender,
             blockhash,
             gamma_i,
             e,
@@ -209,11 +207,11 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (signers, blockhash, gamma_i, e, priv_shared_key, shared_secrets, prev_state, params) =
+        let (sender, blockhash, gamma_i, e, priv_shared_key, shared_secrets, prev_state, params) =
             load_test_case(&contents, "process_process_blocksig_invalid_block", rpc);
 
         let next = process_blocksig(
-            &signers[0],
+            &sender,
             blockhash,
             gamma_i,
             e,
@@ -237,11 +235,11 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (signers, blockhash, gamma_i, e, priv_shared_key, shared_secrets, prev_state, params) =
+        let (sender, blockhash, gamma_i, e, priv_shared_key, shared_secrets, prev_state, params) =
             load_test_case(&contents, "process_blocksig_1_valid_block", rpc);
 
         let next = process_blocksig(
-            &signers[0],
+            &sender,
             blockhash,
             gamma_i,
             e,
@@ -286,11 +284,11 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (signers, blockhash, gamma_i, e, priv_shared_key, shared_secrets, prev_state, params) =
+        let (sender, blockhash, gamma_i, e, priv_shared_key, shared_secrets, prev_state, params) =
             load_test_case(&contents, "process_blocksig_with_no_block_shared_key", rpc);
 
         let next = process_blocksig(
-            &signers[0],
+            &sender,
             blockhash,
             gamma_i,
             e,
@@ -316,7 +314,7 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (signers, blockhash, gamma_i, e, priv_shared_key, shared_secrets, prev_state, params) =
+        let (sender, blockhash, gamma_i, e, priv_shared_key, shared_secrets, prev_state, params) =
             load_test_case(
                 &contents,
                 "process_blocksig_receiving_invaid_signature",
@@ -324,7 +322,7 @@ mod tests {
             );
 
         let next = process_blocksig(
-            &signers[0],
+            &sender,
             blockhash,
             gamma_i,
             e,
@@ -351,11 +349,11 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (signers, blockhash, gamma_i, e, priv_shared_key, shared_secrets, prev_state, params) =
+        let (sender, blockhash, gamma_i, e, priv_shared_key, shared_secrets, prev_state, params) =
             load_test_case(&contents, "process_blocksig_with_invaid_signature", rpc);
 
         let next = process_blocksig(
-            &signers[0],
+            &sender,
             blockhash,
             gamma_i,
             e,
@@ -386,11 +384,11 @@ mod tests {
         let mut rpc = MockRpc::new();
         rpc.should_call_submitblock(Ok(()));
 
-        let (signers, blockhash, gamma_i, e, priv_shared_key, shared_secrets, prev_state, params) =
+        let (sender, blockhash, gamma_i, e, priv_shared_key, shared_secrets, prev_state, params) =
             load_test_case(&contents, "process_blocksig_successfully", rpc);
 
         let next = process_blocksig(
-            &signers[0],
+            &sender,
             blockhash,
             gamma_i,
             e,
@@ -421,7 +419,7 @@ mod tests {
         case: &str,
         rpc: MockRpc,
     ) -> (
-        Vec<SignerID>,
+        SignerID,
         Hash,
         FE,
         FE,
@@ -432,28 +430,10 @@ mod tests {
     ) {
         let v = &contents["cases"][case];
 
-        let private_key = private_key_from_wif(&v["node_private_key"]);
-        let public_keys: Vec<PublicKey> = v["public_keys"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|pk| to_public_key(pk))
-            .collect();
-        let threshold = v["threshold"].as_u64().unwrap();
-        let params = NodeParametersBuilder::new()
-            .rpc(rpc)
-            .threshold(threshold as u8)
-            .pubkey_list(public_keys.clone())
-            .private_key(private_key)
-            .build();
-
+        let params = to_node_parameters(&v, rpc);
         let block_key: Option<FE> = serde_json::from_value(v["block_key"].clone()).unwrap();
-        let block = to_block(&v["candidate_block"]);
-        let signers: Vec<SignerID> = public_keys
-            .iter()
-            .map(|&pk| SignerID { pubkey: pk })
-            .collect();
-
+        let block = to_block(&v["candidate_block"]).unwrap();
+        let sender = to_signer_id(&v["received"]["sender"].as_str().unwrap().to_string());
         let hex = hex::decode(v["received"]["block_hash"].as_str().unwrap()).unwrap();
         let blockhash = Hash::from_slice(&hex[..]).unwrap();
         let gamma_i = to_fe(&v["received"]["gamma_i"]);
@@ -508,7 +488,7 @@ mod tests {
             .signatures(signatures)
             .build();
         (
-            signers,
+            sender,
             blockhash,
             gamma_i,
             e,
