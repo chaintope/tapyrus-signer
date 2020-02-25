@@ -45,7 +45,7 @@ This process assumes on Amazon Linux 2 environment. However it might work on any
 $ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 $ source $HOME/.cargo/env
 $ rustc --version
-rustc 1.39.0 (4560ea788 2019-11-04)
+rustc 1.41.0 (5e1a79984 2020-01-27)
 ```
 
 #### Install Packages
@@ -66,7 +66,7 @@ $ cargo build --release
 
 ```
 $ mkdir -p tapyrus-signer-${VERSION}-x86_64-px-linux-gnu/bin
-$ cp target/release/node tapyrus-signer-${VERSION}-x86_64-px-linux-gnu/bin
+$ cp target/release/tapyrus-signerd tapyrus-signer-${VERSION}-x86_64-px-linux-gnu/bin
 $ tar zcvf tapyrus-signer-${VERSION}-x86_64-px-linux-gnu.tar.gz tapyrus-signer-${VERSION}-x86_64-px-linux-gnu/
 ```
 
@@ -78,7 +78,7 @@ $ tar zcvf tapyrus-signer-${VERSION}-x86_64-px-linux-gnu.tar.gz tapyrus-signer-$
 $ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 $ source $HOME/.cargo/env
 $ rustc --version
-rustc 1.39.0 (4560ea788 2019-11-04)
+rustc 1.41.0 (5e1a79984 2020-01-27)
 ```
 
 #### Build Tapyrus Signer
@@ -92,8 +92,8 @@ $ cargo build --release
 #### Create archive
 
 ```
-$ mkdir -p tapyrus-signer-${VERSION}-x86_64-px-linux-gnu/bin
-$ cp target/release/node tapyrus-signer-${VERSION}-x86_64-px-linux-gnu/bin
-$ tar zcvf tapyrus-signer-${VERSION}-x86_64-px-linux-gnu.tar.gz tapyrus-signer-${VERSION}-x86_64-px-linux-gnu/
+$ mkdir -p tapyrus-signer-${VERSION}-osx64/bin
+$ cp target/release/tapyrus-signerd tapyrus-signer-${VERSION}-osx64/bin
+$ tar zcvf tapyrus-signer-${VERSION}-osx64.tar.gz  tapyrus-signer-${VERSION}-osx64/
 ```
 
