@@ -72,7 +72,7 @@ where
                     signatures: signatures.clone(),
                     round_is_done: false,
                 },
-                Ok(_) => NodeState::Master {
+                Ok(None) => NodeState::Master {
                     block_key: block_key.clone(),
                     shared_block_secrets: new_shared_block_secrets,
                     block_shared_keys: None,
