@@ -64,7 +64,7 @@ where
 
             match result {
                 Err(_) => prev_state.clone(),
-                Ok(Some(keys)) => NodeState::Master {
+                Ok(Some((is_positive, shared_keys))) => NodeState::Master {
                     block_key: block_key.clone(),
                     shared_block_secrets: new_shared_block_secrets,
                     block_shared_keys: Some((keys.0, keys.1.x_i, keys.1.y)),
