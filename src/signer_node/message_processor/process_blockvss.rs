@@ -67,7 +67,7 @@ where
                 Ok(Some((is_positive, shared_keys))) => NodeState::Master {
                     block_key: block_key.clone(),
                     shared_block_secrets: new_shared_block_secrets,
-                    block_shared_keys: Some((keys.0, keys.1.x_i, keys.1.y)),
+                    block_shared_keys: Some((is_positive, shared_keys.x_i, shared_keys.y)),
                     candidate_block: candidate_block.clone(),
                     signatures: signatures.clone(),
                     round_is_done: false,
