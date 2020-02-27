@@ -1,0 +1,213 @@
+openapi: 3.0.0
+info:
+  description: Swagger schema for RPC interface of the Tapyrus Signer, see https://swagger.io/
+  version: 0.3.0
+  title: API Specification
+  termsOfService: ""
+  contact:
+    email: h_yamaguchi@chaintope.com
+  license:
+    name: MIT
+    url: "https://opensource.org/licenses/mit-license.php"
+servers:
+  - url: "http://127.0.0.1:3000"
+tags:
+  - name: federation
+    description: Federation Management API
+    externalDocs:
+      description: Find out more
+      url: >-
+        https://github.com/chaintope/tapyrus-signer/tree/master/doc/federation.md
+paths:
+  /show_federation:
+    post:
+      tags:
+        - federation
+      summary: Show federation
+      description: "Show the federation intended to update in the future block."
+      operationId: show_federation
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - method
+                - id
+                - jsonrpc
+                - params
+              properties:
+                method:
+                  type: string
+                  default: show_federation
+                  example: show_federation
+                  description: Method name
+                id:
+                  type: integer
+                  default: 1
+                  example: 1
+                  format: int32
+                  description: Request ID
+                jsonrpc:
+                  type: string
+                  default: "2.0"
+                  example: "2.0"
+                  description: JSON-RPC Version (2.0)
+                params:
+                  type: object
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Federation"
+        "400":
+          description: Invalid input
+  /update_federation:
+    post:
+      tags:
+        - federation
+      summary: Update federation
+      description: ""
+      operationId: update_federation
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - method
+                - id
+                - jsonrpc
+                - params
+              properties:
+                method:
+                  type: string
+                  default: update_federation
+                  example: update_federation
+                  description: Method name
+                id:
+                  type: integer
+                  default: 1
+                  example: 1
+                  format: int32
+                  description: Request ID
+                jsonrpc:
+                  type: string
+                  default: "2.0"
+                  example: "2.0"
+                  description: JSON-RPC Version (2.0)
+                params:
+                  title: Parameters
+                  type: object
+                  required:
+                    - block_height
+                    - threshold
+                    - node_secret
+                    - public_keys
+                  properties:
+                    block_height:
+                      type: integer
+                      default: 1
+                      example: 99999
+                      description: block height where the update is applied
+                    threshold:
+                      type: integer
+                      default: 0
+                      example: 2
+                      description: the minimum number of signers needed to sign blocks
+                    node_secret:
+                      type: string
+                      default: ""
+                      example: 0102030405060708090a0b0c0d0e0ff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff
+                      description: secret value
+                    public_keys:
+                      type: array
+                      example:
+                        - 03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2
+                        - 03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1
+                        - 02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287
+                      items:
+                        type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid input
+  /rollback_federation:
+    post:
+      tags:
+        - federation
+      summary: Rollback federation.
+      description: ""
+      operationId: rollback_federation
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - method
+                - id
+                - jsonrpc
+                - params
+              properties:
+                method:
+                  type: string
+                  default: show_federation
+                  example: show_federation
+                  description: Method name
+                id:
+                  type: integer
+                  default: 1
+                  example: 1
+                  format: int32
+                  description: Request ID
+                jsonrpc:
+                  type: string
+                  default: "2.0"
+                  example: "2.0"
+                  description: JSON-RPC Version (2.0)
+                params:
+                  title: Parameters
+                  type: object
+                  required:
+                    - block_height
+                  properties:
+                    block_height:
+                      type: integer
+                      default: 1
+                      example: 99999
+                      description: block height where the update is applied
+
+      responses:
+        "400":
+          description: Invalid input
+components:
+  schemas:
+    Federation:
+      type: object
+      properties:
+        block_height:
+          type: integer
+          format: int64
+          example: 1000
+        threshold:
+          type: integer
+          format: int8
+          example: 2
+        public_keys:
+          type: array
+          example:
+            - 033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8
+            - 020464074b94702e9b07803d247021943bdcc1f8700b92b66defb7fadd76e80acf
+            - 02cbe0ad70ffe110d097db648fda20bef14dc72b5c9979c137c451820c176ac23f
+          items:
+            type: string
+externalDocs:
+  description: Find out more about Swagger
+  url: "https://github.com/chaintope/tapyrus-signer/"
