@@ -297,15 +297,23 @@ impl ConnectionManager for RedisManager {
 
     fn broadcast_message(&self, message: Message) {
         assert!(message.receiver_id.is_none());
-        log::debug!("broadcast_message {:?} ", message);
         let channel_name = "tapyrus-signer".to_string();
+        log::debug!(
+            "broadcast_message channel_name: {}, message: {:?}",
+            channel_name,
+            message
+        );
         self.process_message(message, channel_name);
     }
 
     fn send_message(&self, message: Message) {
         assert!(message.receiver_id.is_some());
-        log::debug!("send_message {:?} ", message);
         let channel_name = format!("tapyrus-signer-{}", message.receiver_id.unwrap().pubkey.key);
+        log::debug!(
+            "send_message channel_name: {}, message: {:?}",
+            channel_name,
+            message
+        );
         self.process_message(message, channel_name);
     }
 
