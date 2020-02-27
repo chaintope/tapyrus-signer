@@ -269,6 +269,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 Some(ref receiver) => match receiver.try_recv() {
                     Ok(e) => {
                         self.round_timer.stop();
+                        log::error!("Connection Manager Error {:?}", e);
                         panic!(e.to_string());
                     }
                     Err(TryRecvError::Empty) => {

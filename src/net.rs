@@ -270,6 +270,7 @@ impl RedisManager {
                     let conn = client.get_connection()?;
                     thread::sleep(Duration::from_millis(500));
 
+                    conn.set_write_timeout(Some(Duration::from_secs(5)))?;
                     log::trace!("Publish {} to tapyrus-signer channel.", message);
 
                     let _: () = conn.publish(to, message)?;
