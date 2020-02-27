@@ -1,5 +1,5 @@
 Tapyrus Signer version 0.3.1 is now available for download at: 
-  https://github.com/chaintope/tapyrus-signer/release/tag/v0.3.1/
+  https://github.com/chaintope/tapyrus-signer/releases/tag/v0.3.1/
     
 Please report bugs using the issue tracker at github:
   https://github.com/chaintope/tapyrus-signer/issues
