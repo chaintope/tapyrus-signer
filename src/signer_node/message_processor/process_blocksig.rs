@@ -6,6 +6,7 @@ use crate::net::{
 };
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
+use crate::signer_node::message_processor::get_valid_block;
 use crate::signer_node::utils::sender_index;
 use crate::signer_node::NodeState;
 use crate::signer_node::ToVerifiableSS;
@@ -44,16 +45,11 @@ where
                 new_signatures.len(),
                 params.threshold
             );
-            let block = match candidate_block {
-                None => {
-                    log::error!("Invalid blockvss message received. candidate block is not set.");
+            let block = match get_valid_block(prev_state, blockhash) {
+                Ok(block) => block,
+                Err(_) => {
                     return prev_state.clone();
                 }
-                Some(block) if block.sighash() != blockhash => {
-                    log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", block.sighash(), blockhash);
-                    return prev_state.clone();
-                }
-                Some(block) => block,
             };
 
             if new_signatures.len() >= params.threshold as usize {

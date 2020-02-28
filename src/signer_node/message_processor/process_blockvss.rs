@@ -1,5 +1,4 @@
 use crate::blockdata::hash::Hash;
-use crate::blockdata::Block;
 use crate::crypto::multi_party_schnorr::SharedKeys;
 use crate::errors::Error;
 use crate::net::{
@@ -7,6 +6,7 @@ use crate::net::{
 };
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
+use crate::signer_node::message_processor::get_valid_block;
 use crate::signer_node::{BidirectionalSharedSecretMap, NodeState, SharedSecret};
 use crate::signer_node::{NodeParameters, ToSharedSecretMap};
 use crate::util::jacobi;
@@ -150,25 +150,7 @@ where
         "number of shared_block_secrets: {:?}",
         shared_block_secrets.len()
     );
-    let block_opt: Option<Block> = match prev_state {
-        NodeState::Master {
-            candidate_block, ..
-        } => candidate_block.clone(),
-        NodeState::Member {
-            candidate_block, ..
-        } => candidate_block.clone(),
-        _ => None,
-    };
-    if let Some(block) = block_opt.clone() {
-        if block.sighash() != blockhash {
-            log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", block.sighash(), blockhash);
-            return Err(Error::InvalidBlock);
-        }
-    } else {
-        // Signer node need to receive candidateblock before receiving VSS.
-        log::error!("Invalid blockvss message received. candidateblock was not received in this round yet, but got VSS.");
-        return Err(Error::InvalidBlock);
-    }
+    let block = get_valid_block(prev_state, blockhash)?;
     if shared_block_secrets.len() == params.pubkey_list.len() {
         let shared_keys_for_positive = Sign::verify_vss_and_construct_key(
             &sharing_params,
@@ -176,22 +158,16 @@ where
             &(params.self_node_index + 1),
         )?;
 
-        let result_for_positive = Sign::sign(
-            &shared_keys_for_positive,
-            priv_shared_keys,
-            block_opt.clone().unwrap().sighash(),
-        );
+        let result_for_positive =
+            Sign::sign(&shared_keys_for_positive, priv_shared_keys, block.sighash());
 
         let shared_keys_for_negative = Sign::verify_vss_and_construct_key(
             &sharing_params,
             &shared_block_secrets.for_negative(),
             &(params.self_node_index + 1),
         )?;
-        let result_for_negative = Sign::sign(
-            &shared_keys_for_negative,
-            priv_shared_keys,
-            block_opt.clone().unwrap().sighash(),
-        );
+        let result_for_negative =
+            Sign::sign(&shared_keys_for_negative, priv_shared_keys, block.sighash());
 
         let p = BigInt::from_str_radix(
             "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
@@ -210,7 +186,7 @@ where
                 conman.broadcast_message(Message {
                     message_type: MessageType::BlockGenerationRoundMessages(
                         BlockGenerationRoundMessageType::Blocksig(
-                            block_opt.clone().unwrap().sighash(),
+                            block.sighash(),
                             local_sig.gamma_i,
                             local_sig.e,
                         ),

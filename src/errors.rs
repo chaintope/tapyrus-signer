@@ -18,6 +18,7 @@ pub enum Error {
     InvalidAggregatedSignature,
     InvalidBlock,
     InvalidKey,
+    InvalidNodeState,
     InvalidSS,
     InvalidSig,
     TimerAlreadyStarted,
