@@ -153,7 +153,7 @@ where
     let block_opt: Option<Block> = match prev_state {
         NodeState::Master {
             candidate_block, ..
-        } => Some(candidate_block.clone()),
+        } => candidate_block.clone(),
         NodeState::Member {
             candidate_block, ..
         } => candidate_block.clone(),
@@ -622,7 +622,7 @@ mod tests {
         let prev_state = match v["role"].as_str().unwrap() {
             "master" => Master::new()
                 .block_key(block_key)
-                .candidate_block(block.unwrap().clone())
+                .candidate_block(block.clone())
                 .shared_block_secrets(shared_block_secrets)
                 .build(),
             "member" => Member::new()

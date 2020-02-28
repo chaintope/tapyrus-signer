@@ -14,7 +14,7 @@ pub struct Master {
     block_key: Option<FE>,
     shared_block_secrets: BidirectionalSharedSecretMap,
     block_shared_keys: Option<(bool, FE, GE)>,
-    candidate_block: Block,
+    candidate_block: Option<Block>,
     signatures: BTreeMap<SignerID, (FE, FE)>,
     round_is_done: bool,
 }
@@ -25,7 +25,7 @@ impl Builder for Master {
             block_key: None,
             shared_block_secrets: BidirectionalSharedSecretMap::new(),
             block_shared_keys: None,
-            candidate_block: get_block(0),
+            candidate_block: Some(get_block(0)),
             signatures: BTreeMap::new(),
             round_is_done: false,
         }
@@ -62,7 +62,7 @@ impl Master {
         self
     }
 
-    pub fn candidate_block(&mut self, candidate_block: Block) -> &mut Self {
+    pub fn candidate_block(&mut self, candidate_block: Option<Block>) -> &mut Self {
         self.candidate_block = candidate_block;
         self
     }

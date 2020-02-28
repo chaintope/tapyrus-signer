@@ -117,7 +117,7 @@ pub enum NodeState {
         block_key: Option<FE>,
         shared_block_secrets: BidirectionalSharedSecretMap,
         block_shared_keys: Option<(bool, FE, GE)>,
-        candidate_block: Block,
+        candidate_block: Option<Block>,
         signatures: BTreeMap<SignerID, (FE, FE)>,
         round_is_done: bool,
     },
@@ -324,12 +324,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             Ok(block) => block,
             Err(e) => {
                 log::error!("RPC getnewblock failed. reason={:?}", e);
-                //Behave as master with dummy block.
+                //Behave as master without block.
                 return NodeState::Master {
                     block_key: None,
                     block_shared_keys: None,
                     shared_block_secrets: BTreeMap::new(),
-                    candidate_block: Block::new(vec![]),
+                    candidate_block: None,
                     signatures: BTreeMap::new(),
                     round_is_done: false,
                 };
@@ -352,7 +352,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             block_key: None,
             block_shared_keys: None,
             shared_block_secrets: BTreeMap::new(),
-            candidate_block: block,
+            candidate_block: Some(block),
             signatures: BTreeMap::new(),
             round_is_done: false,
         }
