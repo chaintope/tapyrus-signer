@@ -8,6 +8,10 @@ base: core18
 grade: stable # must be 'stable' to release into candidate/stable channels
 confinement: devmode # use 'strict' once you have the right plugs and slots
 
+apps:
+  tapyrus-signer:
+    command: bin/tapyrus-signerd
+
 parts:
   tapyrus-signer:
     source: https://github.com/chaintope/tapyrus-signer.git
