@@ -117,7 +117,7 @@ pub enum NodeState {
         block_key: Option<FE>,
         shared_block_secrets: BidirectionalSharedSecretMap,
         block_shared_keys: Option<(bool, FE, GE)>,
-        candidate_block: Block,
+        candidate_block: Option<Block>,
         signatures: BTreeMap<SignerID, (FE, FE)>,
         round_is_done: bool,
     },
@@ -320,7 +320,22 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     pub fn start_new_round(&mut self) -> NodeState {
         std::thread::sleep(Duration::from_secs(self.params.round_duration));
 
-        let block = self.params.rpc.getnewblock(&self.params.address).unwrap();
+        let block = match self.params.rpc.getnewblock(&self.params.address) {
+            Ok(block) => block,
+            Err(e) => {
+                log::error!("RPC getnewblock failed. reason={:?}", e);
+                //Behave as master without block.
+                return NodeState::Master {
+                    block_key: None,
+                    block_shared_keys: None,
+                    shared_block_secrets: BTreeMap::new(),
+                    candidate_block: None,
+                    signatures: BTreeMap::new(),
+                    round_is_done: false,
+                };
+            }
+        };
+
         log::info!(
             "Broadcast candidate block. block hash for signing: {:?}",
             block.sighash()
@@ -337,7 +352,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             block_key: None,
             block_shared_keys: None,
             shared_block_secrets: BTreeMap::new(),
-            candidate_block: block,
+            candidate_block: Some(block),
             signatures: BTreeMap::new(),
             round_is_done: false,
         }

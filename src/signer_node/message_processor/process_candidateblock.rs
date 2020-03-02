@@ -171,7 +171,7 @@ mod tests {
         let sender_id = TEST_KEYS.signer_id();
         let candidate_block = get_block(0);
         let prev_state = Master::new()
-            .candidate_block(candidate_block.clone())
+            .candidate_block(Some(candidate_block.clone()))
             .build();
         let conman = TestConnectionManager::new();
         let mut rpc = MockRpc::new();

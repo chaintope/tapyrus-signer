@@ -6,6 +6,7 @@ use crate::net::{
 };
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
+use crate::signer_node::message_processor::get_valid_block;
 use crate::signer_node::utils::sender_index;
 use crate::signer_node::NodeState;
 use crate::signer_node::ToVerifiableSS;
@@ -44,10 +45,12 @@ where
                 new_signatures.len(),
                 params.threshold
             );
-            if candidate_block.sighash() != blockhash {
-                log::error!("Invalid blockvss message received. Received message is based different block. expected: {:?}, actual: {:?}", candidate_block.sighash(), blockhash);
-                return prev_state.clone();
-            }
+            let block = match get_valid_block(prev_state, blockhash) {
+                Ok(block) => block,
+                Err(_) => {
+                    return prev_state.clone();
+                }
+            };
 
             if new_signatures.len() >= params.threshold as usize {
                 if block_shared_keys.is_none() {
@@ -88,7 +91,7 @@ where
                             block_shared_keys.unwrap().2,
                         );
                         let public_key = priv_shared_keys.y;
-                        let hash = candidate_block.sighash().into_inner();
+                        let hash = block.sighash().into_inner();
                         match signature.verify(&hash, &public_key) {
                             Ok(_) => Ok(signature),
                             Err(e) => Err(e),
@@ -102,8 +105,7 @@ where
                 let result = match verification {
                     Ok(signature) => {
                         let sig_hex = Sign::format_signature(&signature);
-                        let new_block: Block =
-                            candidate_block.add_proof(hex::decode(sig_hex).unwrap());
+                        let new_block: Block = block.add_proof(hex::decode(sig_hex).unwrap());
                         match params.rpc.submitblock(&new_block) {
                             Ok(_) => Ok(new_block),
                             Err(e) => Err(e),
@@ -118,7 +120,7 @@ where
                     Ok(new_block) => {
                         log::info!(
                                 "Round Success. caindateblock(block hash for sign)={:?} completedblock={:?}",
-                                candidate_block.sighash(),
+                                block.sighash(),
                                 new_block.hash()
                             );
                         // send completeblock message
@@ -432,7 +434,7 @@ mod tests {
 
         let params = to_node_parameters(&v, rpc);
         let block_key: Option<FE> = serde_json::from_value(v["block_key"].clone()).unwrap();
-        let block = to_block(&v["candidate_block"]).unwrap();
+        let block = to_block(&v["candidate_block"]);
         let sender = to_signer_id(&v["received"]["sender"].as_str().unwrap().to_string());
         let hex = hex::decode(v["received"]["block_hash"].as_str().unwrap()).unwrap();
         let blockhash = Hash::from_slice(&hex[..]).unwrap();
