@@ -1,2 +1,8 @@
 /target
 **/*.rs.bk
+
+# snap directories
+/prime
+/parts
+/stage
+*.snap
