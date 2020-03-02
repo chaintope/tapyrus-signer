@@ -24,6 +24,7 @@ use crate::signer_node::message_processor::process_candidateblock;
 use crate::signer_node::message_processor::process_completedblock;
 use crate::signer_node::message_processor::process_nodevss;
 use crate::signer_node::node_state::builder::{Builder, Master, Member};
+use crate::signer_node::message_processor::process_blockparticipants;
 use crate::timer::RoundTimeOutObserver;
 use crate::util::*;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
@@ -360,6 +361,17 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 vss_for_negative,
                 secret_share_for_negative,
                 &self.priv_shared_keys.as_ref().expect("priv_share_keys should be stored by when the blockvss message communication starts."),
+                &self.current_state,
+                &self.connection_manager,
+                &self.params,
+            ),
+            BlockGenerationRoundMessageType::Blockparticipants(
+                blockhash,
+                participants
+            ) => process_blockparticipants(
+                &sender_id,
+                blockhash,
+                participants,
                 &self.current_state,
                 &self.connection_manager,
                 &self.params,

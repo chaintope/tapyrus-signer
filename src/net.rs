@@ -104,6 +104,7 @@ pub enum BlockGenerationRoundMessageType {
     Candidateblock(Block),
     Completedblock(Block),
     Blockvss(Hash, VerifiableSS, FE, VerifiableSS, FE),
+    Blockparticipants(Hash, Vec<SignerID>),
     Blocksig(Hash, FE, FE),
     Roundfailure,
 }
