@@ -1,7 +1,7 @@
-use curv::{FE, GE};
-use crate::signer_node::BidirectionalSharedSecretMap;
 use crate::blockdata::Block;
 use crate::net::SignerID;
+use crate::signer_node::BidirectionalSharedSecretMap;
+use curv::{FE, GE};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -43,6 +43,7 @@ pub mod builder {
 
     pub trait Builder {
         fn build(&self) -> NodeState;
+        fn from_node_state(state: NodeState) -> Self;
     }
 
     pub struct Master {
@@ -63,6 +64,31 @@ pub mod builder {
                 candidate_block: self.candidate_block.clone(),
                 signatures: self.signatures.clone(),
                 round_is_done: self.round_is_done,
+            }
+        }
+
+        fn from_node_state(state: NodeState) -> Self {
+            if let NodeState::Master {
+                block_key,
+                shared_block_secrets,
+                block_shared_keys,
+                candidate_block,
+                signatures,
+                round_is_done,
+            } = state
+            {
+                Self {
+                    block_key,
+                    shared_block_secrets,
+                    block_shared_keys,
+                    candidate_block,
+                    signatures,
+                    round_is_done,
+                }
+            } else {
+                unreachable!(
+                    "builder::Master::from_node_state should receive NodeState::Master variant"
+                );
             }
         }
     }
@@ -112,7 +138,10 @@ pub mod builder {
             self
         }
 
-        pub fn block_shared_keys(&mut self, block_shared_keys: Option<(bool, FE, GE)>) -> &mut Self {
+        pub fn block_shared_keys(
+            &mut self,
+            block_shared_keys: Option<(bool, FE, GE)>,
+        ) -> &mut Self {
             self.block_shared_keys = block_shared_keys;
             self
         }
@@ -163,6 +192,29 @@ pub mod builder {
                 master_index: self.master_index,
             }
         }
+
+        fn from_node_state(state: NodeState) -> Self {
+            if let NodeState::Member {
+                block_key,
+                shared_block_secrets,
+                block_shared_keys,
+                candidate_block,
+                master_index,
+            } = state
+            {
+                Self {
+                    block_key,
+                    shared_block_secrets,
+                    block_shared_keys,
+                    candidate_block,
+                    master_index,
+                }
+            } else {
+                unreachable!(
+                    "builder::Member::from_node_state should receive NodeState::Member variant"
+                );
+            }
+        }
     }
 
     impl Member {
@@ -195,7 +247,10 @@ pub mod builder {
             self
         }
 
-        pub fn block_shared_keys(&mut self, block_shared_keys: Option<(bool, FE, GE)>) -> &mut Self {
+        pub fn block_shared_keys(
+            &mut self,
+            block_shared_keys: Option<(bool, FE, GE)>,
+        ) -> &mut Self {
             self.block_shared_keys = block_shared_keys;
             self
         }

@@ -7,6 +7,7 @@ use crate::net::{
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
 use crate::signer_node::message_processor::get_valid_block;
+use crate::signer_node::node_state::builder::{Builder, Master, Member};
 use crate::signer_node::{BidirectionalSharedSecretMap, NodeState, SharedSecret};
 use crate::signer_node::{NodeParameters, ToSharedSecretMap};
 use crate::util::jacobi;
@@ -64,22 +65,14 @@ where
 
             match result {
                 Err(_) => prev_state.clone(),
-                Ok(Some((is_positive, shared_keys))) => NodeState::Master {
-                    block_key: block_key.clone(),
-                    shared_block_secrets: new_shared_block_secrets,
-                    block_shared_keys: Some((is_positive, shared_keys.x_i, shared_keys.y)),
-                    candidate_block: candidate_block.clone(),
-                    signatures: signatures.clone(),
-                    round_is_done: false,
-                },
-                Ok(None) => NodeState::Master {
-                    block_key: block_key.clone(),
-                    shared_block_secrets: new_shared_block_secrets,
-                    block_shared_keys: None,
-                    candidate_block: candidate_block.clone(),
-                    signatures: signatures.clone(),
-                    round_is_done: false,
-                },
+                Ok(Some((is_positive, shared_keys))) => Master::from_node_state(prev_state.clone())
+                    .shared_block_secrets(new_shared_block_secrets)
+                    .block_shared_keys(Some((is_positive, shared_keys.x_i, shared_keys.y)))
+                    .build(),
+                Ok(None) => Master::from_node_state(prev_state.clone())
+                    .shared_block_secrets(new_shared_block_secrets)
+                    .block_shared_keys(None)
+                    .build(),
             }
         }
         NodeState::Member {
@@ -113,20 +106,14 @@ where
             );
             match result {
                 Err(_) => prev_state.clone(),
-                Ok(Some(keys)) => NodeState::Member {
-                    block_key: block_key.clone(),
-                    shared_block_secrets: new_shared_block_secrets,
-                    block_shared_keys: Some((keys.0, keys.1.x_i, keys.1.y)),
-                    candidate_block: candidate_block.clone(),
-                    master_index: *master_index,
-                },
-                Ok(_) => NodeState::Member {
-                    block_key: block_key.clone(),
-                    shared_block_secrets: new_shared_block_secrets,
-                    block_shared_keys: None,
-                    candidate_block: candidate_block.clone(),
-                    master_index: *master_index,
-                },
+                Ok(Some(keys)) => Member::from_node_state(prev_state.clone())
+                    .shared_block_secrets(new_shared_block_secrets)
+                    .block_shared_keys(Some((keys.0, keys.1.x_i, keys.1.y)))
+                    .build(),
+                Ok(_) => Member::from_node_state(prev_state.clone())
+                    .shared_block_secrets(new_shared_block_secrets)
+                    .block_shared_keys(None)
+                    .build(),
             }
         }
         _ => prev_state.clone(),
@@ -208,6 +195,8 @@ mod tests {
     use super::process_blockvss;
     use crate::blockdata::hash::Hash;
     use crate::crypto::multi_party_schnorr::SharedKeys;
+    use crate::net::SignerID;
+    use crate::signer_node::node_state::builder::{Builder, Master, Member};
     use crate::signer_node::*;
     use crate::tests::helper::net::TestConnectionManager;
     use crate::tests::helper::node_state_builder::BuilderForTest;
@@ -216,8 +205,6 @@ mod tests {
     use curv::cryptographic_primitives::secret_sharing::feldman_vss::*;
     use curv::{FE, GE};
     use serde_json::Value;
-    use crate::signer_node::node_state::builder::{Master, Member, Builder};
-    use crate::net::SignerID;
 
     #[test]
     fn test_process_blockvss_master_invalid_block() {

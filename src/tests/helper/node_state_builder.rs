@@ -22,12 +22,6 @@ impl BuilderForTest for Master {
 
 impl BuilderForTest for Member {
     fn for_test() -> Self {
-        Self::new(
-            None,
-            BidirectionalSharedSecretMap::new(),
-            None,
-            None,
-            0,
-        )
+        Self::new(None, BidirectionalSharedSecretMap::new(), None, None, 0)
     }
 }

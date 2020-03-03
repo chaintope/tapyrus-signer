@@ -3,12 +3,12 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 mod message_processor;
-pub mod node_state;
 mod node_parameters;
+pub mod node_state;
 mod utils;
 
-pub use node_parameters::NodeParameters;
 pub use crate::signer_node::node_state::NodeState;
+pub use node_parameters::NodeParameters;
 
 use crate::crypto::multi_party_schnorr::*;
 use crate::net::MessageType::{BlockGenerationRoundMessages, KeyGenerationMessage};
@@ -23,6 +23,7 @@ use crate::signer_node::message_processor::process_blockvss;
 use crate::signer_node::message_processor::process_candidateblock;
 use crate::signer_node::message_processor::process_completedblock;
 use crate::signer_node::message_processor::process_nodevss;
+use crate::signer_node::node_state::builder::{Builder, Master, Member};
 use crate::timer::RoundTimeOutObserver;
 use crate::util::*;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
@@ -297,14 +298,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             Err(e) => {
                 log::error!("RPC getnewblock failed. reason={:?}", e);
                 //Behave as master without block.
-                return NodeState::Master {
-                    block_key: None,
-                    block_shared_keys: None,
-                    shared_block_secrets: BTreeMap::new(),
-                    candidate_block: None,
-                    signatures: BTreeMap::new(),
-                    round_is_done: false,
-                };
+                return Master::default().build();
             }
         };
 
@@ -320,14 +314,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             receiver_id: None,
         });
 
-        NodeState::Master {
-            block_key: None,
-            block_shared_keys: None,
-            shared_block_secrets: BTreeMap::new(),
-            candidate_block: Some(block),
-            signatures: BTreeMap::new(),
-            round_is_done: false,
-        }
+        Master::default().candidate_block(Some(block)).build()
     }
 
     pub fn process_key_generation_message(
@@ -407,13 +394,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         if self.params.self_node_index == next_master_index {
             self.current_state = self.start_new_round();
         } else {
-            self.current_state = NodeState::Member {
-                block_key: None,
-                block_shared_keys: None,
-                shared_block_secrets: BidirectionalSharedSecretMap::new(),
-                candidate_block: None,
-                master_index: next_master_index,
-            };
+            self.current_state = Member::default().master_index(next_master_index).build();
         }
     }
 

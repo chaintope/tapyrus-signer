@@ -5,6 +5,7 @@ use crate::net::{
 };
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
+use crate::signer_node::node_state::builder::{Builder, Master, Member};
 use crate::signer_node::utils::sender_index;
 use crate::signer_node::{NodeParameters, NodeState};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
@@ -35,32 +36,17 @@ where
     let key = create_block_vss(block.clone(), params, conman);
 
     match &prev_state {
-        NodeState::Member {
-            shared_block_secrets,
-            block_shared_keys,
-            ..
-        } => NodeState::Member {
-            block_key: Some(key.u_i),
-            shared_block_secrets: shared_block_secrets.clone(),
-            block_shared_keys: block_shared_keys.clone(),
-            candidate_block: Some(block.clone()),
-            master_index: sender_index(sender_id, &params.pubkey_list),
-        },
+        NodeState::Member { .. } => Member::from_node_state(prev_state.clone())
+            .block_key(Some(key.u_i))
+            .candidate_block(Some(block.clone()))
+            .master_index(sender_index(sender_id, &params.pubkey_list))
+            .build(),
         NodeState::Master {
-            block_shared_keys,
-            shared_block_secrets,
-            signatures,
-            candidate_block,
             round_is_done: false,
             ..
-        } => NodeState::Master {
-            block_key: Some(key.u_i),
-            block_shared_keys: block_shared_keys.clone(),
-            shared_block_secrets: shared_block_secrets.clone(),
-            candidate_block: candidate_block.clone(),
-            signatures: signatures.clone(),
-            round_is_done: false,
-        },
+        } => Master::from_node_state(prev_state.clone())
+            .block_key(Some(key.u_i))
+            .build(),
         _ => prev_state.clone(),
     }
 }
@@ -116,6 +102,7 @@ mod tests {
     use crate::blockdata::Block;
     use crate::net::MessageType::BlockGenerationRoundMessages;
     use crate::net::{BlockGenerationRoundMessageType, Message, SignerID};
+    use crate::signer_node::node_state::builder::{Builder, Master, Member};
     use crate::signer_node::{master_index, NodeState};
     use crate::tests::helper::blocks::get_block;
     use crate::tests::helper::keys::TEST_KEYS;
@@ -123,7 +110,6 @@ mod tests {
     use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
     use crate::tests::helper::node_state_builder::BuilderForTest;
     use crate::tests::helper::rpc::MockRpc;
-    use crate::signer_node::node_state::builder::{Master, Member, Builder};
 
     /// This network consists 5 signers and threshold 3.
     #[test]

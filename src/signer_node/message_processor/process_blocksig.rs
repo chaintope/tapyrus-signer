@@ -7,6 +7,7 @@ use crate::net::{
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
 use crate::signer_node::message_processor::get_valid_block;
+use crate::signer_node::node_state::builder::{Builder, Master};
 use crate::signer_node::utils::sender_index;
 use crate::signer_node::NodeState;
 use crate::signer_node::ToVerifiableSS;
@@ -134,28 +135,19 @@ where
                         };
                         conman.broadcast_message(message);
 
-                        return NodeState::Master {
-                            block_key: block_key.clone(),
-                            block_shared_keys: block_shared_keys.clone(),
-                            shared_block_secrets: shared_block_secrets.clone(),
-                            candidate_block: candidate_block.clone(),
-                            signatures: new_signatures,
-                            round_is_done: true,
-                        };
+                        return Master::from_node_state(prev_state.clone())
+                            .signatures(new_signatures)
+                            .round_is_done(true)
+                            .build();
                     }
                     Err(e) => {
                         log::error!("block rejected by Tapyrus Core: {:?}", e);
                     }
                 }
             }
-            NodeState::Master {
-                block_key: block_key.clone(),
-                block_shared_keys: block_shared_keys.clone(),
-                shared_block_secrets: shared_block_secrets.clone(),
-                candidate_block: candidate_block.clone(),
-                signatures: new_signatures,
-                round_is_done: false,
-            }
+            Master::from_node_state(prev_state.clone())
+                .signatures(new_signatures)
+                .build()
         }
         state @ _ => state.clone(),
     }
@@ -166,6 +158,8 @@ mod tests {
     use super::process_blocksig;
     use crate::blockdata::hash::Hash;
     use crate::crypto::multi_party_schnorr::SharedKeys;
+    use crate::net::SignerID;
+    use crate::signer_node::node_state::builder::{Builder, Master, Member};
     use crate::signer_node::*;
     use crate::tests::helper::net::TestConnectionManager;
     use crate::tests::helper::node_state_builder::BuilderForTest;
@@ -175,8 +169,6 @@ mod tests {
     use serde_json::Value;
     use std::collections::BTreeMap;
     use std::iter::FromIterator;
-    use crate::signer_node::node_state::builder::{Member, Builder, Master};
-    use crate::net::SignerID;
 
     #[test]
     fn test_process_blocksig_for_member() {

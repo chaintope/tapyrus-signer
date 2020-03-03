@@ -28,13 +28,13 @@ where
 mod tests {
     use super::process_completedblock;
     use crate::net::SignerID;
+    use crate::signer_node::node_state::builder::{Builder, Member};
     use crate::signer_node::{master_index, NodeState};
     use crate::tests::helper::blocks::get_block;
     use crate::tests::helper::keys::TEST_KEYS;
     use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
     use crate::tests::helper::node_state_builder::BuilderForTest;
     use crate::tests::helper::rpc::MockRpc;
-    use crate::signer_node::node_state::builder::{Member, Builder};
 
     #[test]
     fn test_process_completedblock() {
