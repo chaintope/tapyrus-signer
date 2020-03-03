@@ -168,13 +168,15 @@ mod tests {
     use crate::crypto::multi_party_schnorr::SharedKeys;
     use crate::signer_node::*;
     use crate::tests::helper::net::TestConnectionManager;
-    use crate::tests::helper::node_state_builder::{Builder, Master, Member};
+    use crate::tests::helper::node_state_builder::BuilderForTest;
     use crate::tests::helper::rpc::MockRpc;
     use crate::tests::helper::test_vectors::*;
     use curv::FE;
     use serde_json::Value;
     use std::collections::BTreeMap;
     use std::iter::FromIterator;
+    use crate::signer_node::node_state::builder::{Member, Builder, Master};
+    use crate::net::SignerID;
 
     #[test]
     fn test_process_blocksig_for_member() {
@@ -186,7 +188,7 @@ mod tests {
         let (sender, blockhash, gamma_i, e, priv_shared_key, shared_secrets, _, params) =
             load_test_case(&contents, "process_blocksig_for_member", rpc);
 
-        let prev_state = Member::new().master_index(0).build();
+        let prev_state = Member::for_test().master_index(0).build();
         let next = process_blocksig(
             &sender,
             blockhash,
@@ -482,7 +484,7 @@ mod tests {
             },
         ));
 
-        let prev_state = Master::new()
+        let prev_state = Master::for_test()
             .block_key(block_key)
             .candidate_block(block.clone())
             .block_shared_keys(block_shared_keys)

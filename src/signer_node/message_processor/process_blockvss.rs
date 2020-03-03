@@ -210,12 +210,14 @@ mod tests {
     use crate::crypto::multi_party_schnorr::SharedKeys;
     use crate::signer_node::*;
     use crate::tests::helper::net::TestConnectionManager;
-    use crate::tests::helper::node_state_builder::{Builder, Master, Member};
+    use crate::tests::helper::node_state_builder::BuilderForTest;
     use crate::tests::helper::rpc::MockRpc;
     use crate::tests::helper::test_vectors::*;
     use curv::cryptographic_primitives::secret_sharing::feldman_vss::*;
-    use curv::FE;
+    use curv::{FE, GE};
     use serde_json::Value;
+    use crate::signer_node::node_state::builder::{Master, Member, Builder};
+    use crate::net::SignerID;
 
     #[test]
     fn test_process_blockvss_master_invalid_block() {
@@ -596,12 +598,12 @@ mod tests {
             .collect();
 
         let prev_state = match v["role"].as_str().unwrap() {
-            "master" => Master::new()
+            "master" => Master::for_test()
                 .block_key(block_key)
                 .candidate_block(block.clone())
                 .shared_block_secrets(shared_block_secrets)
                 .build(),
-            "member" => Member::new()
+            "member" => Member::for_test()
                 .block_key(block_key)
                 .candidate_block(block.clone())
                 .shared_block_secrets(shared_block_secrets)
