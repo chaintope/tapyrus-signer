@@ -1,6 +1,7 @@
 use crate::blockdata::hash::Hash;
 use crate::blockdata::Block;
-use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
+use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys, Signature};
+use crate::errors::Error;
 use crate::net::{
     BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
 };
@@ -9,11 +10,13 @@ use crate::sign::Sign;
 use crate::signer_node::message_processor::get_valid_block;
 use crate::signer_node::node_state::builder::{Builder, Master};
 use crate::signer_node::utils::sender_index;
-use crate::signer_node::NodeState;
 use crate::signer_node::ToVerifiableSS;
+use crate::signer_node::{BidirectionalSharedSecretMap, NodeState};
 use crate::signer_node::{NodeParameters, SharedSecretMap, ToSharedSecretMap};
+use bitcoin::PublicKey;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-use curv::FE;
+use curv::{FE, GE};
+use std::collections::BTreeMap;
 
 pub fn process_blocksig<T, C>(
     sender_id: &SignerID,
@@ -30,127 +33,169 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
-    match prev_state {
+    let (block_shared_keys, shared_block_secrets, signatures) = match prev_state {
         NodeState::Master {
-            block_key,
             block_shared_keys,
             shared_block_secrets,
-            candidate_block,
             signatures,
             round_is_done: false,
-        } => {
-            let mut new_signatures = signatures.clone();
-            new_signatures.insert(sender_id.clone(), (gamma_i, e));
-            log::trace!(
-                "number of signatures: {:?} (threshold: {:?})",
-                new_signatures.len(),
-                params.threshold
-            );
-            let block = match get_valid_block(prev_state, blockhash) {
-                Ok(block) => block,
-                Err(_) => {
-                    return prev_state.clone();
-                }
-            };
-
-            if new_signatures.len() >= params.threshold as usize {
-                if block_shared_keys.is_none() {
-                    log::error!("key is not shared.");
-                    return prev_state.clone();
-                }
-
-                let parties = new_signatures
-                    .keys()
-                    .map(|k| sender_index(k, &params.pubkey_list))
-                    .collect::<Vec<usize>>();
-                let key_gen_vss_vec: Vec<VerifiableSS> = shared_secrets.to_vss();
-                let local_sigs: Vec<LocalSig> = new_signatures
-                    .values()
-                    .map(|s| LocalSig {
-                        gamma_i: s.0,
-                        e: s.1,
-                    })
-                    .collect();
-                let eph_vss_vec: Vec<VerifiableSS> = if block_shared_keys.unwrap().0 {
-                    shared_block_secrets.for_positive().to_vss()
-                } else {
-                    shared_block_secrets.for_negative().to_vss()
-                };
-                let sum_of_local_sigs = LocalSig::verify_local_sigs(
-                    &local_sigs,
-                    &parties[..],
-                    &key_gen_vss_vec,
-                    &eph_vss_vec,
-                );
-
-                let verification = match sum_of_local_sigs {
-                    Ok(vss_sum) => {
-                        let signature = Sign::aggregate(
-                            &vss_sum,
-                            &local_sigs,
-                            &parties[..],
-                            block_shared_keys.unwrap().2,
-                        );
-                        let public_key = priv_shared_keys.y;
-                        let hash = block.sighash().into_inner();
-                        match signature.verify(&hash, &public_key) {
-                            Ok(_) => Ok(signature),
-                            Err(e) => Err(e),
-                        }
-                    }
-                    Err(_) => {
-                        log::error!("local signature is invalid.");
-                        return prev_state.clone();
-                    }
-                };
-                let result = match verification {
-                    Ok(signature) => {
-                        let sig_hex = Sign::format_signature(&signature);
-                        let new_block: Block = block.add_proof(hex::decode(sig_hex).unwrap());
-                        match params.rpc.submitblock(&new_block) {
-                            Ok(_) => Ok(new_block),
-                            Err(e) => Err(e),
-                        }
-                    }
-                    Err(_) => {
-                        log::error!("aggregated signature is invalid");
-                        return prev_state.clone();
-                    }
-                };
-                match result {
-                    Ok(new_block) => {
-                        log::info!(
-                                "Round Success. caindateblock(block hash for sign)={:?} completedblock={:?}",
-                                block.sighash(),
-                                new_block.hash()
-                            );
-                        // send completeblock message
-                        log::info!("Broadcast CompletedBlock message. {:?}", new_block.hash());
-                        let message = Message {
-                            message_type: MessageType::BlockGenerationRoundMessages(
-                                BlockGenerationRoundMessageType::Completedblock(new_block),
-                            ),
-                            sender_id: params.signer_id.clone(),
-                            receiver_id: None,
-                        };
-                        conman.broadcast_message(message);
-
-                        return Master::from_node_state(prev_state.clone())
-                            .signatures(new_signatures)
-                            .round_is_done(true)
-                            .build();
-                    }
-                    Err(e) => {
-                        log::error!("block rejected by Tapyrus Core: {:?}", e);
-                    }
-                }
-            }
-            Master::from_node_state(prev_state.clone())
-                .signatures(new_signatures)
-                .build()
+            ..
+        } => (block_shared_keys, shared_block_secrets, signatures),
+        _ => {
+            // Ignore blocksig message except Master state which is not done.
+            return prev_state.clone();
         }
-        state @ _ => state.clone(),
+    };
+
+    let mut state_builder = Master::from_node_state(prev_state.clone());
+
+    let new_signatures = store_received_local_sig(sender_id, signatures, gamma_i, e);
+    state_builder.signatures(new_signatures.clone());
+
+    log::trace!(
+        "number of signatures: {:?} (threshold: {:?})",
+        new_signatures.len(),
+        params.threshold
+    );
+
+    let candidate_block = match get_valid_block(prev_state, blockhash) {
+        Ok(block) => block,
+        Err(_) => {
+            return prev_state.clone();
+        }
+    };
+
+    // Check whether the number of signatures met the threshold
+    if new_signatures.len() < params.threshold as usize {
+        return state_builder.build();
     }
+
+    if block_shared_keys.is_none() {
+        log::error!("key is not shared.");
+        return prev_state.clone();
+    }
+
+    let signature = match aggregate_and_verify_signature(
+        candidate_block,
+        new_signatures,
+        &params.pubkey_list,
+        shared_secrets,
+        &block_shared_keys,
+        &shared_block_secrets,
+        priv_shared_keys,
+    ) {
+        Ok(sig) => sig,
+        Err(e) => {
+            log::error!("aggregated signature is invalid. e: {:?}", e);
+            return prev_state.clone();
+        }
+    };
+
+    let completed_block = match submitblock(candidate_block, &signature, &params.rpc) {
+        Ok(block) => block,
+        Err(e) => {
+            log::error!("block rejected by Tapyrus Core: {:?}", e);
+            return state_builder.build();
+        }
+    };
+
+    log::info!(
+        "Round Success. caindateblock(block hash for sign)={:?} completedblock={:?}",
+        candidate_block.sighash(),
+        completed_block.hash()
+    );
+
+    // send completeblock message
+    broadcast_completedblock(completed_block, &params.signer_id, conman);
+
+    return state_builder.round_is_done(true).build();
+}
+
+fn store_received_local_sig(
+    sender_id: &SignerID,
+    signatures: &BTreeMap<SignerID, (FE, FE)>,
+    gamma_i: FE,
+    e: FE,
+) -> BTreeMap<SignerID, (FE, FE)> {
+    let mut result = signatures.clone();
+    result.insert(sender_id.clone(), (gamma_i, e));
+    result
+}
+
+fn aggregate_and_verify_signature(
+    block: &Block,
+    signatures: BTreeMap<SignerID, (FE, FE)>,
+    pubkey_list: &Vec<PublicKey>,
+    shared_secrets: &SharedSecretMap,
+    block_shared_keys: &Option<(bool, FE, GE)>,
+    shared_block_secrets: &BidirectionalSharedSecretMap,
+    priv_shared_keys: &SharedKeys,
+) -> Result<Signature, Error> {
+    let parties = signatures
+        .keys()
+        .map(|k| sender_index(k, pubkey_list))
+        .collect::<Vec<usize>>();
+    let key_gen_vss_vec: Vec<VerifiableSS> = shared_secrets.to_vss();
+    let local_sigs: Vec<LocalSig> = signatures
+        .values()
+        .map(|s| LocalSig {
+            gamma_i: s.0,
+            e: s.1,
+        })
+        .collect();
+    let eph_vss_vec: Vec<VerifiableSS> = if block_shared_keys.unwrap().0 {
+        shared_block_secrets.for_positive().to_vss()
+    } else {
+        shared_block_secrets.for_negative().to_vss()
+    };
+
+    match LocalSig::verify_local_sigs(&local_sigs, &parties[..], &key_gen_vss_vec, &eph_vss_vec) {
+        Ok(vss_sum) => {
+            let signature = Sign::aggregate(
+                &vss_sum,
+                &local_sigs,
+                &parties[..],
+                block_shared_keys.unwrap().2,
+            );
+            let public_key = priv_shared_keys.y;
+            let hash = block.sighash().into_inner();
+            match signature.verify(&hash, &public_key) {
+                Ok(_) => Ok(signature),
+                Err(e) => Err(e),
+            }
+        }
+        Err(_) => {
+            log::error!("local signature is invalid.");
+            Err(Error::InvalidSig)
+        }
+    }
+}
+
+fn submitblock<T>(block: &Block, sig: &Signature, rpc: &std::sync::Arc<T>) -> Result<Block, Error>
+where
+    T: TapyrusApi,
+{
+    let sig_hex = Sign::format_signature(sig);
+    let new_block: Block = block.add_proof(hex::decode(sig_hex).unwrap());
+    match rpc.submitblock(&new_block) {
+        Ok(_) => Ok(new_block),
+        Err(e) => Err(e),
+    }
+}
+
+fn broadcast_completedblock<C>(block: Block, own_id: &SignerID, conman: &C)
+where
+    C: ConnectionManager,
+{
+    log::info!("Broadcast CompletedBlock message. {:?}", block.hash());
+    let message = Message {
+        message_type: MessageType::BlockGenerationRoundMessages(
+            BlockGenerationRoundMessageType::Completedblock(block),
+        ),
+        sender_id: own_id.clone(),
+        receiver_id: None,
+    };
+    conman.broadcast_message(message);
 }
 
 #[cfg(test)]
