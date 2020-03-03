@@ -31,103 +31,122 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
-    match prev_state {
-        NodeState::Master {
-            block_key,
-            shared_block_secrets,
-            candidate_block,
-            signatures,
-            round_is_done: false,
-            ..
-        } => {
-            let mut new_shared_block_secrets = shared_block_secrets.clone();
-            new_shared_block_secrets.insert(
-                sender_id.clone(),
-                (
-                    SharedSecret {
-                        vss: vss_for_positive.clone(),
-                        secret_share: secret_share_for_positive,
-                    },
-                    SharedSecret {
-                        vss: vss_for_negative.clone(),
-                        secret_share: secret_share_for_negative,
-                    },
-                ),
-            );
-            let result = process_blockvss_inner(
-                blockhash,
-                &new_shared_block_secrets,
-                priv_shared_keys,
-                prev_state,
-                conman,
-                params,
-            );
+    let new_shared_block_secrets = match store_received_vss(
+        sender_id,
+        prev_state,
+        vss_for_positive,
+        secret_share_for_positive,
+        vss_for_negative,
+        secret_share_for_negative,
+    ) {
+        Ok(shared_block_secrets) => shared_block_secrets,
+        Err(e) => {
+            error!("Error: {:?}, state: {:?}", e, prev_state);
+            return prev_state.clone();
+        }
+    };
 
-            match result {
-                Err(_) => prev_state.clone(),
-                Ok(Some((is_positive, shared_keys))) => Master::from_node_state(prev_state.clone())
-                    .shared_block_secrets(new_shared_block_secrets)
-                    .block_shared_keys(Some((is_positive, shared_keys.x_i, shared_keys.y)))
-                    .build(),
-                Ok(None) => Master::from_node_state(prev_state.clone())
+    // Returns if the vss count doesn't meet required number
+    if new_shared_block_secrets.len() != params.pubkey_list.len() {
+        match prev_state {
+            NodeState::Master { .. } => {
+                return Master::from_node_state(prev_state.clone())
                     .shared_block_secrets(new_shared_block_secrets)
                     .block_shared_keys(None)
-                    .build(),
+                    .build();
             }
-        }
-        NodeState::Member {
-            block_key,
-            shared_block_secrets,
-            candidate_block,
-            master_index,
-            ..
-        } => {
-            let mut new_shared_block_secrets = shared_block_secrets.clone();
-            new_shared_block_secrets.insert(
-                sender_id.clone(),
-                (
-                    SharedSecret {
-                        vss: vss_for_positive.clone(),
-                        secret_share: secret_share_for_positive,
-                    },
-                    SharedSecret {
-                        vss: vss_for_negative.clone(),
-                        secret_share: secret_share_for_negative,
-                    },
-                ),
-            );
-            let result = process_blockvss_inner(
-                blockhash,
-                &new_shared_block_secrets,
-                priv_shared_keys,
-                prev_state,
-                conman,
-                params,
-            );
-            match result {
-                Err(_) => prev_state.clone(),
-                Ok(Some(keys)) => Member::from_node_state(prev_state.clone())
-                    .shared_block_secrets(new_shared_block_secrets)
-                    .block_shared_keys(Some((keys.0, keys.1.x_i, keys.1.y)))
-                    .build(),
-                Ok(_) => Member::from_node_state(prev_state.clone())
+            NodeState::Member { .. } => {
+                return Member::from_node_state(prev_state.clone())
                     .shared_block_secrets(new_shared_block_secrets)
                     .block_shared_keys(None)
-                    .build(),
+                    .build();
+            }
+            _ => {
+                return prev_state.clone();
             }
         }
+    }
+
+    let block_shared_keys = match broadcast_local_sig(
+        blockhash,
+        &new_shared_block_secrets,
+        priv_shared_keys,
+        prev_state,
+        conman,
+        params,
+    ) {
+        Ok((is_positive, shared_keys)) => (is_positive, shared_keys.x_i, shared_keys.y),
+        Err(e) => {
+            error!("Error: {:?}, state: {:?}", e, prev_state);
+            return prev_state.clone();
+        }
+    };
+
+    match prev_state {
+        NodeState::Master { .. } => Master::from_node_state(prev_state.clone())
+            .shared_block_secrets(new_shared_block_secrets)
+            .block_shared_keys(Some(block_shared_keys))
+            .build(),
+        NodeState::Member { .. } => Member::from_node_state(prev_state.clone())
+            .shared_block_secrets(new_shared_block_secrets)
+            .block_shared_keys(Some(block_shared_keys))
+            .build(),
         _ => prev_state.clone(),
     }
 }
 
-fn process_blockvss_inner<T, C>(
+/// Store received vss
+fn store_received_vss(
+    sender_id: &SignerID,
+    prev_state: &NodeState,
+    vss_for_positive: VerifiableSS,
+    secret_share_for_positive: FE,
+    vss_for_negative: VerifiableSS,
+    secret_share_for_negative: FE,
+) -> Result<BidirectionalSharedSecretMap, Error> {
+    let mut new_shared_block_secrets;
+    match prev_state {
+        NodeState::Master {
+            shared_block_secrets,
+            round_is_done: false,
+            ..
+        } => {
+            new_shared_block_secrets = shared_block_secrets.clone();
+        }
+        NodeState::Member {
+            shared_block_secrets,
+            ..
+        } => {
+            new_shared_block_secrets = shared_block_secrets.clone();
+        }
+        _ => return Err(Error::InvalidNodeState),
+    }
+
+    new_shared_block_secrets.insert(
+        sender_id.clone(),
+        (
+            SharedSecret {
+                vss: vss_for_positive.clone(),
+                secret_share: secret_share_for_positive,
+            },
+            SharedSecret {
+                vss: vss_for_negative.clone(),
+                secret_share: secret_share_for_negative,
+            },
+        ),
+    );
+
+    Ok(new_shared_block_secrets)
+}
+
+fn broadcast_local_sig<T, C>(
     blockhash: Hash,
     shared_block_secrets: &BidirectionalSharedSecretMap,
     priv_shared_keys: &SharedKeys,
     prev_state: &NodeState,
     conman: &C,
     params: &NodeParameters<T>,
-) -> Result<Option<(bool, SharedKeys)>, Error>
+) -> Result<(bool, SharedKeys), Error>
 where
     T: TapyrusApi,
     C: ConnectionManager,
@@ -138,56 +157,52 @@ where
         shared_block_secrets.len()
     );
     let block = get_valid_block(prev_state, blockhash)?;
-    if shared_block_secrets.len() == params.pubkey_list.len() {
-        let shared_keys_for_positive = Sign::verify_vss_and_construct_key(
-            &sharing_params,
-            &shared_block_secrets.for_positive(),
-            &(params.self_node_index + 1),
-        )?;
+    let shared_keys_for_positive = Sign::verify_vss_and_construct_key(
+        &sharing_params,
+        &shared_block_secrets.for_positive(),
+        &(params.self_node_index + 1),
+    )?;
 
-        let result_for_positive =
-            Sign::sign(&shared_keys_for_positive, priv_shared_keys, block.sighash());
+    let result_for_positive =
+        Sign::sign(&shared_keys_for_positive, priv_shared_keys, block.sighash());
 
-        let shared_keys_for_negative = Sign::verify_vss_and_construct_key(
-            &sharing_params,
-            &shared_block_secrets.for_negative(),
-            &(params.self_node_index + 1),
-        )?;
-        let result_for_negative =
-            Sign::sign(&shared_keys_for_negative, priv_shared_keys, block.sighash());
+    let shared_keys_for_negative = Sign::verify_vss_and_construct_key(
+        &sharing_params,
+        &shared_block_secrets.for_negative(),
+        &(params.self_node_index + 1),
+    )?;
+    let result_for_negative =
+        Sign::sign(&shared_keys_for_negative, priv_shared_keys, block.sighash());
 
-        let p = BigInt::from_str_radix(
-            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
-            16,
-        )
-        .unwrap();
-        let is_positive = jacobi(&shared_keys_for_positive.y.y_coor().unwrap(), &p) == 1;
-        let (shared_keys, result) = if is_positive {
-            (shared_keys_for_positive, result_for_positive)
-        } else {
-            (shared_keys_for_negative, result_for_negative)
-        };
-
-        match result {
-            Ok(local_sig) => {
-                conman.broadcast_message(Message {
-                    message_type: MessageType::BlockGenerationRoundMessages(
-                        BlockGenerationRoundMessageType::Blocksig(
-                            block.sighash(),
-                            local_sig.gamma_i,
-                            local_sig.e,
-                        ),
-                    ),
-                    sender_id: params.signer_id,
-                    receiver_id: None,
-                });
-            }
-            _ => (),
-        }
-        return Ok(Some((is_positive, shared_keys)));
+    let p = BigInt::from_str_radix(
+        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
+        16,
+    )
+    .unwrap();
+    let is_positive = jacobi(&shared_keys_for_positive.y.y_coor().unwrap(), &p) == 1;
+    let (shared_keys, result) = if is_positive {
+        (shared_keys_for_positive, result_for_positive)
     } else {
-        return Ok(None);
+        (shared_keys_for_negative, result_for_negative)
+    };
+
+    match result {
+        Ok(local_sig) => {
+            conman.broadcast_message(Message {
+                message_type: MessageType::BlockGenerationRoundMessages(
+                    BlockGenerationRoundMessageType::Blocksig(
+                        block.sighash(),
+                        local_sig.gamma_i,
+                        local_sig.e,
+                    ),
+                ),
+                sender_id: params.signer_id,
+                receiver_id: None,
+            });
+        }
+        _ => (),
     }
+    return Ok((is_positive, shared_keys));
 }
 
 #[cfg(test)]
