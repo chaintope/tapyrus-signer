@@ -13,7 +13,7 @@ pub mod hash {
 
     /// This is hash value container struct.
     /// This struct assumes porting value from sha256d::Hash.
-    #[derive(Serialize, Deserialize, PartialEq)]
+    #[derive(Serialize, Deserialize, PartialEq, Clone, Copy)]
     pub struct Hash([u8; 32]);
 
     impl Hash {
