@@ -12,6 +12,7 @@ pub struct NodeParameters<T: TapyrusApi> {
     pub private_key: PrivateKey,
     pub rpc: std::sync::Arc<T>,
     pub address: Address,
+    /// Own Signer ID. Actually it is signer own public key.
     pub signer_id: SignerID,
     pub self_node_index: usize,
     pub round_duration: u64,

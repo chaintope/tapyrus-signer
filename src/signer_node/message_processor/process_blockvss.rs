@@ -14,6 +14,8 @@ use crate::util::jacobi;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::ECPoint;
 use curv::{BigInt, FE};
+use std::borrow::Borrow;
+use std::collections::HashSet;
 
 pub fn process_blockvss<T, C>(
     sender_id: &SignerID,
@@ -22,7 +24,6 @@ pub fn process_blockvss<T, C>(
     secret_share_for_positive: FE,
     vss_for_negative: VerifiableSS,
     secret_share_for_negative: FE,
-    priv_shared_keys: &SharedKeys,
     prev_state: &NodeState,
     conman: &C,
     params: &NodeParameters<T>,
@@ -46,36 +47,8 @@ where
         }
     };
 
-    // Returns if the vss count doesn't meet required number
-    if new_shared_block_secrets.len() != params.pubkey_list.len() {
-        match prev_state {
-            NodeState::Master { .. } => {
-                return Master::from_node_state(prev_state.clone())
-                    .shared_block_secrets(new_shared_block_secrets)
-                    .block_shared_keys(None)
-                    .build();
-            }
-            NodeState::Member { .. } => {
-                return Member::from_node_state(prev_state.clone())
-                    .shared_block_secrets(new_shared_block_secrets)
-                    .block_shared_keys(None)
-                    .build();
-            }
-            _ => {
-                return prev_state.clone();
-            }
-        }
-    }
-
-    let block_shared_keys = match broadcast_local_sig(
-        blockhash,
-        &new_shared_block_secrets,
-        priv_shared_keys,
-        prev_state,
-        conman,
-        params,
-    ) {
-        Ok((is_positive, shared_keys)) => (is_positive, shared_keys.x_i, shared_keys.y),
+    let candidate_block = match get_valid_block(prev_state, blockhash) {
+        Ok(b) => b,
         Err(e) => {
             error!("Error: {:?}, state: {:?}", e, prev_state);
             return prev_state.clone();
@@ -83,18 +56,64 @@ where
     };
 
     match prev_state {
-        NodeState::Master { .. } => Master::from_node_state(prev_state.clone())
-            .shared_block_secrets(new_shared_block_secrets)
-            .block_shared_keys(Some(block_shared_keys))
-            .build(),
+        NodeState::Master { .. } => {
+            let mut state_builder = Master::from_node_state(prev_state.clone());
+
+            if new_shared_block_secrets.len() >= params.threshold as usize {
+                let participants = select_participants_for_signing(&new_shared_block_secrets);
+                broadcast_blockparticipants(
+                    &participants,
+                    &new_shared_block_secrets,
+                    candidate_block,
+                    conman,
+                    &params.signer_id,
+                );
+                state_builder.participants(participants);
+            }
+
+            state_builder
+                .shared_block_secrets(new_shared_block_secrets)
+                .build()
+        }
         NodeState::Member { .. } => Member::from_node_state(prev_state.clone())
             .shared_block_secrets(new_shared_block_secrets)
-            .block_shared_keys(Some(block_shared_keys))
             .build(),
         _ => prev_state.clone(),
     }
 }
 
+fn broadcast_blockparticipants<C: ConnectionManager>(
+    participants: &HashSet<SignerID>,
+    shared_block_secrets: &BidirectionalSharedSecretMap,
+    block: &Block,
+    conman: &C,
+    self_signer_id: &SignerID,
+) {
+    conman.broadcast_message(Message {
+        message_type: MessageType::BlockGenerationRoundMessages(
+            BlockGenerationRoundMessageType::Blockparticipants(
+                block.sighash(),
+                participants.clone(),
+            ),
+        ),
+        sender_id: self_signer_id.clone(),
+        receiver_id: None,
+    });
+}
+
+/// Select participants for signing
+/// The selection rule is who the one's blockvss message was arrived to the master node before met the
+/// threshold.
+fn select_participants_for_signing(
+    shared_block_secrets: &BidirectionalSharedSecretMap,
+) -> HashSet<SignerID> {
+    shared_block_secrets
+        .iter()
+        .map(|(signer_id, ..)| signer_id.clone())
+        .collect()
+}
+
+/// Store received vss
 fn store_received_vss(
     sender_id: &SignerID,
     prev_state: &NodeState,
@@ -136,72 +155,6 @@ fn store_received_vss(
     );
 
     Ok(new_shared_block_secrets)
-}
-
-fn broadcast_local_sig<T, C>(
-    blockhash: Hash,
-    shared_block_secrets: &BidirectionalSharedSecretMap,
-    priv_shared_keys: &SharedKeys,
-    prev_state: &NodeState,
-    conman: &C,
-    params: &NodeParameters<T>,
-) -> Result<(bool, SharedKeys), Error>
-where
-    T: TapyrusApi,
-    C: ConnectionManager,
-{
-    let sharing_params = params.sharing_params();
-    log::trace!(
-        "number of shared_block_secrets: {:?}",
-        shared_block_secrets.len()
-    );
-    let block = get_valid_block(prev_state, blockhash)?;
-    let shared_keys_for_positive = Sign::verify_vss_and_construct_key(
-        &sharing_params,
-        &shared_block_secrets.for_positive(),
-        &(params.self_node_index + 1),
-    )?;
-
-    let result_for_positive =
-        Sign::sign(&shared_keys_for_positive, priv_shared_keys, block.sighash());
-
-    let shared_keys_for_negative = Sign::verify_vss_and_construct_key(
-        &sharing_params,
-        &shared_block_secrets.for_negative(),
-        &(params.self_node_index + 1),
-    )?;
-    let result_for_negative =
-        Sign::sign(&shared_keys_for_negative, priv_shared_keys, block.sighash());
-
-    let p = BigInt::from_str_radix(
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
-        16,
-    )
-    .unwrap();
-    let is_positive = jacobi(&shared_keys_for_positive.y.y_coor().unwrap(), &p) == 1;
-    let (shared_keys, result) = if is_positive {
-        (shared_keys_for_positive, result_for_positive)
-    } else {
-        (shared_keys_for_negative, result_for_negative)
-    };
-
-    match result {
-        Ok(local_sig) => {
-            conman.broadcast_message(Message {
-                message_type: MessageType::BlockGenerationRoundMessages(
-                    BlockGenerationRoundMessageType::Blocksig(
-                        block.sighash(),
-                        local_sig.gamma_i,
-                        local_sig.e,
-                    ),
-                ),
-                sender_id: params.signer_id,
-                receiver_id: None,
-            });
-        }
-        _ => (),
-    }
-    return Ok((is_positive, shared_keys));
 }
 
 #[cfg(test)]
@@ -248,7 +201,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            &priv_shared_keys,
             &prev_state,
             &conman,
             &params,
@@ -292,7 +244,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            &priv_shared_keys,
             &prev_state,
             &conman,
             &params,
@@ -346,7 +297,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            &priv_shared_keys,
             &prev_state,
             &conman,
             &params,
@@ -396,7 +346,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            &priv_shared_keys,
             &prev_state,
             &conman,
             &params,
@@ -432,7 +381,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            &priv_shared_keys,
             &prev_state,
             &conman,
             &params,
@@ -476,7 +424,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            &priv_shared_keys,
             &prev_state,
             &conman,
             &params,
@@ -530,7 +477,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            &priv_shared_keys,
             &prev_state,
             &conman,
             &params,

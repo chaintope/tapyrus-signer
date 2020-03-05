@@ -21,6 +21,7 @@ use std::time::Duration;
 
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::FE;
+use std::collections::HashSet;
 
 /// Signerの識別子。公開鍵を識別子にする。
 #[derive(Debug, Eq, Hash, Copy, Clone)]
@@ -104,7 +105,7 @@ pub enum BlockGenerationRoundMessageType {
     Candidateblock(Block),
     Completedblock(Block),
     Blockvss(Hash, VerifiableSS, FE, VerifiableSS, FE),
-    Blockparticipants(Hash, Vec<SignerID>),
+    Blockparticipants(Hash, HashSet<SignerID>),
     Blocksig(Hash, FE, FE),
     Roundfailure,
 }

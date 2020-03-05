@@ -73,11 +73,11 @@ impl Sign {
         eph_shared_keys: &SharedKeys,
         priv_shared_keys: &SharedKeys,
         message: Hash,
-    ) -> Result<LocalSig, Error> {
+    ) -> LocalSig {
         let message_slice = message.borrow_inner();
         let local_sig =
             LocalSig::compute(&message_slice.clone(), &eph_shared_keys, &priv_shared_keys);
-        Ok(local_sig)
+        local_sig
     }
 
     pub fn aggregate(

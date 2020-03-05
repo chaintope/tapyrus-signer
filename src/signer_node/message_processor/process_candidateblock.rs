@@ -175,6 +175,7 @@ mod tests {
             block_shared_keys,
             candidate_block,
             signatures,
+            participants,
             round_is_done,
             ..
         } = prev_state
@@ -186,11 +187,13 @@ mod tests {
                     block_shared_keys: block_shared_keys_target,
                     candidate_block: candidate_block_target,
                     signatures: signatures_target,
+                    participants: participants_target,
                     round_is_done: round_is_done_target,
                 } if shared_block_secrets_target == shared_block_secrets
                     && block_shared_keys_target == block_shared_keys
                     && candidate_block_target == candidate_block
                     && signatures_target == signatures
+                    && participants_target == participants
                     && round_is_done_target == round_is_done =>
                 {
                     ()

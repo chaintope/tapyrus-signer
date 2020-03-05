@@ -33,6 +33,7 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
+    // extract values from state object.
     let (block_shared_keys, shared_block_secrets, signatures) = match prev_state {
         NodeState::Master {
             block_shared_keys,

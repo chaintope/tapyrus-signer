@@ -2,7 +2,7 @@ use crate::blockdata::Block;
 use crate::net::SignerID;
 use crate::signer_node::BidirectionalSharedSecretMap;
 use curv::{FE, GE};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeState {
@@ -26,6 +26,10 @@ pub enum NodeState {
         /// Map of local signatures for each signers. Final signature for candidate block is calculated by these
         /// signatures on lagrange interpolation.
         signatures: BTreeMap<SignerID, (FE, FE)>,
+        /// The set of participants who can participate signature issuing protocol. The participants
+        /// are declared by Master node of the round.
+        participants: HashSet<SignerID>,
+        /// Set true when the round is done.
         round_is_done: bool,
     },
     Member {
@@ -44,6 +48,9 @@ pub enum NodeState {
         /// It is broadcasted by master node of a round. The goal of rounds are generating signature
         /// for this candidate block.
         candidate_block: Option<Block>,
+        /// The set of participants who can participate signature issuing protocol. The participants
+        /// are declared by Master node of the round.
+        participants: HashSet<SignerID>,
         master_index: usize,
     },
     RoundComplete {
@@ -57,7 +64,7 @@ pub mod builder {
     use crate::net::SignerID;
     use crate::signer_node::{BidirectionalSharedSecretMap, NodeState, INITIAL_MASTER_INDEX};
     use curv::{FE, GE};
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashSet};
 
     pub trait Builder {
         fn build(&self) -> NodeState;
@@ -70,6 +77,7 @@ pub mod builder {
         block_shared_keys: Option<(bool, FE, GE)>,
         candidate_block: Option<Block>,
         signatures: BTreeMap<SignerID, (FE, FE)>,
+        participants: HashSet<SignerID>,
         round_is_done: bool,
     }
 
@@ -81,6 +89,7 @@ pub mod builder {
                 block_shared_keys: self.block_shared_keys.clone(),
                 candidate_block: self.candidate_block.clone(),
                 signatures: self.signatures.clone(),
+                participants: self.participants.clone(),
                 round_is_done: self.round_is_done,
             }
         }
@@ -92,6 +101,7 @@ pub mod builder {
                 block_shared_keys,
                 candidate_block,
                 signatures,
+                participants,
                 round_is_done,
             } = state
             {
@@ -101,6 +111,7 @@ pub mod builder {
                     block_shared_keys,
                     candidate_block,
                     signatures,
+                    participants,
                     round_is_done,
                 }
             } else {
@@ -119,6 +130,7 @@ pub mod builder {
                 block_shared_keys: None,
                 candidate_block: None,
                 signatures: BTreeMap::new(),
+                participants: HashSet::new(),
                 round_is_done: false,
             }
         }
@@ -131,6 +143,7 @@ pub mod builder {
             block_shared_keys: Option<(bool, FE, GE)>,
             candidate_block: Option<Block>,
             signatures: BTreeMap<SignerID, (FE, FE)>,
+            participants: HashSet<SignerID>,
             round_is_done: bool,
         ) -> Self {
             Self {
@@ -139,6 +152,7 @@ pub mod builder {
                 block_shared_keys,
                 candidate_block,
                 signatures,
+                participants,
                 round_is_done,
             }
         }
@@ -174,6 +188,11 @@ pub mod builder {
             self
         }
 
+        pub fn participants(&mut self, participants: HashSet<SignerID>) -> &mut Self {
+            self.participants = participants;
+            self
+        }
+
         pub fn round_is_done(&mut self, round_is_done: bool) -> &mut Self {
             self.round_is_done = round_is_done;
             self
@@ -185,6 +204,7 @@ pub mod builder {
         shared_block_secrets: BidirectionalSharedSecretMap,
         block_shared_keys: Option<(bool, FE, GE)>,
         candidate_block: Option<Block>,
+        participants: HashSet<SignerID>,
         master_index: usize,
     }
 
@@ -195,6 +215,7 @@ pub mod builder {
                 shared_block_secrets: BidirectionalSharedSecretMap::new(),
                 block_shared_keys: None,
                 candidate_block: None,
+                participants: HashSet::new(),
                 master_index: INITIAL_MASTER_INDEX,
             }
         }
@@ -207,6 +228,7 @@ pub mod builder {
                 shared_block_secrets: self.shared_block_secrets.clone(),
                 block_shared_keys: self.block_shared_keys.clone(),
                 candidate_block: self.candidate_block.clone(),
+                participants: self.participants.clone(),
                 master_index: self.master_index,
             }
         }
@@ -217,6 +239,7 @@ pub mod builder {
                 shared_block_secrets,
                 block_shared_keys,
                 candidate_block,
+                participants,
                 master_index,
             } = state
             {
@@ -225,6 +248,7 @@ pub mod builder {
                     shared_block_secrets,
                     block_shared_keys,
                     candidate_block,
+                    participants,
                     master_index,
                 }
             } else {
@@ -241,6 +265,7 @@ pub mod builder {
             shared_block_secrets: BidirectionalSharedSecretMap,
             block_shared_keys: Option<(bool, FE, GE)>,
             candidate_block: Option<Block>,
+            participants: HashSet<SignerID>,
             master_index: usize,
         ) -> Self {
             Self {
@@ -248,6 +273,7 @@ pub mod builder {
                 shared_block_secrets,
                 block_shared_keys,
                 candidate_block,
+                participants,
                 master_index,
             }
         }
@@ -275,6 +301,11 @@ pub mod builder {
 
         pub fn candidate_block(&mut self, candidate_block: Option<Block>) -> &mut Self {
             self.candidate_block = candidate_block;
+            self
+        }
+
+        pub fn participants(&mut self, participants: HashSet<SignerID>) -> &mut Self {
+            self.participants = participants;
             self
         }
 
