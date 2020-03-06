@@ -45,7 +45,8 @@ impl Sign {
         secret_shares: &SharedSecretMap,
         index: &usize,
     ) -> Result<SharedKeys, Error> {
-        assert_eq!(secret_shares.len(), params.share_count);
+        // Parameters.threshold is decremented just 1 from real the threshold. So add 1 here.
+        assert_eq!(params.threshold + 1, secret_shares.len());
 
         let correct_ss = secret_shares
             .values()

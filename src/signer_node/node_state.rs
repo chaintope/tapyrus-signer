@@ -64,6 +64,7 @@ pub mod builder {
     use crate::net::SignerID;
     use crate::signer_node::{BidirectionalSharedSecretMap, NodeState, INITIAL_MASTER_INDEX};
     use curv::{FE, GE};
+    use std::borrow::BorrowMut;
     use std::collections::{BTreeMap, HashSet};
 
     pub trait Builder {
@@ -181,6 +182,10 @@ pub mod builder {
         pub fn candidate_block(&mut self, candidate_block: Option<Block>) -> &mut Self {
             self.candidate_block = candidate_block;
             self
+        }
+
+        pub fn borrow_mut_signatures(&mut self) -> &mut BTreeMap<SignerID, (FE, FE)> {
+            self.signatures.borrow_mut()
         }
 
         pub fn signatures(&mut self, signatures: BTreeMap<SignerID, (FE, FE)>) -> &mut Self {

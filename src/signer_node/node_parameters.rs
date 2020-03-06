@@ -51,6 +51,12 @@ impl<T: TapyrusApi> NodeParameters<T> {
         }
     }
 
+    pub fn get_signer_id_by_index(&self, index: usize) -> SignerID {
+        SignerID {
+            pubkey: self.pubkey_list[index].clone(),
+        }
+    }
+
     pub fn sharing_params(&self) -> Parameters {
         let t = (self.threshold - 1 as u8).try_into().unwrap();
         let n: usize = (self.pubkey_list.len() as u8).try_into().unwrap();
