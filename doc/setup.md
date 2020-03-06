@@ -2,6 +2,8 @@
 
 This document describes how to set up new Tapyrus Signer Network.
 
+## Overview
+
 We can set up Tapyrus Signer Network and Tapyrus Core Network with the 'trusted' way desribed in [How to start tapyrus in dev mode?](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/getting_started.md#how-to-start-tapyrus-in-dev-mode). The trusted setup requires to share each signer's private key with all signers. But each tapyrus signer should be treated as 'trustless' as wel as other blockchain system.
 
 The following shows the protocol for setting up signer in a 'trustless' network which has n-singers and threshold t which t is less than n.
@@ -270,8 +272,15 @@ it is the same as the encryption of `static_vss` except nonce used by chacha20_p
 
 ## Appendix C: Security Consideration
 
-// TODO:
-
 ### Nonce used by Encrypting with ChaCha20-Poly1305
 
+As described in Appendix A, we use ChaCha20-Poly1305 encryption to generate vss.
+`networkid` is used as nonce in encrypting `static_vss`.
+Note that according to security requirement of ChaCha20, so we can not reuse same networkid with same static keypair.
+In generating `ephemeral_vss`, fixed null-nonce can be used because keypair is ephemeral.
+
 ### Communicating with a protocol with PFS
+
+We suppose that signers can establish secure connection as described in the section [Overview](#Overview)
+It is required to use a communication method having the property of PFS in order to minimize leaked information even if the encryption algorithm used in this version is broken in the future.
+Otherwise, the private key and the node secret may leak from the past communication contents.
