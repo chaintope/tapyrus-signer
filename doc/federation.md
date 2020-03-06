@@ -80,4 +80,4 @@ To cancel the planned federation, execute `rollback_federation` with block_heigh
 
 Federation changes or cancellations must be made before the previous block is generated and submitted to the blockchain.
 
-See [API Specification](./api.md) for details of the RPC API.
+See [API Specification](./rpc.yaml) for details of the RPC API.
