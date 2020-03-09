@@ -47,9 +47,9 @@ pub mod test_vectors {
     use bitcoin::{PrivateKey, PublicKey};
     use curv::{FE, GE};
     use serde_json::Value;
+    use std::collections::HashSet;
     use std::fs::read_to_string;
     use std::str::FromStr;
-    use std::collections::HashSet;
 
     pub fn load_test_vector(file: &str) -> Result<Value, LoadJsonFileError> {
         let content = read_to_string(file).or(Err(LoadJsonFileError {
@@ -137,8 +137,7 @@ pub mod test_vectors {
     }
 
     pub fn to_participants(value: &Value) -> HashSet<SignerID> {
-        let r: HashSet<String> =
-            serde_json::from_value(value.clone()).unwrap_or(HashSet::new());
+        let r: HashSet<String> = serde_json::from_value(value.clone()).unwrap_or(HashSet::new());
         r.iter().map(|i| to_signer_id(i)).collect()
     }
 

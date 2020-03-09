@@ -41,13 +41,9 @@ impl Sign {
     /// return SharedKeys { y, x_i },
     /// where y is a aggregated public key and x_i is a share of player i.
     pub fn verify_vss_and_construct_key(
-        params: &Parameters,
         secret_shares: &SharedSecretMap,
         index: &usize,
     ) -> Result<SharedKeys, Error> {
-        // Parameters.threshold is decremented just 1 from real the threshold. So add 1 here.
-        assert_eq!(params.threshold + 1, secret_shares.len());
-
         let correct_ss = secret_shares
             .values()
             .map(|v| v.vss.validate_share(&v.secret_share, *index))

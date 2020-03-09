@@ -64,14 +64,12 @@ fn generate_local_sig<T>(
 where
     T: TapyrusApi,
 {
-    let sharing_params = params.sharing_params();
     log::trace!(
         "number of shared_block_secrets: {:?}",
         shared_block_secrets.len()
     );
     let block = get_valid_block(prev_state, blockhash)?;
     let shared_keys_for_positive = Sign::verify_vss_and_construct_key(
-        &sharing_params,
         &shared_block_secrets.for_positive(),
         &(params.self_node_index + 1),
     )?;
@@ -80,7 +78,6 @@ where
         Sign::sign(&shared_keys_for_positive, priv_shared_keys, block.sighash());
 
     let shared_keys_for_negative = Sign::verify_vss_and_construct_key(
-        &sharing_params,
         &shared_block_secrets.for_negative(),
         &(params.self_node_index + 1),
     )?;

@@ -15,8 +15,6 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
-    let params = signer_node.params.sharing_params();
-
     signer_node.shared_secrets.insert(
         sender_id.clone(),
         SharedSecret {
@@ -27,7 +25,6 @@ where
 
     if signer_node.shared_secrets.len() == signer_node.params.pubkey_list.len() {
         let shared_keys = Sign::verify_vss_and_construct_key(
-            &params,
             &signer_node.shared_secrets,
             &(signer_node.params.self_node_index + 1),
         )
