@@ -13,20 +13,20 @@ pub use process_nodevss::process_nodevss;
 
 use crate::blockdata::hash::Hash;
 use crate::blockdata::Block;
+use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
 use crate::errors::Error;
-use crate::signer_node::{NodeState, BidirectionalSharedSecretMap, NodeParameters};
-use crate::crypto::multi_party_schnorr::{SharedKeys, LocalSig};
-use crate::rpc::TapyrusApi;
-use crate::sign::Sign;
-use curv::BigInt;
-use crate::util::jacobi;
-use curv::elliptic::curves::traits::ECPoint;
-use crate::net::MessageType;
 use crate::net::BlockGenerationRoundMessageType;
 use crate::net::ConnectionManager;
 use crate::net::Message;
-use crate::signer_node::ToSharedSecretMap;
+use crate::net::MessageType;
 use crate::net::SignerID;
+use crate::rpc::TapyrusApi;
+use crate::sign::Sign;
+use crate::signer_node::ToSharedSecretMap;
+use crate::signer_node::{BidirectionalSharedSecretMap, NodeParameters, NodeState};
+use crate::util::jacobi;
+use curv::elliptic::curves::traits::ECPoint;
+use curv::BigInt;
 
 fn get_valid_block(state: &NodeState, blockhash: Hash) -> Result<&Block, Error> {
     let block_opt = match state {
@@ -61,8 +61,8 @@ fn generate_local_sig<T>(
     prev_state: &NodeState,
     params: &NodeParameters<T>,
 ) -> Result<(bool, SharedKeys, LocalSig), Error>
-    where
-        T: TapyrusApi,
+where
+    T: TapyrusApi,
 {
     let sharing_params = params.sharing_params();
     log::trace!(
@@ -91,7 +91,7 @@ fn generate_local_sig<T>(
         "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
         16,
     )
-        .unwrap();
+    .unwrap();
     let is_positive = jacobi(&shared_keys_for_positive.y.y_coor().unwrap(), &p) == 1;
     let (shared_keys, local_sig) = if is_positive {
         (shared_keys_for_positive, result_for_positive)
@@ -106,7 +106,7 @@ fn broadcast_localsig<C: ConnectionManager>(
     sighash: Hash,
     local_sig: &LocalSig,
     conman: &C,
-    signer_id: &SignerID
+    signer_id: &SignerID,
 ) {
     conman.broadcast_message(Message {
         message_type: MessageType::BlockGenerationRoundMessages(

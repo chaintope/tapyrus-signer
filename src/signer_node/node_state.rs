@@ -61,12 +61,12 @@ pub enum NodeState {
 
 pub mod builder {
     use crate::blockdata::Block;
+    use crate::crypto::multi_party_schnorr::LocalSig;
     use crate::net::SignerID;
     use crate::signer_node::{BidirectionalSharedSecretMap, NodeState, INITIAL_MASTER_INDEX};
     use curv::{FE, GE};
     use std::borrow::BorrowMut;
     use std::collections::{BTreeMap, HashSet};
-    use crate::crypto::multi_party_schnorr::LocalSig;
 
     pub trait Builder {
         fn build(&self) -> NodeState;

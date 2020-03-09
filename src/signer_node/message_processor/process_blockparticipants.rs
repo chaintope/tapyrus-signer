@@ -1,10 +1,10 @@
 use crate::blockdata::hash::Hash;
 use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
-use crate::net::{
-    ConnectionManager, SignerID,
-};
+use crate::net::{ConnectionManager, SignerID};
 use crate::rpc::TapyrusApi;
-use crate::signer_node::message_processor::{generate_local_sig, broadcast_localsig, get_valid_block};
+use crate::signer_node::message_processor::{
+    broadcast_localsig, generate_local_sig, get_valid_block,
+};
 use crate::signer_node::node_state::builder::{Builder, Master, Member};
 use crate::signer_node::{NodeParameters, NodeState};
 use curv::{FE, GE};
@@ -24,7 +24,7 @@ where
     C: ConnectionManager,
 {
     // Get values from the node state.
-    let (shared_block_secrets,master_id) = match &prev_state {
+    let (shared_block_secrets, master_id) = match &prev_state {
         NodeState::Master {
             shared_block_secrets: s,
             ..
@@ -80,12 +80,7 @@ where
         }
     };
 
-    broadcast_localsig(
-        block.sighash(),
-        &local_sig,
-        conman,
-        &params.signer_id
-    );
+    broadcast_localsig(block.sighash(), &local_sig, conman, &params.signer_id);
 
     create_next_state(
         sender_id,
@@ -289,20 +284,12 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (
-            sender,
-            blockhash,
-            participants,
-            priv_shared_key,
-            prev_state,
-            params,
-            _,
-            _,
-        ) = load_test_case(
-            &contents,
-            "process_blockparticipants_not_include_the_node",
-            rpc,
-        );
+        let (sender, blockhash, participants, priv_shared_key, prev_state, params, _, _) =
+            load_test_case(
+                &contents,
+                "process_blockparticipants_not_include_the_node",
+                rpc,
+            );
 
         let next = process_blockparticipants(
             &sender,
@@ -344,20 +331,12 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (
-            sender,
-            blockhash,
-            participants,
-            priv_shared_key,
-            prev_state,
-            params,
-            _,
-            _,
-        ) = load_test_case(
-            &contents,
-            "process_blockparticipants_master_from_fake_master",
-            rpc,
-        );
+        let (sender, blockhash, participants, priv_shared_key, prev_state, params, _, _) =
+            load_test_case(
+                &contents,
+                "process_blockparticipants_master_from_fake_master",
+                rpc,
+            );
 
         let next = process_blockparticipants(
             &sender,
@@ -385,20 +364,12 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (
-            sender,
-            blockhash,
-            participants,
-            priv_shared_key,
-            prev_state,
-            params,
-            _,
-            _,
-        ) = load_test_case(
-            &contents,
-            "process_blockparticipants_member_from_fake_master",
-            rpc,
-        );
+        let (sender, blockhash, participants, priv_shared_key, prev_state, params, _, _) =
+            load_test_case(
+                &contents,
+                "process_blockparticipants_member_from_fake_master",
+                rpc,
+            );
 
         let next = process_blockparticipants(
             &sender,
@@ -429,20 +400,12 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (
-            sender,
-            blockhash,
-            participants,
-            priv_shared_key,
-            prev_state,
-            params,
-            _,
-            _,
-        ) = load_test_case(
-            &contents,
-            "process_blockparticipants_with_shortage_shared_block_secrets",
-            rpc,
-        );
+        let (sender, blockhash, participants, priv_shared_key, prev_state, params, _, _) =
+            load_test_case(
+                &contents,
+                "process_blockparticipants_with_shortage_shared_block_secrets",
+                rpc,
+            );
 
         let next = process_blockparticipants(
             &sender,

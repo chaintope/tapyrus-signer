@@ -1,19 +1,21 @@
 use crate::blockdata::hash::Hash;
 use crate::crypto::multi_party_schnorr::SharedKeys;
 use crate::blockdata::Block;
+use crate::crypto::multi_party_schnorr::SharedKeys;
 use crate::errors::Error;
 use crate::net::{
     BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
 };
 use crate::rpc::TapyrusApi;
-use crate::signer_node::message_processor::{get_valid_block, generate_local_sig, broadcast_localsig};
+use crate::signer_node::message_processor::{
+    broadcast_localsig, generate_local_sig, get_valid_block,
+};
 use crate::signer_node::node_state::builder::{Builder, Master, Member};
 use crate::signer_node::NodeParameters;
 use crate::signer_node::{BidirectionalSharedSecretMap, NodeState, SharedSecret};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::FE;
 use std::collections::HashSet;
-use crate::crypto::multi_party_schnorr::SharedKeys;
 
 pub fn process_blockvss<T, C>(
     sender_id: &SignerID,
@@ -144,7 +146,7 @@ where
             state_builder
                 .shared_block_secrets(new_shared_block_secrets)
                 .build()
-        },
+        }
         _ => prev_state.clone(),
     }
 }
@@ -229,6 +231,7 @@ fn store_received_vss(
 mod tests {
     use super::process_blockvss;
     use crate::blockdata::hash::Hash;
+    use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
     use crate::net::SignerID;
     use crate::signer_node::node_state::builder::{Builder, Master, Member};
     use crate::signer_node::*;
@@ -237,11 +240,10 @@ mod tests {
     use crate::tests::helper::rpc::MockRpc;
     use crate::tests::helper::test_vectors::*;
     use curv::cryptographic_primitives::secret_sharing::feldman_vss::*;
+    use curv::elliptic::curves::traits::ECScalar;
     use curv::{FE, GE};
     use serde_json::Value;
     use std::collections::HashSet;
-    use curv::elliptic::curves::traits::ECScalar;
-    use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
 
     #[test]
     fn test_process_blockvss_master_invalid_block() {

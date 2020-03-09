@@ -34,12 +34,7 @@ where
     C: ConnectionManager,
 {
     // extract values from state object.
-    let (
-        block_shared_keys,
-        shared_block_secrets,
-        signatures,
-        participants,
-    ) = match prev_state {
+    let (block_shared_keys, shared_block_secrets, signatures, participants) = match prev_state {
         NodeState::Master {
             block_shared_keys,
             shared_block_secrets,
@@ -47,7 +42,12 @@ where
             round_is_done: false,
             participants,
             ..
-        } => (block_shared_keys, shared_block_secrets, signatures, participants),
+        } => (
+            block_shared_keys,
+            shared_block_secrets,
+            signatures,
+            participants,
+        ),
         _ => {
             // Ignore blocksig message except Master state which is not done.
             return prev_state.clone();
