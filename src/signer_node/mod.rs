@@ -361,6 +361,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 vss_for_negative,
                 secret_share_for_negative,
                 &self.current_state,
+                &self.priv_shared_keys.as_ref().expect("priv_share_keys should be stored by when the blockvss message communication starts."),
                 &self.connection_manager,
                 &self.params,
             ),

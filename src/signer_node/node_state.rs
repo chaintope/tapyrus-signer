@@ -66,6 +66,7 @@ pub mod builder {
     use curv::{FE, GE};
     use std::borrow::BorrowMut;
     use std::collections::{BTreeMap, HashSet};
+    use crate::crypto::multi_party_schnorr::LocalSig;
 
     pub trait Builder {
         fn build(&self) -> NodeState;
@@ -181,6 +182,12 @@ pub mod builder {
 
         pub fn candidate_block(&mut self, candidate_block: Option<Block>) -> &mut Self {
             self.candidate_block = candidate_block;
+            self
+        }
+
+        pub fn insert_signature(&mut self, signer_id: SignerID, local_sig: LocalSig) -> &mut Self {
+            let LocalSig { gamma_i, e } = local_sig;
+            self.signatures.insert(signer_id, (gamma_i, e));
             self
         }
 

@@ -4,7 +4,7 @@ use crate::net::{
     ConnectionManager, SignerID,
 };
 use crate::rpc::TapyrusApi;
-use crate::signer_node::message_processor::broadcast_local_sig;
+use crate::signer_node::message_processor::{generate_local_sig, broadcast_localsig, get_valid_block};
 use crate::signer_node::node_state::builder::{Builder, Master, Member};
 use crate::signer_node::{NodeParameters, NodeState};
 use curv::{FE, GE};
@@ -24,7 +24,7 @@ where
     C: ConnectionManager,
 {
     // Get values from the node state.
-    let (shared_block_secrets, master_id) = match &prev_state {
+    let (shared_block_secrets,master_id) = match &prev_state {
         NodeState::Master {
             shared_block_secrets: s,
             ..
@@ -35,6 +35,14 @@ where
             ..
         } => (s, params.get_signer_id_by_index(master_index.clone())),
         _ => return prev_state.clone(),
+    };
+
+    let block = match get_valid_block(prev_state, blockhash) {
+        Ok(block) => block,
+        Err(e) => {
+            log::warn!("{:?}", e);
+            return prev_state.clone();
+        }
     };
 
     if master_id != *sender_id {
@@ -56,12 +64,11 @@ where
     }
 
     // Generate local signature and broadcast it.
-    let (block_shared_keys, local_sig) = match broadcast_local_sig(
-        blockhash,
+    let (block_shared_keys, local_sig) = match generate_local_sig(
+        block.sighash(),
         &shared_block_secrets,
         priv_shared_keys,
         prev_state,
-        conman,
         params,
     ) {
         Ok((is_positive, shared_keys, local_sig)) => {
@@ -72,6 +79,14 @@ where
             return prev_state.clone();
         }
     };
+
+    broadcast_localsig(
+        block.sighash(),
+        &local_sig,
+        conman,
+        &params.signer_id
+    );
+
     create_next_state(
         sender_id,
         prev_state,

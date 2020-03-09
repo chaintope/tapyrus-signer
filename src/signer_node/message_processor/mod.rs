@@ -26,6 +26,7 @@ use crate::net::BlockGenerationRoundMessageType;
 use crate::net::ConnectionManager;
 use crate::net::Message;
 use crate::signer_node::ToSharedSecretMap;
+use crate::net::SignerID;
 
 fn get_valid_block(state: &NodeState, blockhash: Hash) -> Result<&Block, Error> {
     let block_opt = match state {
@@ -53,17 +54,15 @@ fn get_valid_block(state: &NodeState, blockhash: Hash) -> Result<&Block, Error> 
     }
 }
 
-fn broadcast_local_sig<T, C>(
+fn generate_local_sig<T>(
     blockhash: Hash,
     shared_block_secrets: &BidirectionalSharedSecretMap,
     priv_shared_keys: &SharedKeys,
     prev_state: &NodeState,
-    conman: &C,
     params: &NodeParameters<T>,
 ) -> Result<(bool, SharedKeys, LocalSig), Error>
     where
         T: TapyrusApi,
-        C: ConnectionManager,
 {
     let sharing_params = params.sharing_params();
     log::trace!(
@@ -100,19 +99,26 @@ fn broadcast_local_sig<T, C>(
         (shared_keys_for_negative, result_for_negative)
     };
 
+    return Ok((is_positive, shared_keys, local_sig));
+}
+
+fn broadcast_localsig<C: ConnectionManager>(
+    sighash: Hash,
+    local_sig: &LocalSig,
+    conman: &C,
+    signer_id: &SignerID
+) {
     conman.broadcast_message(Message {
         message_type: MessageType::BlockGenerationRoundMessages(
             BlockGenerationRoundMessageType::Blocksig(
-                block.sighash(),
-                local_sig.gamma_i,
-                local_sig.e,
+                sighash,
+                local_sig.gamma_i.clone(),
+                local_sig.e.clone(),
             ),
         ),
-        sender_id: params.signer_id,
+        sender_id: signer_id.clone(),
         receiver_id: None,
     });
-
-    return Ok((is_positive, shared_keys, local_sig));
 }
 
 #[cfg(test)]
