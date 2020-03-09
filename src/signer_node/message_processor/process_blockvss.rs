@@ -556,11 +556,7 @@ mod tests {
             })
             .collect();
 
-        let participants: HashSet<SignerID> = {
-            let r: HashSet<String> =
-                serde_json::from_value(v["participants"].clone()).unwrap_or(HashSet::new());
-            r.iter().map(|i| to_signer_id(i)).collect()
-        };
+        let participants = to_participants(&v["participants"]);
 
         let prev_state = match v["role"].as_str().unwrap() {
             "master" => Master::for_test()

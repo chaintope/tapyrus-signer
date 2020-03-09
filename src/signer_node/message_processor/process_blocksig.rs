@@ -34,19 +34,30 @@ where
     C: ConnectionManager,
 {
     // extract values from state object.
-    let (block_shared_keys, shared_block_secrets, signatures) = match prev_state {
+    let (
+        block_shared_keys,
+        shared_block_secrets,
+        signatures,
+        participants,
+    ) = match prev_state {
         NodeState::Master {
             block_shared_keys,
             shared_block_secrets,
             signatures,
             round_is_done: false,
+            participants,
             ..
-        } => (block_shared_keys, shared_block_secrets, signatures),
+        } => (block_shared_keys, shared_block_secrets, signatures, participants),
         _ => {
             // Ignore blocksig message except Master state which is not done.
             return prev_state.clone();
         }
     };
+
+    // Ignore the message if the sender is not contained in the participants.
+    if !participants.contains(sender_id) {
+        return prev_state.clone();
+    }
 
     let mut state_builder = Master::from_node_state(prev_state.clone());
 
@@ -315,6 +326,34 @@ mod tests {
     }
 
     #[test]
+    fn test_process_blocksig_from_non_participants() {
+        // when node
+        //  - receive from non-paticipants member.
+        // node should return previous node state.
+
+        let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
+
+        let conman = TestConnectionManager::new();
+        let rpc = MockRpc::new();
+        let (sender, blockhash, gamma_i, e, priv_shared_key, shared_secrets, prev_state, params) =
+            load_test_case(&contents, "process_blocksig_from_non_participants", rpc);
+
+        let next = process_blocksig(
+            &sender,
+            blockhash,
+            gamma_i,
+            e,
+            &priv_shared_key,
+            &shared_secrets,
+            &prev_state,
+            &conman,
+            &params,
+        );
+
+        assert_eq!(next, prev_state);
+    }
+
+    #[test]
     fn test_process_blocksig_with_no_block_shared_key() {
         // when node
         //  - receives a valid block,
@@ -480,6 +519,7 @@ mod tests {
         let blockhash = Hash::from_slice(&hex[..]).unwrap();
         let gamma_i = to_fe(&v["received"]["gamma_i"]);
         let e = to_fe(&v["received"]["e"]);
+        let participants = to_participants(&v["participants"]);
 
         let priv_shared_key: SharedKeys =
             serde_json::from_value(v["priv_shared_key"].clone()).unwrap();
@@ -528,6 +568,7 @@ mod tests {
             .block_shared_keys(block_shared_keys)
             .shared_block_secrets(shared_block_secrets)
             .signatures(signatures)
+            .participants(participants)
             .build();
         (
             sender,
