@@ -1,21 +1,14 @@
 use crate::blockdata::hash::Hash;
-use crate::crypto::multi_party_schnorr::{LocalSig, Parameters, SharedKeys};
-use crate::errors::Error;
+use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
 use crate::net::{
-    BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
+    ConnectionManager, SignerID,
 };
 use crate::rpc::TapyrusApi;
-use crate::sign::Sign;
-use crate::signer_node::message_processor::get_valid_block;
+use crate::signer_node::message_processor::broadcast_local_sig;
 use crate::signer_node::node_state::builder::{Builder, Master, Member};
-use crate::signer_node::{master_index, ToSharedSecretMap};
-use crate::signer_node::{BidirectionalSharedSecretMap, NodeParameters, NodeState};
-use crate::util::jacobi;
-use curv::elliptic::curves::traits::ECPoint;
-use curv::{BigInt, FE, GE};
-use serde::Serialize;
+use crate::signer_node::{NodeParameters, NodeState};
+use curv::{FE, GE};
 use std::collections::HashSet;
-use std::iter::FromIterator;
 
 pub fn process_blockparticipants<T, C>(
     sender_id: &SignerID,
@@ -31,18 +24,16 @@ where
     C: ConnectionManager,
 {
     // Get values from the node state.
-    let (shared_block_secrets, block, master_id) = match &prev_state {
+    let (shared_block_secrets, master_id) = match &prev_state {
         NodeState::Master {
             shared_block_secrets: s,
-            candidate_block: Some(b),
             ..
-        } => (s, b, params.signer_id.clone()),
+        } => (s, params.signer_id.clone()),
         NodeState::Member {
             shared_block_secrets: s,
-            candidate_block: Some(b),
             master_index,
             ..
-        } => (s, b, params.get_signer_id_by_index(master_index.clone())),
+        } => (s, params.get_signer_id_by_index(master_index.clone())),
         _ => return prev_state.clone(),
     };
 
@@ -90,68 +81,6 @@ where
     )
 }
 
-fn broadcast_local_sig<T, C>(
-    blockhash: Hash,
-    shared_block_secrets: &BidirectionalSharedSecretMap,
-    priv_shared_keys: &SharedKeys,
-    prev_state: &NodeState,
-    conman: &C,
-    params: &NodeParameters<T>,
-) -> Result<(bool, SharedKeys, LocalSig), Error>
-where
-    T: TapyrusApi,
-    C: ConnectionManager,
-{
-    let sharing_params = params.sharing_params();
-    log::trace!(
-        "number of shared_block_secrets: {:?}",
-        shared_block_secrets.len()
-    );
-    let block = get_valid_block(prev_state, blockhash)?;
-    let shared_keys_for_positive = Sign::verify_vss_and_construct_key(
-        &sharing_params,
-        &shared_block_secrets.for_positive(),
-        &(params.self_node_index + 1),
-    )?;
-
-    let result_for_positive =
-        Sign::sign(&shared_keys_for_positive, priv_shared_keys, block.sighash());
-
-    let shared_keys_for_negative = Sign::verify_vss_and_construct_key(
-        &sharing_params,
-        &shared_block_secrets.for_negative(),
-        &(params.self_node_index + 1),
-    )?;
-    let result_for_negative =
-        Sign::sign(&shared_keys_for_negative, priv_shared_keys, block.sighash());
-
-    let p = BigInt::from_str_radix(
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
-        16,
-    )
-    .unwrap();
-    let is_positive = jacobi(&shared_keys_for_positive.y.y_coor().unwrap(), &p) == 1;
-    let (shared_keys, local_sig) = if is_positive {
-        (shared_keys_for_positive, result_for_positive)
-    } else {
-        (shared_keys_for_negative, result_for_negative)
-    };
-
-    conman.broadcast_message(Message {
-        message_type: MessageType::BlockGenerationRoundMessages(
-            BlockGenerationRoundMessageType::Blocksig(
-                block.sighash(),
-                local_sig.gamma_i,
-                local_sig.e,
-            ),
-        ),
-        sender_id: params.signer_id,
-        receiver_id: None,
-    });
-
-    return Ok((is_positive, shared_keys, local_sig));
-}
-
 fn create_next_state(
     sender_id: &SignerID,
     prev_state: &NodeState,
@@ -193,9 +122,8 @@ mod tests {
     use crate::tests::helper::node_state_builder::BuilderForTest;
     use crate::tests::helper::rpc::MockRpc;
     use crate::tests::helper::test_vectors::*;
-    use curv::cryptographic_primitives::secret_sharing::feldman_vss::*;
     use curv::elliptic::curves::traits::ECScalar;
-    use curv::{BigInt, FE, GE};
+    use curv::{FE, GE};
     use serde_json::Value;
     use std::collections::HashSet;
 
@@ -353,8 +281,8 @@ mod tests {
             priv_shared_key,
             prev_state,
             params,
-            expected_localsig,
-            expected_block_shared_keys,
+            _,
+            _,
         ) = load_test_case(
             &contents,
             "process_blockparticipants_not_include_the_node",
@@ -408,8 +336,8 @@ mod tests {
             priv_shared_key,
             prev_state,
             params,
-            expected_localsig,
-            expected_block_shared_keys,
+            _,
+            _,
         ) = load_test_case(
             &contents,
             "process_blockparticipants_master_from_fake_master",
@@ -449,8 +377,8 @@ mod tests {
             priv_shared_key,
             prev_state,
             params,
-            expected_localsig,
-            expected_block_shared_keys,
+            _,
+            _,
         ) = load_test_case(
             &contents,
             "process_blockparticipants_member_from_fake_master",
@@ -493,8 +421,8 @@ mod tests {
             priv_shared_key,
             prev_state,
             params,
-            expected_localsig,
-            expected_block_shared_keys,
+            _,
+            _,
         ) = load_test_case(
             &contents,
             "process_blockparticipants_with_shortage_shared_block_secrets",

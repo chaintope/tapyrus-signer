@@ -14,7 +14,18 @@ pub use process_nodevss::process_nodevss;
 use crate::blockdata::hash::Hash;
 use crate::blockdata::Block;
 use crate::errors::Error;
-use crate::signer_node::NodeState;
+use crate::signer_node::{NodeState, BidirectionalSharedSecretMap, NodeParameters};
+use crate::crypto::multi_party_schnorr::{SharedKeys, LocalSig};
+use crate::rpc::TapyrusApi;
+use crate::sign::Sign;
+use curv::BigInt;
+use crate::util::jacobi;
+use curv::elliptic::curves::traits::ECPoint;
+use crate::net::MessageType;
+use crate::net::BlockGenerationRoundMessageType;
+use crate::net::ConnectionManager;
+use crate::net::Message;
+use crate::signer_node::ToSharedSecretMap;
 
 fn get_valid_block(state: &NodeState, blockhash: Hash) -> Result<&Block, Error> {
     let block_opt = match state {
@@ -40,6 +51,68 @@ fn get_valid_block(state: &NodeState, blockhash: Hash) -> Result<&Block, Error> 
         }
         Some(block) => Ok(block),
     }
+}
+
+fn broadcast_local_sig<T, C>(
+    blockhash: Hash,
+    shared_block_secrets: &BidirectionalSharedSecretMap,
+    priv_shared_keys: &SharedKeys,
+    prev_state: &NodeState,
+    conman: &C,
+    params: &NodeParameters<T>,
+) -> Result<(bool, SharedKeys, LocalSig), Error>
+    where
+        T: TapyrusApi,
+        C: ConnectionManager,
+{
+    let sharing_params = params.sharing_params();
+    log::trace!(
+        "number of shared_block_secrets: {:?}",
+        shared_block_secrets.len()
+    );
+    let block = get_valid_block(prev_state, blockhash)?;
+    let shared_keys_for_positive = Sign::verify_vss_and_construct_key(
+        &sharing_params,
+        &shared_block_secrets.for_positive(),
+        &(params.self_node_index + 1),
+    )?;
+
+    let result_for_positive =
+        Sign::sign(&shared_keys_for_positive, priv_shared_keys, block.sighash());
+
+    let shared_keys_for_negative = Sign::verify_vss_and_construct_key(
+        &sharing_params,
+        &shared_block_secrets.for_negative(),
+        &(params.self_node_index + 1),
+    )?;
+    let result_for_negative =
+        Sign::sign(&shared_keys_for_negative, priv_shared_keys, block.sighash());
+
+    let p = BigInt::from_str_radix(
+        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
+        16,
+    )
+        .unwrap();
+    let is_positive = jacobi(&shared_keys_for_positive.y.y_coor().unwrap(), &p) == 1;
+    let (shared_keys, local_sig) = if is_positive {
+        (shared_keys_for_positive, result_for_positive)
+    } else {
+        (shared_keys_for_negative, result_for_negative)
+    };
+
+    conman.broadcast_message(Message {
+        message_type: MessageType::BlockGenerationRoundMessages(
+            BlockGenerationRoundMessageType::Blocksig(
+                block.sighash(),
+                local_sig.gamma_i,
+                local_sig.e,
+            ),
+        ),
+        sender_id: params.signer_id,
+        receiver_id: None,
+    });
+
+    return Ok((is_positive, shared_keys, local_sig));
 }
 
 #[cfg(test)]

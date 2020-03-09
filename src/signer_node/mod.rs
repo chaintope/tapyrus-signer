@@ -32,7 +32,7 @@ use curv::elliptic::curves::traits::*;
 use curv::{FE, GE};
 use redis::ControlFlow;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::time::Duration;
 
