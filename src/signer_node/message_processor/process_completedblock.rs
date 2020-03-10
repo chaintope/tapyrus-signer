@@ -28,11 +28,12 @@ where
 mod tests {
     use super::process_completedblock;
     use crate::net::SignerID;
+    use crate::signer_node::node_state::builder::{Builder, Member};
     use crate::signer_node::{master_index, NodeState};
     use crate::tests::helper::blocks::get_block;
     use crate::tests::helper::keys::TEST_KEYS;
     use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
-    use crate::tests::helper::node_state_builder::{Builder, Member};
+    use crate::tests::helper::node_state_builder::BuilderForTest;
     use crate::tests::helper::rpc::MockRpc;
 
     #[test]
@@ -44,7 +45,7 @@ mod tests {
         let params = NodeParametersBuilder::new().rpc(rpc).build();
 
         // check 1, next_master_index should be incremented after process completeblock message.
-        let prev_state = Member::new().master_index(0).build();
+        let prev_state = Member::for_test().master_index(0).build();
         let sender_id = SignerID::new(TEST_KEYS.pubkeys()[1]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
 
@@ -56,7 +57,7 @@ mod tests {
         }
 
         // check 2, next master index should be back to 0 if the previous master index is the last number.
-        let prev_state = Member::new().master_index(4).build();
+        let prev_state = Member::for_test().master_index(4).build();
         let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
 
@@ -76,7 +77,7 @@ mod tests {
         rpc.should_call_testproposedblock(Ok(true));
         let params = NodeParametersBuilder::new().rpc(rpc).build();
 
-        let prev_state = Member::new().master_index(0).build();
+        let prev_state = Member::for_test().master_index(0).build();
         let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
 

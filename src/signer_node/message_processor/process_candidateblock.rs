@@ -5,6 +5,7 @@ use crate::net::{
 };
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
+use crate::signer_node::node_state::builder::{Builder, Master, Member};
 use crate::signer_node::utils::sender_index;
 use crate::signer_node::{NodeParameters, NodeState};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
@@ -35,32 +36,17 @@ where
     let key = create_block_vss(block.clone(), params, conman);
 
     match &prev_state {
-        NodeState::Member {
-            shared_block_secrets,
-            block_shared_keys,
-            ..
-        } => NodeState::Member {
-            block_key: Some(key.u_i),
-            shared_block_secrets: shared_block_secrets.clone(),
-            block_shared_keys: block_shared_keys.clone(),
-            candidate_block: Some(block.clone()),
-            master_index: sender_index(sender_id, &params.pubkey_list),
-        },
+        NodeState::Member { .. } => Member::from_node_state(prev_state.clone())
+            .block_key(Some(key.u_i))
+            .candidate_block(Some(block.clone()))
+            .master_index(sender_index(sender_id, &params.pubkey_list))
+            .build(),
         NodeState::Master {
-            block_shared_keys,
-            shared_block_secrets,
-            signatures,
-            candidate_block,
             round_is_done: false,
             ..
-        } => NodeState::Master {
-            block_key: Some(key.u_i),
-            block_shared_keys: block_shared_keys.clone(),
-            shared_block_secrets: shared_block_secrets.clone(),
-            candidate_block: candidate_block.clone(),
-            signatures: signatures.clone(),
-            round_is_done: false,
-        },
+        } => Master::from_node_state(prev_state.clone())
+            .block_key(Some(key.u_i))
+            .build(),
         _ => prev_state.clone(),
     }
 }
@@ -116,12 +102,13 @@ mod tests {
     use crate::blockdata::Block;
     use crate::net::MessageType::BlockGenerationRoundMessages;
     use crate::net::{BlockGenerationRoundMessageType, Message, SignerID};
+    use crate::signer_node::node_state::builder::{Builder, Master, Member};
     use crate::signer_node::{master_index, NodeState};
     use crate::tests::helper::blocks::get_block;
     use crate::tests::helper::keys::TEST_KEYS;
     use crate::tests::helper::net::TestConnectionManager;
     use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
-    use crate::tests::helper::node_state_builder::{Builder, Master, Member};
+    use crate::tests::helper::node_state_builder::BuilderForTest;
     use crate::tests::helper::rpc::MockRpc;
 
     /// This network consists 5 signers and threshold 3.
@@ -129,7 +116,7 @@ mod tests {
     fn test_as_member_with_valid_args() {
         let sender_id = TEST_KEYS.signer_id();
         let candidate_block = get_block(0);
-        let prev_state = Member::new().build();
+        let prev_state = Member::for_test().build();
         let conman = TestConnectionManager::new();
         let mut rpc = MockRpc::new();
         // It should call testproposedblock RPC once.
@@ -170,7 +157,7 @@ mod tests {
     fn test_as_master_with_valid_args() {
         let sender_id = TEST_KEYS.signer_id();
         let candidate_block = get_block(0);
-        let prev_state = Master::new()
+        let prev_state = Master::for_test()
             .candidate_block(Some(candidate_block.clone()))
             .build();
         let conman = TestConnectionManager::new();
@@ -236,7 +223,7 @@ mod tests {
         let sender_id = TEST_KEYS.signer_id();
         // invalid block
         let candidate_block = Block::new(hex::decode("00000020ed658cc40670cceda23bb0b614821fe6d48a41d107d19f3f3a5608ad3d483092b151160ab71133b428e1f62eaeb598ae858ff66017c99601f29088b7c64a481d6284e145d29b70bf54392d29701031d2af9fed5f9bb21fbb284fa71ceb238f69a6d4095d00010200000000010100000000000000000000000000000000000000000000000000000000000000000c000000035c0101ffffffff0200f2052a010000001976a914cf12dbc04bb0de6fb6a87a5aeb4b2e74c97006b288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf90120000000000000000000000000000000000000000000000000000000000000000000000000").unwrap());
-        let prev_state = Master::new().build();
+        let prev_state = Master::for_test().build();
         let conman = TestConnectionManager::new();
         let mut rpc = MockRpc::new();
         // It should call testproposedblock RPC once.
@@ -261,7 +248,7 @@ mod tests {
         let sender_id = TEST_KEYS.signer_id();
         // invalid block
         let candidate_block = Block::new(hex::decode("00000020ed658cc40670cceda23bb0b614821fe6d48a41d107d19f3f3a5608ad3d483092b151160ab71133b428e1f62eaeb598ae858ff66017c99601f29088b7c64a481d6284e145d29b70bf54392d29701031d2af9fed5f9bb21fbb284fa71ceb238f69a6d4095d00010200000000010100000000000000000000000000000000000000000000000000000000000000000c000000035c0101ffffffff0200f2052a010000001976a914cf12dbc04bb0de6fb6a87a5aeb4b2e74c97006b288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf90120000000000000000000000000000000000000000000000000000000000000000000000000").unwrap());
-        let prev_state = Member::new().build();
+        let prev_state = Member::for_test().build();
         let conman = TestConnectionManager::new();
         let mut rpc = MockRpc::new();
 
@@ -304,7 +291,7 @@ mod tests {
         rpc.should_call_testproposedblock(Ok(true));
         rpc.should_call_testproposedblock(Ok(true));
 
-        let prev_state = Member::new().master_index(0).build();
+        let prev_state = Member::for_test().master_index(0).build();
         let params = NodeParametersBuilder::new()
             .private_key(TEST_KEYS.key[0])
             .rpc(rpc)
