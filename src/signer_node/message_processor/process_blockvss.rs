@@ -95,7 +95,6 @@ where
     }
 }
 
-/// Store received vss
 fn store_received_vss(
     sender_id: &SignerID,
     prev_state: &NodeState,
