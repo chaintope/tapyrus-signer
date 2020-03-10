@@ -18,6 +18,7 @@ use crate::net::{
 };
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use crate::sign::Sign;
+use crate::signer_node::message_processor::create_block_vss;
 use crate::signer_node::message_processor::process_blockparticipants;
 use crate::signer_node::message_processor::process_blocksig;
 use crate::signer_node::message_processor::process_blockvss;
@@ -316,7 +317,18 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             receiver_id: None,
         });
 
-        Master::default().candidate_block(Some(block)).build()
+        let (keys, shared_secret_for_positive, shared_secret_for_negative) =
+            create_block_vss(block.clone(), &self.params, &self.connection_manager);
+
+        Master::default()
+            .candidate_block(Some(block))
+            .block_key(Some(keys.u_i))
+            .insert_shared_block_secrets(
+                self.params.signer_id.clone(),
+                shared_secret_for_positive,
+                shared_secret_for_negative,
+            )
+            .build()
     }
 
     pub fn process_key_generation_message(

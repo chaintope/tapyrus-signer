@@ -33,6 +33,11 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
+    // Ignore the message when the sender is myself.
+    if *sender_id == params.signer_id {
+        return prev_state.clone();
+    }
+
     let new_shared_block_secrets = match store_received_vss(
         sender_id,
         prev_state,
@@ -285,69 +290,11 @@ mod tests {
     }
 
     #[test]
-    fn test_process_blockvss_master_with_0_shared_block_secrets() {
-        // When
-        //     - the node receives a valid block and secrets
-        //     - but the number of secrets doesn't meet threshold,
-        // it should
-        //     - skip broadcasting blockparticipants message
-        //     - update shared_block_secrets
-        let contents = load_test_vector("./tests/resources/process_blockvss.json").unwrap();
-
-        let conman = TestConnectionManager::new();
-        let rpc = MockRpc::new();
-        let (
-            sender,
-            blockhash,
-            vss_for_positive,
-            secret_share_for_positive,
-            vss_for_negative,
-            secret_share_for_negative,
-            priv_shared_keys,
-            prev_state,
-            params,
-            _,
-            _,
-            _,
-        ) = load_test_case(
-            &contents,
-            "process_blockvss_master_with_0_shared_block_secrets",
-            rpc,
-        );
-
-        let next = process_blockvss(
-            &sender,
-            blockhash,
-            vss_for_positive,
-            secret_share_for_positive,
-            vss_for_negative,
-            secret_share_for_negative,
-            &prev_state,
-            &priv_shared_keys,
-            &conman,
-            &params,
-        );
-        conman.assert();
-        match next {
-            NodeState::Master {
-                block_shared_keys,
-                shared_block_secrets,
-                ..
-            } => {
-                assert_eq!(shared_block_secrets.len(), 1);
-                assert_eq!(block_shared_keys, None);
-            }
-            _ => {
-                panic!("NodeState should be Master");
-            }
-        }
-    }
-
-    #[test]
     fn test_process_blockvss_master_with_1_shared_block_secrets() {
         // When
+        //     - the node has own secrets
         //     - the node receives a valid block and secrets
-        //     - but the number of secrets meets threshold,
+        //     - the number of secrets meets threshold,
         // it should
         //     - broadcast blockparticipants message
         //     - update shared_block_secrets

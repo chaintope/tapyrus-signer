@@ -13,6 +13,7 @@ pub use process_nodevss::process_nodevss;
 
 use crate::blockdata::hash::Hash;
 use crate::blockdata::Block;
+use crate::crypto::multi_party_schnorr::Keys;
 use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
 use crate::errors::Error;
 use crate::net::BlockGenerationRoundMessageType;
@@ -22,11 +23,12 @@ use crate::net::MessageType;
 use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
-use crate::signer_node::ToSharedSecretMap;
 use crate::signer_node::{BidirectionalSharedSecretMap, NodeParameters, NodeState};
+use crate::signer_node::{SharedSecret, ToSharedSecretMap};
 use crate::util::jacobi;
-use curv::elliptic::curves::traits::ECPoint;
-use curv::BigInt;
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
+use curv::elliptic::curves::traits::{ECPoint, ECScalar};
+use curv::{BigInt, FE};
 
 fn get_valid_block(state: &NodeState, blockhash: Hash) -> Result<&Block, Error> {
     let block_opt = match state {
@@ -52,6 +54,77 @@ fn get_valid_block(state: &NodeState, blockhash: Hash) -> Result<&Block, Error> 
         }
         Some(block) => Ok(block),
     }
+}
+
+/// Create own VSSs and send to each other signers.
+/// Returns
+///     * own random key pair
+///     * a VSS for itself(for positive and negative)
+///     * own commitments
+pub fn create_block_vss<T, C>(
+    block: Block,
+    params: &NodeParameters<T>,
+    conman: &C,
+) -> (Keys, SharedSecret, SharedSecret)
+where
+    T: TapyrusApi,
+    C: ConnectionManager,
+{
+    let sharing_params = params.sharing_params();
+    let key = Sign::create_key(params.self_node_index + 1, None);
+
+    let parties = (0..sharing_params.share_count)
+        .map(|i| i + 1)
+        .collect::<Vec<usize>>();
+
+    let (vss_scheme, secret_shares) = VerifiableSS::share_at_indices(
+        sharing_params.threshold,
+        sharing_params.share_count,
+        &key.u_i,
+        &parties,
+    );
+    let order: BigInt = FE::q();
+    let (vss_scheme_for_negative, secret_shares_for_negative) = VerifiableSS::share_at_indices(
+        sharing_params.threshold,
+        sharing_params.share_count,
+        &(ECScalar::from(&(order - key.u_i.to_big_int()))),
+        &parties,
+    );
+
+    for i in 0..params.pubkey_list.len() {
+        // Skip broadcasting if it is vss for myself. Just return this.
+        if i == params.self_node_index {
+            continue;
+        }
+
+        conman.send_message(Message {
+            message_type: MessageType::BlockGenerationRoundMessages(
+                BlockGenerationRoundMessageType::Blockvss(
+                    block.sighash(),
+                    vss_scheme.clone(),
+                    secret_shares[i],
+                    vss_scheme_for_negative.clone(),
+                    secret_shares_for_negative[i],
+                ),
+            ),
+            sender_id: params.signer_id,
+            receiver_id: Some(SignerID {
+                pubkey: params.pubkey_list[i],
+            }),
+        });
+    }
+
+    (
+        key,
+        SharedSecret {
+            vss: vss_scheme.clone(),
+            secret_share: secret_shares[params.self_node_index],
+        },
+        SharedSecret {
+            vss: vss_scheme_for_negative.clone(),
+            secret_share: secret_shares_for_negative[params.self_node_index],
+        },
+    )
 }
 
 fn generate_local_sig<T>(

@@ -63,7 +63,9 @@ pub mod builder {
     use crate::blockdata::Block;
     use crate::crypto::multi_party_schnorr::LocalSig;
     use crate::net::SignerID;
-    use crate::signer_node::{BidirectionalSharedSecretMap, NodeState, INITIAL_MASTER_INDEX};
+    use crate::signer_node::{
+        BidirectionalSharedSecretMap, NodeState, SharedSecret, INITIAL_MASTER_INDEX,
+    };
     use curv::{FE, GE};
     use std::borrow::BorrowMut;
     use std::collections::{BTreeMap, HashSet};
@@ -161,6 +163,19 @@ pub mod builder {
 
         pub fn block_key(&mut self, block_key: Option<FE>) -> &mut Self {
             self.block_key = block_key;
+            self
+        }
+
+        pub fn insert_shared_block_secrets(
+            &mut self,
+            signer_id: SignerID,
+            shared_secret_for_positive: SharedSecret,
+            shared_secret_for_negative: SharedSecret,
+        ) -> &mut Self {
+            self.shared_block_secrets.insert(
+                signer_id,
+                (shared_secret_for_positive, shared_secret_for_negative),
+            );
             self
         }
 
@@ -292,6 +307,19 @@ pub mod builder {
 
         pub fn block_key(&mut self, block_key: Option<FE>) -> &mut Self {
             self.block_key = block_key;
+            self
+        }
+
+        pub fn insert_shared_block_secrets(
+            &mut self,
+            signer_id: SignerID,
+            shared_secret_for_positive: SharedSecret,
+            shared_secret_for_negative: SharedSecret,
+        ) -> &mut Self {
+            self.shared_block_secrets.insert(
+                signer_id,
+                (shared_secret_for_positive, shared_secret_for_negative),
+            );
             self
         }
 
