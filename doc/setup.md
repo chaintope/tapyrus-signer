@@ -67,9 +67,9 @@ And then, Signer[i] send the generated `static_vss[i, j]` (j = 1, 2, ..., n; i !
 
 - the public key `static_public_key[i]` which indicates the signer who sends this vss.
 - the public key `static_public_key[j]` which indicates the signer to be received the `static_vss[i, j]`
-- "positive" public commitments `commitments[k]` (k = 1, 2, ..., t)
+- "positive" public commitments `commitments[k]` (k = 0, 1, ..., t - 1)
 - "positive" secret `secret[j]` to perform secret sharing scheme.
-- "negative" public commitments `commitments[k]` (k = 1, 2, ..., t)
+- "negative" public commitments `commitments[k]` (k = 0, 1, ..., t - 1)
 - "negative" secret `secret[j]` to perform secret sharing scheme.
 
 `static_vss[i, j]` have 2 kinds of VSS, named "positive" and "negative". Only "positive" VSS is used to generate aggregated value. For more information, see [^6].
