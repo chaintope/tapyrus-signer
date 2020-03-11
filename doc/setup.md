@@ -4,7 +4,7 @@ This document describes how to set up new Tapyrus Signer Network.
 
 ## Overview
 
-We can set up Tapyrus Signer Network and Tapyrus Core Network with the 'trusted' way described in [How to start tapyrus in dev mode?](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/getting_started.md#how-to-start-tapyrus-in-dev-mode). The trusted setup requires to share each signer's private key with all signers. But each tapyrus signer should be treated as 'trustless' as well as other blockchain system.
+We can set up Tapyrus Signer Network and Tapyrus Core Network with the 'trusted' way described in [How to start tapyrus in dev mode?](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/getting_started.md#how-to-start-tapyrus-in-dev-mode). The trusted setup requires to share each signer's private key with all signers. But each signer in Tapyrus Signer Network should be treated as 'trustless' as well as other blockchain system.
 
 The following shows the protocol for setting up signer in a 'trustless' network which has n-singers and threshold t which t is less than n.
 
@@ -104,7 +104,7 @@ Note that `node_secret[i]` is not encrpyted because it is not intended to send t
 
 ## Step 5. Generate a genesis block
 
-Whoever knows `aggregated_public_key` can generate a genesis block using tapyrus genesis utility `tapyrus-genesis`.
+Whoever knows `aggregated_public_key` can generate a genesis block using Tapyrus genesis utility `tapyrus-genesis`.
 And then they share the block with all signers;
 
 ```
@@ -207,11 +207,11 @@ Create file named 'genesis.`networkid`' and fill it with `block_with_signature`.
 
 ## Next Step
 
-Now we are ready to start tapyrus core and tapyrus signer network.
+Now we are ready to start Tapyrus Core and Tapyrus Signer Network.
 
-To start tapyrus core network, see [Start Tapyrus-core nodes](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/getting_started.md#5-start-tapyrus-core-nodes).
+To start Tapyrus Core Network, see [Start Tapyrus-core nodes](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/getting_started.md#5-start-tapyrus-core-nodes).
 
-To start tapyrus signer network, go to [How To configure Tapyrus Signer Network](./configuration.md). The secret values or keys refered in this document will be required to start Tapyrus Signer Network.
+To start Tapyrus Signer Network, go to [How To configure Tapyrus Signer Network](./configuration.md). The secret values or keys refered in this document will be required to start Tapyrus Signer Network.
 
 - `static_private_key[i]` and `static_public_key[i]` in Step 1
 - `aggregated_public_key` and `node_secret[i]` in Step 3

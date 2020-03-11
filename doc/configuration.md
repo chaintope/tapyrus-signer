@@ -36,7 +36,7 @@ For all settings including optional ones, see [sample file](https://github.com/c
 
 ### [rpc] section
 
-`[rpc]` section is a set of settings for rpc connection to tapyrus core node.
+`[rpc]` section is a set of settings for rpc connection to Tapyrus Core node.
 
 - There is no mondatory settings in this section.
 
@@ -48,7 +48,7 @@ For all settings including optional ones, see [sample file](https://github.com/c
 
 ## Start Signer Node
 
-To start tapyrus signer process,
+To start Tapyrus Signer process,
 
 ```
 /path/to/bin/tapyrus-signerd -c /path/to/signer-config.toml
