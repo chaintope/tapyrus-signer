@@ -12,7 +12,7 @@ Building `node` requires Rust following version.
 $ rustc --version
 rustc 1.41.0 (5e1a79984 2020-01-27)
 ```
-And [Tapyrus-core](https://bitbucket.org/chaintope/tapyrus-core/src/master/) of latest version for run node.
+And [Tapyrus-core](https://github.com/chaintope/tapyrus-core/) of latest version for run node.
 
 ## Building the Source
 
