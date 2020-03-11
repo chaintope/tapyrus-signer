@@ -39,7 +39,7 @@ And signers who received `update_federation` schedule to update this information
 The above parameters need to be persisted. If the signer process is restarted after executing `update_federation`, the federation must be updated without having to execute `update_federation` again.
 
 - Existing signers who belong to the federation:
-  - until they receives a RPC `update_federation` request which includes new signer's public key.
+  - until they receives a RPC `update_federation` request which includes public keys of all signers in new federation.
     - SHOULD reject any communication from a new signer
   - after they receives a RPC `update_federation`,
     - MAY accept connection requests from the new signer
