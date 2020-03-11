@@ -10,9 +10,9 @@ We introduce Federation which is consisted of a set of identifiable signers and 
 
 A new signer joining the network needs to get approval from the signers who belongs to the federation.
 Federation including a new signer needs to recreate a new aggregate public key and secret in the same protocol as [How to set up new Tapyrus Signer Network](./setup.md).
-The created aggregated public key is committed by the signer in existing federation and submitted to TapyrusCore with the block.
-A block has a field for a new aggregated public key.
-When a new aggregated public key is set in a block, TapyrusCore discards the public key that has been used so far, and performs proof verification using the new aggregate public key from the next block.
+The created aggregated public key is committed by the signer in existing federation and submitted to Tapyrus Core with the block.
+Block headers have a field for a new aggregated public key.
+When a new aggregated public key is set in a block header, Tapyrus Core discards the public key that has been used so far, and performs proof verification using the new aggregate public key from the next block.
 When leaving from federation, it is necessary to update the aggregated public key in the same protocol.
 
 ## How To Update Federation
@@ -22,7 +22,7 @@ The following describes how to change the federation.
 ### Re-create aggregated public key and secret.
 
 Federation members, including the new signer, regenerate the aggregated public key and the secret in the same procedure as Step 2-Step 4 in [How to set up new Tapyrus Signer Network](./setup.md).
-Note that the same static public key can be used for the existing signer, so Step1 is not required. However, for a new signer, a key pair needs to be created in Step 1.
+Note that the same static public key can be used for the existing signer, so Step 2 is not required. However, for a new signer, a key pair needs to be created in Step 2.
 
 ### Updating the aggregated public key for existing signers
 
@@ -45,14 +45,14 @@ The above parameters need to be persisted. If the signer process is restarted af
     - MAY accept connection requests from the new signer
   - until the applicable block height is reached
     - MUST ignore any messages from the new signer.
-  - after the block that applies the federation changes has been submitted into TapyrusCore,
+  - after the block that applies the federation changes has been submitted into Tapyrus Core,
     - SHOULD disconnect the old signer who is no longer member of the federation.
     - MUST reject any communication from them.
 - New signer:
   - after a federation signer receives a RPC `update_federation`,
     - MAY send a connection request to them.
 - Old signer:
-  - after the block that applies the federation changes has been submitted into TapyrusCore,
+  - after the block that applies the federation changes has been submitted into Tapyrus Core,
     - SHOULD disconnect and leave from the Tapyrus Signer Network
 
 ### Start new signer and stop leaving signer
@@ -61,9 +61,9 @@ The new signer launches tapysus-signer as described in [How To configure Tapyrus
 The signer MUST complete launching before entering the generation round of the specified block height.
 When the signer leaves, they MAY stop the process at any time after the round where new federation is applied.
 
-### Send the aggregated public key to TapyrusCore.
+### Send the aggregated public key to Tapyrus Core.
 
-The round master sent the new aggregated public key to TapyrusCore one round before the new federation is applied.
+The round master sent the new aggregated public key to Tapyrus Core one round before the new federation is applied.
 When starting the previous round, the round master sets a new aggregated public key to the block and broadcast it to other member of the federation.
 Each member of the round, upon receiving the candidateblock message, verifies that the aggregated public key is the same as the one expected, and then sign the block.
 If the verification is failed, each member SHOULD ignored all messages during that round so that no blocks are generated in that round.

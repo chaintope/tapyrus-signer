@@ -4,7 +4,7 @@ This document describes how to set up new Tapyrus Signer Network.
 
 ## Overview
 
-We can set up Tapyrus Signer Network and Tapyrus Core Network with the 'trusted' way desribed in [How to start tapyrus in dev mode?](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/getting_started.md#how-to-start-tapyrus-in-dev-mode). The trusted setup requires to share each signer's private key with all signers. But each tapyrus signer should be treated as 'trustless' as wel as other blockchain system.
+We can set up Tapyrus Signer Network and Tapyrus Core Network with the 'trusted' way described in [How to start tapyrus in dev mode?](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/getting_started.md#how-to-start-tapyrus-in-dev-mode). The trusted setup requires to share each signer's private key with all signers. But each tapyrus signer should be treated as 'trustless' as well as other blockchain system.
 
 The following shows the protocol for setting up signer in a 'trustless' network which has n-singers and threshold t which t is less than n.
 
@@ -225,7 +225,7 @@ In this section, we describe the protocol to encode/encrypt the VSS.
 
 Below in this section, notation `vss` means `static_vss[i, j]` or `ephemeral_vss[i, j]`.
 
-### Structure of static vss
+### Structure of vss
 
 As in Step 2 and Stpe 6 `static_vss` and `ephemeral_vss` have 7 fields:
 
