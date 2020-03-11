@@ -18,15 +18,24 @@ use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use std::fmt::{Debug, Display};
 
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::FE;
 use std::collections::HashSet;
+use serde::export::Formatter;
+use serde::export::fmt::Error;
 
 /// Signerの識別子。公開鍵を識別子にする。
-#[derive(Debug, Eq, Hash, Copy, Clone)]
+#[derive(Eq, Hash, Copy, Clone)]
 pub struct SignerID {
     pub pubkey: PublicKey,
+}
+
+impl Debug for SignerID {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "SignerID({})", self.pubkey)
+    }
 }
 
 impl SignerID {
@@ -92,10 +101,27 @@ pub enum MessageType {
     BlockGenerationRoundMessages(BlockGenerationRoundMessageType),
 }
 
+impl Display for MessageType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        match self {
+            MessageType::KeyGenerationMessage(m) => write!(f, "{}", m),
+            MessageType::BlockGenerationRoundMessages(m) => write!(f, "{}", m),
+        }
+    }
+}
+
 /// # Key Generation Protocol Messages
 #[derive(PartialEq, Debug, Serialize, Deserialize)]
 pub enum KeyGenerationMessageType {
     Nodevss(VerifiableSS, FE),
+}
+
+impl Display for KeyGenerationMessageType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        match self {
+            KeyGenerationMessageType::Nodevss(_, _) => write!(f, "Nodevss"),
+        }
+    }
 }
 
 /// # Round Messages
@@ -408,12 +434,12 @@ mod test {
         let pubkey = TEST_KEYS.pubkeys()[0];
         let signer_id: SignerID = SignerID { pubkey };
         let serialized = serde_json::to_string(&signer_id).unwrap();
-        assert_eq!("[3,131,26,105,184,0,152,51,171,91,3,38,1,46,175,72,155,254,163,90,115,33,177,202,21,177,29,136,19,20,35,250,252]", serialized);
+        assert_eq!("\"03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc\"", serialized);
     }
 
     #[test]
     fn signer_id_deserialize_test() {
-        let serialized = "[3,131,26,105,184,0,152,51,171,91,3,38,1,46,175,72,155,254,163,90,115,33,177,202,21,177,29,136,19,20,35,250,252]";
+        let serialized = "\"03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc\"";
         let signer_id = serde_json::from_str::<SignerID>(serialized).unwrap();
 
         let pubkey = TEST_KEYS.pubkeys()[0];

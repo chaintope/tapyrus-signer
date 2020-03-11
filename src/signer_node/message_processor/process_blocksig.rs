@@ -61,6 +61,7 @@ where
 
     let mut state_builder = Master::from_node_state(prev_state.clone());
 
+    log::debug!("Store local sig, sender: {:?}, gamma_i: {:?}, e: {:?}", sender_id, gamma_i, e);
     let new_signatures = store_received_local_sig(sender_id, signatures, gamma_i, e);
     state_builder.signatures(new_signatures.clone());
 
