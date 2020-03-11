@@ -75,9 +75,15 @@ where
                     params.threshold as usize,
                 );
 
+                let shared_block_secrets_by_participants = new_shared_block_secrets
+                    .clone()
+                    .into_iter()
+                    .filter(|(i, ..)| participants.contains(i))
+                    .collect();
+
                 let (block_shared_keys, local_sig) = match generate_local_sig(
                     candidate_block.sighash(),
-                    &new_shared_block_secrets,
+                    &shared_block_secrets_by_participants,
                     priv_shared_keys,
                     prev_state,
                     params,
@@ -108,7 +114,7 @@ where
                 state_builder
                     .participants(participants)
                     .block_shared_keys(Some(block_shared_keys))
-                    .insert_signature(sender_id.clone(), local_sig);
+                    .insert_signature(params.signer_id.clone(), local_sig);
             }
 
             state_builder

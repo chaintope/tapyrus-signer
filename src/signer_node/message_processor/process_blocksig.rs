@@ -88,13 +88,19 @@ where
         return prev_state.clone();
     }
 
+    let shared_block_secrets_by_participants = shared_block_secrets
+        .clone()
+        .into_iter()
+        .filter(|(i, ..)| participants.contains(i))
+        .collect();
+
     let signature = match aggregate_and_verify_signature(
         candidate_block,
         new_signatures,
         &params.pubkey_list,
         shared_secrets,
         &block_shared_keys,
-        &shared_block_secrets,
+        &shared_block_secrets_by_participants,
         priv_shared_keys,
     ) {
         Ok(sig) => sig,

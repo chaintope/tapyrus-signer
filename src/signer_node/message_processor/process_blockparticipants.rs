@@ -23,6 +23,10 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
+    if params.signer_id == *sender_id {
+        return prev_state.clone();
+    }
+
     // Get values from the node state.
     let (shared_block_secrets, master_id) = match &prev_state {
         NodeState::Master {
@@ -63,10 +67,16 @@ where
         return create_next_state(sender_id, prev_state, participants, None, None);
     }
 
+    let shared_block_secrets_by_participants = shared_block_secrets
+        .clone()
+        .into_iter()
+        .filter(|(i, ..)| participants.contains(i))
+        .collect();
+
     // Generate local signature and broadcast it.
     let (block_shared_keys, local_sig) = match generate_local_sig(
         block.sighash(),
-        &shared_block_secrets,
+        &shared_block_secrets_by_participants,
         priv_shared_keys,
         prev_state,
         params,
@@ -141,13 +151,11 @@ mod tests {
     fn test_process_blockparticipants_master() {
         // When the node receives valid message.
         // It should
-        //     - Broadcast blocksig messsage.
-        //     - Store participants
-        //     - Store block_shared_keys
+        //     - Ignore message.
         let contents =
             load_test_vector("./tests/resources/process_blockparticipants.json").unwrap();
 
-        let mut conman = TestConnectionManager::new();
+        let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
         let (
             sender,
@@ -156,22 +164,9 @@ mod tests {
             priv_shared_key,
             prev_state,
             params,
-            expected_localsig,
-            expected_block_shared_keys,
+            _,
+            _,
         ) = load_test_case(&contents, "process_blockparticipants_master", rpc);
-
-        // Add 0 for to make purpose field of gamma_i to 'add'.
-        let zero: FE = ECScalar::zero();
-        let expected_localsig = expected_localsig.unwrap();
-        let gamma_i: FE = expected_localsig.gamma_i + zero;
-
-        conman.should_broadcast(Message {
-            message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Blocksig(blockhash, gamma_i, expected_localsig.e),
-            ),
-            sender_id: params.signer_id.clone(),
-            receiver_id: None,
-        });
 
         let next = process_blockparticipants(
             &sender,
@@ -183,23 +178,7 @@ mod tests {
             &params,
         );
 
-        match next {
-            NodeState::Master {
-                block_shared_keys,
-                signatures,
-                participants: target_participants,
-                round_is_done: false,
-                ..
-            } => {
-                assert_eq!(target_participants, participants);
-                assert_eq!(signatures.len(), 1);
-                assert_eq!(block_shared_keys, expected_block_shared_keys)
-            }
-            _ => {
-                panic!("NodeState is not expected");
-            }
-        }
-
+        assert_eq!(next, prev_state);
         conman.assert();
     }
 
@@ -226,7 +205,7 @@ mod tests {
             params,
             expected_localsig,
             expected_block_shared_keys,
-        ) = load_test_case(&contents, "process_blockparticipants_master", rpc);
+        ) = load_test_case(&contents, "process_blockparticipants_member", rpc);
 
         // Add 0 for to make purpose field of gamma_i to 'add'.
         let zero: FE = ECScalar::zero();
@@ -252,15 +231,12 @@ mod tests {
         );
 
         match next {
-            NodeState::Master {
+            NodeState::Member {
                 block_shared_keys,
-                signatures,
                 participants: target_participants,
-                round_is_done: false,
                 ..
             } => {
                 assert_eq!(target_participants, participants);
-                assert_eq!(signatures.len(), 1);
                 assert_eq!(block_shared_keys, expected_block_shared_keys)
             }
             _ => {
@@ -489,12 +465,15 @@ mod tests {
                 .shared_block_secrets(shared_block_secrets)
                 .participants(participants)
                 .build(),
-            "member" => Member::for_test()
-                .block_key(block_key)
-                .candidate_block(block.clone())
-                .shared_block_secrets(shared_block_secrets)
-                .participants(participants)
-                .build(),
+            "member" => {
+                Member::for_test()
+                    .block_key(block_key)
+                    .candidate_block(block.clone())
+                    .shared_block_secrets(shared_block_secrets)
+                    .participants(participants)
+                    .master_index(v["master_index"].as_u64().unwrap_or(0) as usize)
+                    .build()
+            },
             _ => panic!("test should be fail"),
         };
 

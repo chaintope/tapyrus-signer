@@ -111,22 +111,11 @@
           "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
           "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287"
         ]
-      },
-      "expected_localsig": {
-        "gamma_i": "b42d01fd501709fe749419e404df867b72ea2dbc13ff9404f83ded4a02bb4f94",
-        "e": "c4604e68cdd2ef0ccef3eaf5f453ee0efa73beb9759ffa2295afa704939ec644"
-      },
-      "expected_block_shared_keys": {
-        "positive": false,
-        "x_i": "0d8501d7bb411a3d854177822c91f3ffc704dae169373032f5be847676e75508",
-        "y": {
-          "x": "2ba82fcda00d9216bef8c3c5e5d47d1f8ec758d777f8a802780aaf48271940de",
-          "y": "eb2ee580a7a6c3abda257d16adac311a7d6fda959026423225493d663fd14cb3"
-        }
       }
     },
     "process_blockparticipants_member": {
       "role": "member",
+      "master_index": 1,
       "public_keys": [
         "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1",
         "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
@@ -223,10 +212,50 @@
             },
             "secret_share": "06d80463db0f49cef6e455007146ccc13e56fc9e010617317c0d5ffe3ec59d2a"
           }
+        ],
+        "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1": [
+          {
+            "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
+              "commitments": [
+                {
+                  "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
+                  "y": "7359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf557429"
+                },
+                {
+                  "x": "5ac08ed34ce1a22afc6b7c956c14052e931b11e3cedd1be72df4cc082c41b19c",
+                  "y": "c7efbc8a78e3c61f915cb8cb19372cb96d4743398f214815824850a313a35373"
+                }
+              ]
+            },
+            "secret_share": "14fd1161c8002904b7e92ba6919b96435ce9e1eb73a8f368a3b4032d93623d7b"
+          },
+          {
+            "vss": {
+              "parameters": {
+                "threshold": 1,
+                "share_count": 3
+              },
+              "commitments": [
+                {
+                  "x": "4f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b3716396",
+                  "y": "8ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa8806"
+                },
+                {
+                  "x": "635e20d8999088b54e1bb778de295be02cac1e15bd0171caeeeeff7ebfea97f1",
+                  "y": "82a0a3dca4694f40319174fc78c135f31ecf37628a3f56e0407fda0adc769281"
+                }
+              ]
+            },
+            "secret_share": "06d80463db0f49cef6e455007146ccc13e56fc9e010617317c0d5ffe3ec59d2a"
+          }
         ]
       },
       "received": {
-        "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
+        "sender": "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
         "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
         "participants": [
           "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
@@ -248,6 +277,7 @@
     },
     "process_blockparticipants_not_include_the_node": {
       "role": "member",
+      "master_index": 1,
       "public_keys": [
         "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1",
         "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
@@ -348,7 +378,7 @@
       },
       "participants": [],
       "received": {
-        "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
+        "sender": "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
         "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
         "participants": [
           "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1",
@@ -580,6 +610,7 @@
     },
     "process_blockparticipants_with_shortage_shared_block_secrets": {
       "role": "member",
+      "master_index": 1,
       "public_keys": [
         "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1",
         "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
@@ -639,7 +670,7 @@
         ]
       },
       "received": {
-        "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
+        "sender": "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
         "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
         "participants": [
           "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
