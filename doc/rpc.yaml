@@ -106,7 +106,7 @@ paths:
                   required:
                     - block_height
                     - threshold
-                    - node_secret
+                    - node_secret_share
                     - public_keys
                   properties:
                     block_height:
@@ -119,7 +119,7 @@ paths:
                       default: 0
                       example: 2
                       description: the minimum number of signers needed to sign blocks
-                    node_secret:
+                    node_secret_share:
                       type: string
                       default: ""
                       example: 0102030405060708090a0b0c0d0e0ff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff
