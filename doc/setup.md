@@ -191,10 +191,10 @@ Then each signer broadcasts their local_sig.
 
 ## Step 9. Compute the signature of the genesis block.
 
-After collecting `local_sig`, we can compute the signature of the genesis block using `tapyrus-setup combinesig`
+After collecting `local_sig`, we can compute the signature of the genesis block using `tapyrus-setup computesig`
 
 ```
-tapyrus-setup combinesig -sig=<local_sig[1]> -sig=<local_sig[2]> ... -sig=<local_sig[n]> -block=<block>
+tapyrus-setup computesig -sig=<local_sig[1]> -sig=<local_sig[2]> ... -sig=<local_sig[n]> -block=<block>
 
 output: <block_with_signature>
 ```
