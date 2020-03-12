@@ -115,6 +115,7 @@ output <block>
 ```
 
 - `aggregated_public_key` is generated at Step 4.
+- `block` is encoded as a hex string. For more information, see [here](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/signedblocks.md#block-structure-expansion-for-signed-block)
 
 This utility generates a block without block proof, so we must sign the block in the following steps.
 
@@ -181,6 +182,10 @@ output: <local_sig[i]>
 - `node_secret_share[i]` is the secret key share of Signer[i], generated in Step 4.
 - `block` is the genesis block without block proof.
 - `local_sig[i]` is the "local signature" described as γi in the paper [^4]. signer[i] may reveal `local_sig[i]`.
+
+`local_sig[i]` is encoded hex string of ( r | s ).
+   - r - the unsigned big-endian 256-bit encoding of the Schnorr signature's r integer.
+   - s - the unsigned big-endian 256-bit encoding of the Schnorr signature's s integer.
 
 Then each signer broadcasts their local_sig.
 
