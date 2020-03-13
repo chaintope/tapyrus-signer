@@ -5,7 +5,7 @@
 use crate::blockdata::hash::Hash;
 use crate::blockdata::Block;
 use crate::errors;
-use crate::serialize::ByteBufVisitor;
+use crate::serialize::{ByteBufVisitor, HexStrVisitor};
 use bitcoin::PublicKey;
 use redis::{Client, Commands, ControlFlow, PubSubCommands, RedisError};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -73,10 +73,8 @@ impl Serialize for SignerID {
     where
         S: Serializer,
     {
-        use bitcoin::util::psbt::serialize::Serialize;
-
-        let ser = self.pubkey.serialize();
-        serializer.serialize_bytes(&ser[..])
+        let hex = hex::encode(&self.pubkey.key.serialize()[..]);
+        serializer.serialize_str(&hex)
     }
 }
 
@@ -85,7 +83,7 @@ impl<'de> Deserialize<'de> for SignerID {
     where
         D: Deserializer<'de>,
     {
-        let vec = deserializer.deserialize_byte_buf(ByteBufVisitor)?;
+        let vec = deserializer.deserialize_str(HexStrVisitor::new())?;
 
         // TODO: Handle when PublicKey::from_slice returns Error
         let pubkey = PublicKey::from_slice(&vec).unwrap();
