@@ -196,7 +196,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     sender_id,
                     ..
                 }) => {
-                    log::debug!("Got {} message from {:?}. MessageType: {:?}", message_type, sender_id, message_type);
+                    log::debug!(
+                        "Got {} message from {:?}. MessageType: {:?}",
+                        message_type,
+                        sender_id,
+                        message_type
+                    );
 
                     match message_type {
                         KeyGenerationMessage(msg) => {

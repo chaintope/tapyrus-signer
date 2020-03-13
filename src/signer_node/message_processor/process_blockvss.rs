@@ -1,5 +1,4 @@
 use crate::blockdata::hash::Hash;
-use crate::crypto::multi_party_schnorr::SharedKeys;
 use crate::blockdata::Block;
 use crate::crypto::multi_party_schnorr::SharedKeys;
 use crate::errors::Error;

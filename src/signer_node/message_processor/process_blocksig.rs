@@ -13,13 +13,12 @@ use crate::signer_node::utils::sender_index;
 use crate::signer_node::ToVerifiableSS;
 use crate::signer_node::{BidirectionalSharedSecretMap, NodeState};
 use crate::signer_node::{NodeParameters, SharedSecretMap, ToSharedSecretMap};
-use bitcoin::{PublicKey, PrivateKey};
+use bitcoin::{PrivateKey, PublicKey};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-use log::Level::Debug;
 use curv::{FE, GE};
-use std::collections::{BTreeMap, HashSet};
-use serde::{Serialize, Deserialize};
 use derive_builder::Builder;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 pub fn process_blocksig<T, C>(
     sender_id: &SignerID,
@@ -44,7 +43,7 @@ where
                 sender: sender_id.clone(),
                 block_hash: blockhash,
                 gamma_i,
-                e
+                e,
             })
             .public_keys(params.pubkey_list.clone())
             .threshold(params.threshold as usize)
@@ -71,20 +70,27 @@ where
         ),
         _ => {
             // Ignore blocksig message except Master state which is not done.
-            #[cfg(feature = "dump")] dump_builder.build().unwrap().log();
+            #[cfg(feature = "dump")]
+            dump_builder.build().unwrap().log();
             return prev_state.clone();
         }
     };
 
     // Ignore the message if the sender is not contained in the participants.
     if !participants.contains(sender_id) {
-        #[cfg(feature = "dump")] dump_builder.build().unwrap().log();
+        #[cfg(feature = "dump")]
+        dump_builder.build().unwrap().log();
         return prev_state.clone();
     }
 
     let mut state_builder = Master::from_node_state(prev_state.clone());
 
-    log::debug!("Store local sig, sender: {:?}, gamma_i: {:?}, e: {:?}", sender_id, gamma_i, e);
+    log::debug!(
+        "Store local sig, sender: {:?}, gamma_i: {:?}, e: {:?}",
+        sender_id,
+        gamma_i,
+        e
+    );
     let new_signatures = store_received_local_sig(sender_id, signatures, gamma_i, e);
     state_builder.signatures(new_signatures.clone());
 
@@ -97,20 +103,23 @@ where
     let candidate_block = match get_valid_block(prev_state, blockhash) {
         Ok(block) => block,
         Err(_) => {
-            #[cfg(feature = "dump")] dump_builder.build().unwrap().log();
+            #[cfg(feature = "dump")]
+            dump_builder.build().unwrap().log();
             return prev_state.clone();
         }
     };
 
     // Check whether the number of signatures met the threshold
     if new_signatures.len() < params.threshold as usize {
-        #[cfg(feature = "dump")] dump_builder.build().unwrap().log();
+        #[cfg(feature = "dump")]
+        dump_builder.build().unwrap().log();
         return state_builder.build();
     }
 
     if block_shared_keys.is_none() {
         log::error!("key is not shared.");
-        #[cfg(feature = "dump")] dump_builder.build().unwrap().log();
+        #[cfg(feature = "dump")]
+        dump_builder.build().unwrap().log();
         return prev_state.clone();
     }
 
@@ -132,7 +141,8 @@ where
         Ok(sig) => sig,
         Err(e) => {
             log::error!("aggregated signature is invalid. e: {:?}", e);
-            #[cfg(feature = "dump")] dump_builder.build().unwrap().log();
+            #[cfg(feature = "dump")]
+            dump_builder.build().unwrap().log();
             return prev_state.clone();
         }
     };
@@ -142,7 +152,8 @@ where
         Err(e) => {
             log::error!("block rejected by Tapyrus Core: {:?}", e);
 
-            #[cfg(feature = "dump")] dump_builder.build().unwrap().log();
+            #[cfg(feature = "dump")]
+            dump_builder.build().unwrap().log();
 
             return state_builder.build();
         }
@@ -155,7 +166,11 @@ where
     );
 
     #[cfg(feature = "dump")]
-    dump_builder.completed_block(completed_block.clone()).build().unwrap().log();
+    dump_builder
+        .completed_block(completed_block.clone())
+        .build()
+        .unwrap()
+        .log();
 
     // send completeblock message
     broadcast_completedblock(completed_block, &params.signer_id, conman);
@@ -264,6 +279,7 @@ pub struct Dump {
 }
 
 impl Dump {
+    #[allow(dead_code)]
     fn log(&self) {
         log::debug!("Dump: {}", serde_json::to_string(self).unwrap());
     }
@@ -280,29 +296,21 @@ pub struct Received {
 #[cfg(test)]
 mod tests {
     use super::process_blocksig;
-    use crate::blockdata::hash::Hash;
-    use crate::crypto::multi_party_schnorr::SharedKeys;
-    use crate::net::{SignerID, Message, BlockGenerationRoundMessageType};
-    use crate::signer_node::node_state::builder::{Builder, Master, Member};
+    use crate::net::{BlockGenerationRoundMessageType, Message};
+    use crate::signer_node::message_processor::process_blocksig::Dump;
     use crate::signer_node::*;
     use crate::tests::helper::net::TestConnectionManager;
-    use crate::tests::helper::node_state_builder::BuilderForTest;
+    use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
     use crate::tests::helper::rpc::MockRpc;
     use crate::tests::helper::test_vectors::*;
-    use curv::FE;
-    use serde_json::Value;
-    use std::collections::BTreeMap;
-    use std::iter::FromIterator;
-    use crate::signer_node::message_processor::{generate_local_sig, create_block_vss};
-    use curv::elliptic::curves::traits::ECPoint;
-    use crate::signer_node::message_processor::process_blocksig::Dump;
-    use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
 
     #[test]
     fn test_process_blocksig_for_member() {
         // if node state is Member, process_blocksig should return Member state(it is same as prev_state).
         let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
-        let dump: Dump = serde_json::from_value(contents["cases"]["process_blocksig_for_member"].clone()).unwrap();
+        let dump: Dump =
+            serde_json::from_value(contents["cases"]["process_blocksig_for_member"].clone())
+                .unwrap();
         let conman = TestConnectionManager::new();
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
@@ -333,7 +341,9 @@ mod tests {
         // if node receives invalid block (that means block is not the same as candidate block),
         // node should return prev_state immediately.
         let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
-        let dump: Dump = serde_json::from_value(contents["cases"]["process_blocksig_invalid_block"].clone()).unwrap();
+        let dump: Dump =
+            serde_json::from_value(contents["cases"]["process_blocksig_invalid_block"].clone())
+                .unwrap();
         let conman = TestConnectionManager::new();
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
@@ -366,7 +376,9 @@ mod tests {
         //  - but the number of signatures(1) is not enough (2) to generate an aggregated signature,
         // node should return new Master state which has signatures.
         let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
-        let dump: Dump = serde_json::from_value(contents["cases"]["process_blocksig_1_valid_block"].clone()).unwrap();
+        let dump: Dump =
+            serde_json::from_value(contents["cases"]["process_blocksig_1_valid_block"].clone())
+                .unwrap();
         let conman = TestConnectionManager::new();
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
@@ -419,7 +431,10 @@ mod tests {
         //  - receive from non-paticipants member.
         // node should return previous node state.
         let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
-        let dump: Dump = serde_json::from_value(contents["cases"]["process_blocksig_from_non_participants"].clone()).unwrap();
+        let dump: Dump = serde_json::from_value(
+            contents["cases"]["process_blocksig_from_non_participants"].clone(),
+        )
+        .unwrap();
         let conman = TestConnectionManager::new();
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
@@ -453,7 +468,10 @@ mod tests {
         //  - but received gamma_i and e is invalid.
         // node should return prev_state.
         let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
-        let dump: Dump = serde_json::from_value(contents["cases"]["process_blocksig_receiving_invaid_signature"].clone()).unwrap();
+        let dump: Dump = serde_json::from_value(
+            contents["cases"]["process_blocksig_receiving_invaid_signature"].clone(),
+        )
+        .unwrap();
         let conman = TestConnectionManager::new();
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
@@ -489,7 +507,10 @@ mod tests {
         // node should return prev_state.
 
         let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
-        let dump: Dump = serde_json::from_value(contents["cases"]["process_blocksig_with_invaid_signature"].clone()).unwrap();
+        let dump: Dump = serde_json::from_value(
+            contents["cases"]["process_blocksig_with_invaid_signature"].clone(),
+        )
+        .unwrap();
         let conman = TestConnectionManager::new();
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
@@ -527,7 +548,9 @@ mod tests {
         //  - return Master
 
         let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
-        let dump: Dump = serde_json::from_value(contents["cases"]["process_blocksig_successfully"].clone()).unwrap();
+        let dump: Dump =
+            serde_json::from_value(contents["cases"]["process_blocksig_successfully"].clone())
+                .unwrap();
         let mut rpc = MockRpc::new();
         rpc.should_call_submitblock(Ok(()));
         let params = NodeParametersBuilder::new()
@@ -540,7 +563,9 @@ mod tests {
         let mut conman = TestConnectionManager::new();
         conman.should_broadcast(Message {
             message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Completedblock(dump.completed_block.unwrap().clone()),
+                BlockGenerationRoundMessageType::Completedblock(
+                    dump.completed_block.unwrap().clone(),
+                ),
             ),
             sender_id: params.signer_id,
             receiver_id: None,

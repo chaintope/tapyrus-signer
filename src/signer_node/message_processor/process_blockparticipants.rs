@@ -157,16 +157,8 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (
-            sender,
-            blockhash,
-            participants,
-            priv_shared_key,
-            prev_state,
-            params,
-            _,
-            _,
-        ) = load_test_case(&contents, "process_blockparticipants_master", rpc);
+        let (sender, blockhash, participants, priv_shared_key, prev_state, params, _, _) =
+            load_test_case(&contents, "process_blockparticipants_master", rpc);
 
         let next = process_blockparticipants(
             &sender,
@@ -465,15 +457,13 @@ mod tests {
                 .shared_block_secrets(shared_block_secrets)
                 .participants(participants)
                 .build(),
-            "member" => {
-                Member::for_test()
-                    .block_key(block_key)
-                    .candidate_block(block.clone())
-                    .shared_block_secrets(shared_block_secrets)
-                    .participants(participants)
-                    .master_index(v["master_index"].as_u64().unwrap_or(0) as usize)
-                    .build()
-            },
+            "member" => Member::for_test()
+                .block_key(block_key)
+                .candidate_block(block.clone())
+                .shared_block_secrets(shared_block_secrets)
+                .participants(participants)
+                .master_index(v["master_index"].as_u64().unwrap_or(0) as usize)
+                .build(),
             _ => panic!("test should be fail"),
         };
 

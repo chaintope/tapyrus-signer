@@ -2,16 +2,16 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use bitcoin_hashes::{sha256d, Hash};
-use serde::{Deserialize, Serialize, Deserializer, Serializer};
-use std::fmt::Debug;
 use crate::serialize::HexStrVisitor;
+use bitcoin_hashes::{sha256d, Hash};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt::Debug;
 
 pub mod hash {
     use crate::errors::Error;
-    use serde::{Deserialize, Serialize, Serializer, Deserializer};
-    use std::fmt::Debug;
     use crate::serialize::HexStrVisitor;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::fmt::Debug;
 
     /// This is hash value container struct.
     /// This struct assumes porting value from sha256d::Hash.
@@ -51,8 +51,13 @@ pub mod hash {
     }
 
     impl Serialize for Hash {
-        fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error> where
-            S: Serializer {
+        fn serialize<S>(
+            &self,
+            serializer: S,
+        ) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+        where
+            S: Serializer,
+        {
             let hex = hex::encode(&self.into_inner()[..]);
             serializer.serialize_str(&hex)
         }
@@ -60,8 +65,8 @@ pub mod hash {
 
     impl<'de> Deserialize<'de> for Hash {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where
-                D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
         {
             let vec = deserializer.deserialize_str(HexStrVisitor::with_size(32))?;
             Ok(Hash::from_slice(&vec[..]).unwrap())
@@ -134,8 +139,10 @@ impl Debug for Block {
 }
 
 impl Serialize for Block {
-    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error> where
-        S: Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
         let hex = self.hex();
         serializer.serialize_str(&hex)
     }
@@ -143,8 +150,8 @@ impl Serialize for Block {
 
 impl<'de> Deserialize<'de> for Block {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let vec = deserializer.deserialize_str(HexStrVisitor::new())?;
         Ok(Block::new(vec))

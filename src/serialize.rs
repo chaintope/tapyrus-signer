@@ -2,9 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use serde::de::{Error, SeqAccess, Visitor, Unexpected};
-use std::fmt;
 use serde::de;
+use serde::de::{Error, SeqAccess, Unexpected, Visitor};
+use std::fmt;
 
 pub struct ByteBufVisitor;
 
@@ -56,7 +56,6 @@ impl<'de> Visitor<'de> for ByteBufVisitor {
     }
 }
 
-
 pub struct HexStrVisitor {
     /// Bytes size of a input. If this field is set None, it allows variable size.
     static_size: Option<usize>,
@@ -68,7 +67,9 @@ impl HexStrVisitor {
     }
 
     pub fn with_size(s: usize) -> Self {
-        HexStrVisitor { static_size: Some(s) }
+        HexStrVisitor {
+            static_size: Some(s),
+        }
     }
 }
 
@@ -80,8 +81,8 @@ impl<'de> Visitor<'de> for HexStrVisitor {
     }
 
     fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
+    where
+        E: de::Error,
     {
         match hex::decode(s) {
             Ok(v) => {
@@ -90,8 +91,8 @@ impl<'de> Visitor<'de> for HexStrVisitor {
                 } else {
                     Err(de::Error::invalid_length(v.len(), &self))
                 }
-            },
-            Err(e) => Err(de::Error::invalid_value(Unexpected::Str(s), &self)),
+            }
+            Err(_) => Err(de::Error::invalid_value(Unexpected::Str(s), &self)),
         }
     }
 }

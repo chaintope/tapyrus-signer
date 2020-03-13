@@ -30,7 +30,11 @@ where
     match &prev_state {
         NodeState::Member { .. } => {
             if let Err(e) = params.rpc.testproposedblock(&block) {
-                log::warn!("Received Invalid candidate block sender: {}, {:?}",  sender_id, e);
+                log::warn!(
+                    "Received Invalid candidate block sender: {}, {:?}",
+                    sender_id,
+                    e
+                );
                 return prev_state.clone();
             }
 

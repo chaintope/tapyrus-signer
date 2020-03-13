@@ -10,6 +10,7 @@ use bitcoin::PublicKey;
 use redis::{Client, Commands, ControlFlow, PubSubCommands, RedisError};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cmp::Ordering;
+use std::fmt::{Debug, Display};
 use std::sync::mpsc::{channel, Receiver, Sender};
 /// メッセージを受け取って、それを処理するためのモジュール
 /// メッセージの処理は、メッセージの種類とラウンドの状態に依存する。
@@ -18,13 +19,12 @@ use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use std::fmt::{Debug, Display};
 
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::FE;
-use std::collections::HashSet;
-use serde::export::Formatter;
 use serde::export::fmt::Error;
+use serde::export::Formatter;
+use std::collections::HashSet;
 
 /// Signerの識別子。公開鍵を識別子にする。
 #[derive(Eq, Hash, Copy, Clone)]
@@ -132,6 +132,21 @@ pub enum BlockGenerationRoundMessageType {
     Blockparticipants(Hash, HashSet<SignerID>),
     Blocksig(Hash, FE, FE),
     Roundfailure,
+}
+
+impl Display for BlockGenerationRoundMessageType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        match self {
+            BlockGenerationRoundMessageType::Candidateblock(_) => write!(f, "Candidateblock"),
+            BlockGenerationRoundMessageType::Completedblock(_) => write!(f, "Completedblock"),
+            BlockGenerationRoundMessageType::Blockvss(_, _, _, _, _) => write!(f, "Blockvss"),
+            BlockGenerationRoundMessageType::Blockparticipants(_, _) => {
+                write!(f, "Blockparticipants")
+            }
+            BlockGenerationRoundMessageType::Blocksig(_, _, _) => write!(f, "Blocksig"),
+            BlockGenerationRoundMessageType::Roundfailure => write!(f, "Roundfailure"),
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, Serialize, Deserialize)]
@@ -432,7 +447,10 @@ mod test {
         let pubkey = TEST_KEYS.pubkeys()[0];
         let signer_id: SignerID = SignerID { pubkey };
         let serialized = serde_json::to_string(&signer_id).unwrap();
-        assert_eq!("\"03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc\"", serialized);
+        assert_eq!(
+            "\"03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc\"",
+            serialized
+        );
     }
 
     #[test]
