@@ -66,14 +66,15 @@ boradcasted on Redis pub/sub.
 
 All messages has signer id field which is specify by signer public key.
 
-| Name            | payload | Description                                                  |
-| --------------- | ------- | ------------------------------------------------------------ |
-| nodevss         | NodeVss | Each signers send VSS in Key Generation Protocol.            |
-| candidateblock  | Block   | Round master broadcasts to signer network a candidate block. |
-| blockvss        | BlockVSS| Send vss for random secret.                                  |
-| blocksig        | LocalSig| Broadcast local sig.                                         |
-| completedblock  | Block   | Round master broadcasts completed block.                     |
-| roundfailure    |         | Round master notifies the round is failure.                  |
+| Name              | payload        | Description                                                  |
+| ----------------- | -------------- | ------------------------------------------------------------ |
+| nodevss           | NodeVss        | Each signers send VSS in Key Generation Protocol.            |
+| candidateblock    | Block          | Round master broadcasts to signer network a candidate block. |
+| blockvss          | BlockVSS       | Send vss for random secret.                                  |
+| blockparticipants | Vec<PublicKey> | Round master notify signature issuing protocol is going to be executed with the signers who are represented in payload keys |
+| blocksig          | LocalSig       | Broadcast local sig.                                         |
+| completedblock    | Block          | Round master broadcasts completed block.                     |
+| roundfailure      |                | Round master notifies the round is failure.                  |
 
 
 ## Round
@@ -128,10 +129,15 @@ and member node.
      * Calculate VSSs for all signers each from random polynomial and each signer index.
      * Send commitments and VSSs to each signer using blockvss message. Especially, master signer should pay attention for each VSS must be sent to correct signer.
      * Receive VSSs from other signers and verify it using commitments.
-     * If the number of VSSs met number of signers, go next step.(In paper, it is enough that collecting vss is met threshold, but current implementation is not do that. This behavior is going to be fixed near future.)
-2. Sharing local signatures  
+     * If you are Master node, the number of VSSs met number of threshold, go next step.
+     * If you are Member node, just wait blockparticipants message.
+2. Master node declares signers list who can participate after steps
+     *  If you are Master node, then broadcast blockparticipants message which represents who can participate Sharing local signature step.
+     *  If you are Member node, do nothing. just wait blockparticipants message.
+3. Sharing local signatures
+     * This step must be done by only signers who was designated in blockparticipants message. And all participants must have all VSSs from all other participants.
      * Calculate own share from VSSs got in "Sharing VSSs".
-     * Calculate aggregated public key from commitments which correspond constant term's coefficients
+     * Calculate temporary aggregated public key from commitments which correspond constant term's coefficients
      * Generate local signature from below informations.
           * Two shares which are generated in Key Generation Protocol and previous step.
           * Aggregated public key which is generated in Key Generation Protocol.
