@@ -4,7 +4,7 @@ use crate::signer_node::BidirectionalSharedSecretMap;
 use curv::{FE, GE};
 use std::collections::{BTreeMap, HashSet};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum NodeState {
     Joining,
     Master {

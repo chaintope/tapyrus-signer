@@ -13,10 +13,13 @@ use crate::signer_node::utils::sender_index;
 use crate::signer_node::ToVerifiableSS;
 use crate::signer_node::{BidirectionalSharedSecretMap, NodeState};
 use crate::signer_node::{NodeParameters, SharedSecretMap, ToSharedSecretMap};
-use bitcoin::PublicKey;
+use bitcoin::{PublicKey, PrivateKey};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
+use log::Level::Debug;
 use curv::{FE, GE};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
+use serde::{Serialize, Deserialize};
+use derive_builder::Builder;
 
 pub fn process_blocksig<T, C>(
     sender_id: &SignerID,
@@ -33,6 +36,24 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
+    #[cfg(feature = "dump")]
+    let mut dump_builder = {
+        let mut builder = DumpBuilder::default();
+        builder
+            .received(Received {
+                sender: sender_id.clone(),
+                block_hash: blockhash,
+                gamma_i,
+                e
+            })
+            .public_keys(params.pubkey_list.clone())
+            .threshold(params.threshold as usize)
+            .node_privaet_key(params.private_key)
+            .priv_shared_key(priv_shared_keys.clone())
+            .shared_secrets(shared_secrets.clone())
+            .prev_state(prev_state.clone());
+        builder
+    };
     // extract values from state object.
     let (block_shared_keys, shared_block_secrets, signatures, participants) = match prev_state {
         NodeState::Master {
@@ -50,12 +71,14 @@ where
         ),
         _ => {
             // Ignore blocksig message except Master state which is not done.
+            #[cfg(feature = "dump")] dump_builder.build().unwrap().log();
             return prev_state.clone();
         }
     };
 
     // Ignore the message if the sender is not contained in the participants.
     if !participants.contains(sender_id) {
+        #[cfg(feature = "dump")] dump_builder.build().unwrap().log();
         return prev_state.clone();
     }
 
@@ -74,17 +97,20 @@ where
     let candidate_block = match get_valid_block(prev_state, blockhash) {
         Ok(block) => block,
         Err(_) => {
+            #[cfg(feature = "dump")] dump_builder.build().unwrap().log();
             return prev_state.clone();
         }
     };
 
     // Check whether the number of signatures met the threshold
     if new_signatures.len() < params.threshold as usize {
+        #[cfg(feature = "dump")] dump_builder.build().unwrap().log();
         return state_builder.build();
     }
 
     if block_shared_keys.is_none() {
         log::error!("key is not shared.");
+        #[cfg(feature = "dump")] dump_builder.build().unwrap().log();
         return prev_state.clone();
     }
 
@@ -106,6 +132,7 @@ where
         Ok(sig) => sig,
         Err(e) => {
             log::error!("aggregated signature is invalid. e: {:?}", e);
+            #[cfg(feature = "dump")] dump_builder.build().unwrap().log();
             return prev_state.clone();
         }
     };
@@ -114,6 +141,9 @@ where
         Ok(block) => block,
         Err(e) => {
             log::error!("block rejected by Tapyrus Core: {:?}", e);
+
+            #[cfg(feature = "dump")] dump_builder.build().unwrap().log();
+
             return state_builder.build();
         }
     };
@@ -123,6 +153,9 @@ where
         candidate_block.sighash(),
         completed_block.hash()
     );
+
+    #[cfg(feature = "dump")]
+    dump_builder.completed_block(completed_block.clone()).build().unwrap().log();
 
     // send completeblock message
     broadcast_completedblock(completed_block, &params.signer_id, conman);
@@ -215,6 +248,33 @@ where
         receiver_id: None,
     };
     conman.broadcast_message(message);
+}
+
+#[derive(Debug, Serialize, Deserialize, Builder)]
+pub struct Dump {
+    public_keys: Vec<PublicKey>,
+    threshold: usize,
+    node_privaet_key: PrivateKey,
+    received: Received,
+    priv_shared_key: SharedKeys,
+    shared_secrets: SharedSecretMap,
+    prev_state: NodeState,
+    #[builder(setter(strip_option), default)]
+    completed_block: Option<Block>,
+}
+
+impl Dump {
+    fn log(&self) {
+        log::debug!("Dump: {}", serde_json::to_string(self).unwrap());
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Received {
+    sender: SignerID,
+    block_hash: Hash,
+    gamma_i: FE,
+    e: FE,
 }
 
 #[cfg(test)]
