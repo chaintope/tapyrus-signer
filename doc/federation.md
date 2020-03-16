@@ -33,15 +33,14 @@ RPC `update_federation` takes the following parameters.
 
 | name         | type                | description                                                                                  |
 | ------------ | ------------------- | -------------------------------------------------------------------------------------------- |
-| public_keys  | array of hex string | an array of the public keys which contain all of the new federation.                         |
 | block_height | 32-bits integer     | a block height where the new federation is applied                                           |
-| node_secret_share  | hex string          | secret value generated in Step 4 in setup                                                    |
-| threshold    | 64-bits integer     | number of signer agreements to sign a block. it must be less than the number of public keys. |
+| threshold    | 64-bits integer     | number of signer agreements to sign a block. it must be less than the number of signers.     |
+| node_vss     | array of hex string | an array of the Verifiable Secret Sharing. see Appendix A in setup.md                        |
 
 The following is an example of executing `update_federation` using curl.
 
 ```
-curl -X POST "http://127.0.0.1:3000/update_federation" -H "accept: */*" -H "Content-Type: application/json" -d "{\"method\":\"update_federation\",\"id\":1,\"jsonrpc\":\"2.0\",\"params\":{\"block_height\":99999,\"threshold\":2,\"node_secret_share\":\"0102030405060708090a0b0c0d0e0ff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff\",\"public_keys\":[\"03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2\",\"03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1\",\"02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287\"]}}"
+curl -X POST "http://127.0.0.1:3000/update_federation" -H "accept: */*" -H "Content-Type: application/json" -d "{\"method\":\"update_federation\",\"id\":1,\"jsonrpc\":\"2.0\",\"params\":{\"block_height\":99999,\"threshold\":2,,\"vss\":[\"03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2...\",\"03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1...\",\"02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287...\"]}}"
 ```
 
 And signers who received `update_federation` schedule to update this information in the future block.

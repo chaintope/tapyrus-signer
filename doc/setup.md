@@ -194,7 +194,8 @@ Then each signer broadcasts their local_sig.
 After collecting `local_sig`, we can compute the signature of the genesis block using `tapyrus-setup computesig`
 
 ```
-tapyrus-setup computesig -sig=<local_sig[1]> -sig=<local_sig[2]> ... -sig=<local_sig[n]> -block=<block>
+tapyrus-setup computesig -sig=<local_sig[1]> -sig=<local_sig[2]> ... -sig=<local_sig[n]> -block=<block> -block_vss=1:<block_vss[1, i]> -block_vss=2:<block_vss[2, i]> ... -block_vss=t:<block_vss[n, i]> -node_vss=1:<node_vss[1, i]> -node_vss=2:<node_vss[2, i]> ... -node_vss=n:<node_vss[n, i]>
+
 
 output: <block_with_signature>
 ```
