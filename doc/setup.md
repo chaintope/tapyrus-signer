@@ -238,11 +238,12 @@ As in Step 2 and Stpe 6 `node_vss` and `block_vss` have 7 fields:
 | -------------------- | --------- | ------------------------------------------------------------------------------------------------- |
 | sender_public_key    | 33        | indicates the signer who sends the vss                                                            |
 | receiver_public_key  | 33        | indicates the signer to be received the vss                                                       |
-| len                  | 2         | number of commitments                                                                             |
-| positive commitments | 33 \* len | commitments for secret value for r . an array of the points on the elliptic curve secp256k1.      |
+| positive commitments | 64 \* len | commitments for secret value for r . an array of the points on the elliptic curve secp256k1.      |
 | positive secret      | 32        | secret value for r to perform secret sharing scheme                                               |
-| negative commitments | 33 \* len | commitments for secret value for (n - r). an array of the points on the elliptic curve secp256k1. |
+| negative commitments | 64 \* len | commitments for secret value for (n - r). an array of the points on the elliptic curve secp256k1. |
 | negative secret      | 32        | secret value for (n - r) to perform secret sharing scheme                                         |
+
+Each commitment consists of 32-bits x-coordinate and 32-bits y-coordinate.
 
 ### Encryption of `node_vss`
 
@@ -251,7 +252,7 @@ As in Step 2 and Stpe 6 `node_vss` and `block_vss` have 7 fields:
 1. Compute p = ECDH(`node_private_key`, `receiver_node_public_key`). where ECDH is a Elliptic-Curve Diffie-Hellman function. p represents a point on the secp256k1 and has 33-byte length.
 2. Compute k = h(p). where h is SHA256 hash function. k is used as 32-bytes symmetric key of ChaCha20-Poly1305.
 3. Concat all fields except `sender_node_public_key`.
-   payload = `receiver_node_public_key` || `len` || `positive commitments` || `positive secret` || `negative commitments` || `negative secret`
+   payload = `receiver_node_public_key` || `positive commitments` || `positive secret` || `negative commitments` || `negative secret`
 4. Let n be 64 bits of leading zeros followed by a 32-bit `networkid`(0x0000000000000000 || `networkid`).
 5. Encrypt payload with ChaCha20-Poly1305 encrpytion function.
    enc_payload = chacha20_poly1305_encrypt(k, n, ad = '', payload)
@@ -265,7 +266,7 @@ it is the same as the encryption of `node_vss` except nonce used by chacha20_pol
 1. Compute k = ECDH(`block_private_key`, `receiver_block_public_key`).
 2. Compute sk = h(k). where h is SHA256 hash function.
 3. Concat all fields except `sender_block_public_key`.
-   payload = `receiver_block_public_key` || `len` || `positive commitments` || `positive secret` || `negative commitments` || `negative secret`
+   payload = `receiver_block_public_key` || `positive commitments` || `positive secret` || `negative commitments` || `negative secret`
 4. Let n be a 96-bit null-nonce (0x000000000000000000000000).
 5. Encrypt payload with ChaCha20-Poly1305 encrpytion function.
    enc_payload = chacha20_poly1305_encrypt(k, n, ad = '', payload)
