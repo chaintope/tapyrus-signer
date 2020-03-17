@@ -26,7 +26,7 @@ use serde::export::fmt::Error;
 use serde::export::Formatter;
 use std::collections::HashSet;
 
-/// Signerの識別子。公開鍵を識別子にする。
+/// Signer identifier is his public key.
 #[derive(Eq, Hash, Copy, Clone)]
 pub struct SignerID {
     pub pubkey: PublicKey,
