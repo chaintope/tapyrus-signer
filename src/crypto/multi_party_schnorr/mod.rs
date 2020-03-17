@@ -315,7 +315,7 @@ mod tests {
                 "8c36e52e1d9f5c62634001393e81c65d427e8dd60f9eeac866d2c46adcc65107",
                 16,
             )
-            .unwrap();
+                .unwrap();
             let fe: FE = ECScalar::from(&bn);
             g * fe
         };
@@ -325,7 +325,7 @@ mod tests {
                 "1d11656e57924a03cd12d5f3517e286bf697255642565405d78eeebcc20d43c0",
                 16,
             )
-            .unwrap();
+                .unwrap();
             let fe: FE = ECScalar::from(&bn);
             g * fe
         };
@@ -348,3 +348,6 @@ mod tests {
         assert_eq!(expected, compute_e(&v, &y, &message[..]));
     }
 }
+
+#[cfg(test)]
+mod test;
