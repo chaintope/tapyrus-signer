@@ -27,6 +27,9 @@ use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::{BigInt, FE, GE};
 use sha2::{Digest, Sha256};
 
+pub mod mock_impl;
+pub mod traits;
+
 const SECURITY: usize = 256;
 
 pub struct Keys {
@@ -348,3 +351,6 @@ mod tests {
         assert_eq!(expected, compute_e(&v, &y, &message[..]));
     }
 }
+
+#[cfg(test)]
+mod test;
