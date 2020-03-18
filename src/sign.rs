@@ -8,7 +8,7 @@ use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::*;
 use curv::{BigInt, FE, GE};
 
-use crate::blockdata::hash::Hash;
+use crate::blockdata::hash::SHA256Hash;
 use crate::errors::Error;
 use crate::signer_node::SharedSecretMap;
 use crate::signer_node::ToShares;
@@ -69,7 +69,7 @@ impl Sign {
     pub fn sign(
         eph_shared_keys: &SharedKeys,
         priv_shared_keys: &SharedKeys,
-        message: Hash,
+        message: SHA256Hash,
     ) -> LocalSig {
         let message_slice = message.borrow_inner();
         let local_sig =

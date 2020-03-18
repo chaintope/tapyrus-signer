@@ -1,4 +1,4 @@
-use crate::blockdata::hash::Hash;
+use crate::blockdata::hash::SHA256Hash;
 use crate::blockdata::Block;
 use crate::crypto::multi_party_schnorr::SharedKeys;
 use crate::errors::Error;
@@ -18,7 +18,7 @@ use std::collections::HashSet;
 
 pub fn process_blockvss<T, C>(
     sender_id: &SignerID,
-    blockhash: Hash,
+    blockhash: SHA256Hash,
     vss_for_positive: VerifiableSS,
     secret_share_for_positive: FE,
     vss_for_negative: VerifiableSS,
@@ -240,7 +240,7 @@ fn store_received_vss(
 #[cfg(test)]
 mod tests {
     use super::process_blockvss;
-    use crate::blockdata::hash::Hash;
+    use crate::blockdata::hash::SHA256Hash;
     use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
     use crate::net::SignerID;
     use crate::signer_node::node_state::builder::{Builder, Master, Member};
@@ -654,7 +654,7 @@ mod tests {
         rpc: MockRpc,
     ) -> (
         SignerID,
-        Hash,
+        SHA256Hash,
         VerifiableSS,
         FE,
         VerifiableSS,
@@ -675,7 +675,7 @@ mod tests {
 
         let sender = to_signer_id(&v["received"]["sender"].as_str().unwrap().to_string());
         let hex = hex::decode(v["received"]["block_hash"].as_str().unwrap()).unwrap();
-        let blockhash = Hash::from_slice(&hex[..]).unwrap();
+        let blockhash = SHA256Hash::from_slice(&hex[..]).unwrap();
         let vss_for_positive: VerifiableSS =
             serde_json::from_value(v["received"]["vss_for_positive"].clone()).unwrap();
         let secret_share_for_positive = to_fe(&v["received"]["secret_share_for_positive"]);

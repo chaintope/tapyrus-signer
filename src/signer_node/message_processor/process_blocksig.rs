@@ -1,4 +1,4 @@
-use crate::blockdata::hash::Hash;
+use crate::blockdata::hash::SHA256Hash;
 use crate::blockdata::Block;
 use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys, Signature};
 use crate::errors::Error;
@@ -22,7 +22,7 @@ use std::collections::BTreeMap;
 
 pub fn process_blocksig<T, C>(
     sender_id: &SignerID,
-    blockhash: Hash,
+    blockhash: SHA256Hash,
     gamma_i: FE,
     e: FE,
     priv_shared_keys: &SharedKeys,
@@ -288,7 +288,7 @@ impl Dump {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Received {
     sender: SignerID,
-    block_hash: Hash,
+    block_hash: SHA256Hash,
     gamma_i: FE,
     e: FE,
 }

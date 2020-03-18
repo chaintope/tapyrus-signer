@@ -16,18 +16,18 @@ pub mod hash {
     /// This is hash value container struct.
     /// This struct assumes porting value from sha256d::Hash.
     #[derive(PartialEq, Clone, Copy)]
-    pub struct Hash([u8; 32]);
+    pub struct SHA256Hash([u8; 32]);
 
-    impl Hash {
+    impl SHA256Hash {
         const LEN: usize = 32;
 
-        pub fn from_slice(sl: &[u8]) -> Result<Hash, Error> {
+        pub fn from_slice(sl: &[u8]) -> Result<SHA256Hash, Error> {
             if sl.len() != Self::LEN {
                 Err(Error::InvalidLength(Self::LEN, sl.len()))
             } else {
                 let mut ret = [0; 32];
                 ret.copy_from_slice(sl);
-                Ok(Hash(ret))
+                Ok(SHA256Hash(ret))
             }
         }
 
@@ -39,7 +39,7 @@ pub mod hash {
         }
     }
 
-    impl Debug for Hash {
+    impl Debug for SHA256Hash {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             // Change byteorder to Big Endian
             let mut rev = self.0.clone();
@@ -50,7 +50,7 @@ pub mod hash {
         }
     }
 
-    impl Serialize for Hash {
+    impl Serialize for SHA256Hash {
         fn serialize<S>(
             &self,
             serializer: S,
@@ -63,13 +63,13 @@ pub mod hash {
         }
     }
 
-    impl<'de> Deserialize<'de> for Hash {
+    impl<'de> Deserialize<'de> for SHA256Hash {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: Deserializer<'de>,
         {
             let vec = deserializer.deserialize_str(HexStrVisitor::with_size(32))?;
-            Ok(Hash::from_slice(&vec[..]).unwrap())
+            Ok(SHA256Hash::from_slice(&vec[..]).unwrap())
         }
     }
 }
@@ -101,15 +101,15 @@ impl Block {
 
     /// Returns hash for signing. This hash value doesn't include proof field. Actual block hash
     /// includes proof data.
-    pub fn sighash(&self) -> hash::Hash {
+    pub fn sighash(&self) -> hash::SHA256Hash {
         let header = self.get_header_without_proof();
         let hash = sha256d::Hash::hash(header).into_inner();
-        hash::Hash::from_slice(&hash)
+        hash::SHA256Hash::from_slice(&hash)
             .expect("couldn't convert to blockdata::hash::Hash from sha256d::hash")
     }
 
     /// Returns block hash
-    pub fn hash(&self) -> hash::Hash {
+    pub fn hash(&self) -> hash::SHA256Hash {
         let header = if self.0[Self::PROOF_POSITION] == 0 {
             &self.0[..(Self::PROOF_POSITION + 1)] // length byte
         } else {
@@ -117,7 +117,7 @@ impl Block {
         };
 
         let hash = sha256d::Hash::hash(header).into_inner();
-        hash::Hash::from_slice(&hash)
+        hash::SHA256Hash::from_slice(&hash)
             .expect("couldn't convert to blockdata::hash::Hash from sha256d::hash")
     }
 
@@ -204,7 +204,7 @@ mod tests {
         );
 
         let json = serde_json::to_string(&hash).unwrap();
-        let deserialize_hash: hash::Hash = serde_json::from_str(&json).unwrap();
+        let deserialize_hash: hash::SHA256Hash = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialize_hash, hash);
     }
 

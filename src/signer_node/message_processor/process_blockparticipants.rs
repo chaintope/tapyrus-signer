@@ -1,4 +1,4 @@
-use crate::blockdata::hash::Hash;
+use crate::blockdata::hash::SHA256Hash;
 use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
 use crate::net::{ConnectionManager, SignerID};
 use crate::rpc::TapyrusApi;
@@ -12,7 +12,7 @@ use std::collections::HashSet;
 
 pub fn process_blockparticipants<T, C>(
     sender_id: &SignerID,
-    blockhash: Hash,
+    blockhash: SHA256Hash,
     participants: HashSet<SignerID>,
     priv_shared_keys: &SharedKeys,
     prev_state: &NodeState,
@@ -133,7 +133,7 @@ fn create_next_state(
 #[cfg(test)]
 mod tests {
     use super::process_blockparticipants;
-    use crate::blockdata::hash::Hash;
+    use crate::blockdata::hash::SHA256Hash;
     use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
     use crate::net::SignerID;
     use crate::signer_node::node_state::builder::{Builder, Master, Member};
@@ -408,7 +408,7 @@ mod tests {
         rpc: MockRpc,
     ) -> (
         SignerID,
-        Hash,
+        SHA256Hash,
         HashSet<SignerID>,
         SharedKeys,
         NodeState,
@@ -431,7 +431,7 @@ mod tests {
             r.iter().map(|i| to_signer_id(i)).collect()
         };
 
-        let blockhash = Hash::from_slice(&hex[..]).unwrap();
+        let blockhash = SHA256Hash::from_slice(&hex[..]).unwrap();
         let participants: HashSet<SignerID> = {
             let r: HashSet<String> =
                 serde_json::from_value(v["participants"].clone()).unwrap_or(HashSet::new());

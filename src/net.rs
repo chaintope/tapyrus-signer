@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use crate::blockdata::hash::Hash;
+use crate::blockdata::hash::SHA256Hash;
 use crate::blockdata::Block;
 use crate::errors;
 use crate::serialize::{ByteBufVisitor, HexStrVisitor};
@@ -128,9 +128,9 @@ impl Display for KeyGenerationMessageType {
 pub enum BlockGenerationRoundMessageType {
     Candidateblock(Block),
     Completedblock(Block),
-    Blockvss(Hash, VerifiableSS, FE, VerifiableSS, FE),
-    Blockparticipants(Hash, HashSet<SignerID>),
-    Blocksig(Hash, FE, FE),
+    Blockvss(SHA256Hash, VerifiableSS, FE, VerifiableSS, FE),
+    Blockparticipants(SHA256Hash, HashSet<SignerID>),
+    Blocksig(SHA256Hash, FE, FE),
     Roundfailure,
 }
 
