@@ -77,6 +77,12 @@ All messages has signer id field which is specify by signer public key.
 | roundfailure      | N/A            | Round master notifies the round is failure.                  |
 
 
+Caution: Tapyrus-signer is using redis for to relay messages among each node. The word `send` and `broadcast` in the 
+descriptions for each message type means logical specification not actual behavior. Actually each node always send 
+messages to redis-server and redis relays the messages on pub/sub functionality. When it says `broadcast`, it means a 
+message will be sent to a pub/sub channel where subscribed by all nodes. In the other hand, when it says `send`, it 
+means a message will be sent to a channel where subscribed by a specific node.
+
 ## Round
 
 Signer Network has round. Before start the round, a signer node is elected
