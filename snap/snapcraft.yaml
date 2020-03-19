@@ -1,0 +1,24 @@
+name: tapyrus-signer 
+version: git
+summary: Tapyrus Signer
+description: |
+        Tapyrus Signer Node 
+license: MIT
+base: core18
+grade: stable # must be 'stable' to release into candidate/stable channels
+confinement: strict # use 'strict' once you have the right plugs and slots
+
+architectures:
+  - build-on [s390x, ppc64el, arm64, amd64, i386]
+
+apps:
+  daemon:
+    command: tapyrus-signerd
+    plugs: [network]
+
+parts:
+  tapyrus-signer:
+    source: https://github.com/chaintope/tapyrus-signer.git
+    plugin: rust
+    build-packages:
+      - libgmp3-dev
