@@ -66,3 +66,9 @@ impl From<RedisError> for Error {
         Error::RedisError(e)
     }
 }
+
+impl From<bitcoin::consensus::encode::Error> for Error {
+    fn from(e: bitcoin::consensus::encode::Error) -> Error {
+        Error::BitcoinConsensusEncodeError(e)
+    }
+}
