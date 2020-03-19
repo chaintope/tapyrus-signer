@@ -1,16 +1,10 @@
 use crate::blockdata::Block;
-use crate::crypto::multi_party_schnorr::Keys;
-use crate::net::{
-    BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
-};
+use crate::net::{ConnectionManager, SignerID};
 use crate::rpc::TapyrusApi;
-use crate::sign::Sign;
-use crate::signer_node::node_state::builder::{Builder, Master, Member};
+use crate::signer_node::message_processor::create_block_vss;
+use crate::signer_node::node_state::builder::{Builder, Member};
 use crate::signer_node::utils::sender_index;
 use crate::signer_node::{NodeParameters, NodeState};
-use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-use curv::elliptic::curves::traits::ECScalar;
-use curv::{BigInt, FE};
 
 pub fn process_candidateblock<T, C>(
     sender_id: &SignerID,
@@ -23,77 +17,43 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
+    // Ignore the message when the sender is myself.
+    if *sender_id == params.signer_id {
+        return prev_state.clone();
+    }
+
     log::info!(
         "candidateblock received. block hash for signing: {:?}",
         block.sighash()
     );
 
-    if let Err(_e) = params.rpc.testproposedblock(&block) {
-        log::warn!("Received Invalid candidate block sender: {}", sender_id);
-        return prev_state.clone();
-    }
-
-    let key = create_block_vss(block.clone(), params, conman);
-
     match &prev_state {
-        NodeState::Member { .. } => Member::from_node_state(prev_state.clone())
-            .block_key(Some(key.u_i))
-            .candidate_block(Some(block.clone()))
-            .master_index(sender_index(sender_id, &params.pubkey_list))
-            .build(),
-        NodeState::Master {
-            round_is_done: false,
-            ..
-        } => Master::from_node_state(prev_state.clone())
-            .block_key(Some(key.u_i))
-            .build(),
+        NodeState::Member { .. } => {
+            if let Err(e) = params.rpc.testproposedblock(&block) {
+                log::warn!(
+                    "Received Invalid candidate block sender: {}, {:?}",
+                    sender_id,
+                    e
+                );
+                return prev_state.clone();
+            }
+
+            let (key, shared_secret_for_positive, shared_secret_for_negative) =
+                create_block_vss(block.clone(), params, conman);
+
+            Member::from_node_state(prev_state.clone())
+                .block_key(Some(key.u_i))
+                .candidate_block(Some(block.clone()))
+                .master_index(sender_index(sender_id, &params.pubkey_list))
+                .insert_shared_block_secrets(
+                    params.signer_id.clone(),
+                    shared_secret_for_positive,
+                    shared_secret_for_negative,
+                )
+                .build()
+        }
         _ => prev_state.clone(),
     }
-}
-
-fn create_block_vss<T, C>(block: Block, params: &NodeParameters<T>, conman: &C) -> Keys
-where
-    T: TapyrusApi,
-    C: ConnectionManager,
-{
-    let sharing_params = params.sharing_params();
-    let key = Sign::create_key(params.self_node_index + 1, None);
-
-    let parties = (0..sharing_params.share_count)
-        .map(|i| i + 1)
-        .collect::<Vec<usize>>();
-
-    let (vss_scheme, secret_shares) = VerifiableSS::share_at_indices(
-        sharing_params.threshold,
-        sharing_params.share_count,
-        &key.u_i,
-        &parties,
-    );
-    let order: BigInt = FE::q();
-    let (vss_scheme_for_negative, secret_shares_for_negative) = VerifiableSS::share_at_indices(
-        sharing_params.threshold,
-        sharing_params.share_count,
-        &(ECScalar::from(&(order - key.u_i.to_big_int()))),
-        &parties,
-    );
-    for i in 0..params.pubkey_list.len() {
-        conman.send_message(Message {
-            message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Blockvss(
-                    block.sighash(),
-                    vss_scheme.clone(),
-                    secret_shares[i],
-                    vss_scheme_for_negative.clone(),
-                    secret_shares_for_negative[i],
-                ),
-            ),
-            sender_id: params.signer_id,
-            receiver_id: Some(SignerID {
-                pubkey: params.pubkey_list[i],
-            }),
-        });
-    }
-    key
 }
 
 #[cfg(test)]
@@ -111,10 +71,14 @@ mod tests {
     use crate::tests::helper::node_state_builder::BuilderForTest;
     use crate::tests::helper::rpc::MockRpc;
 
+    fn sender_id() -> SignerID {
+        TEST_KEYS.signer_ids()[1]
+    }
+
     /// This network consists 5 signers and threshold 3.
     #[test]
     fn test_as_member_with_valid_args() {
-        let sender_id = TEST_KEYS.signer_id();
+        let sender_id = sender_id();
         let candidate_block = get_block(0);
         let prev_state = Member::for_test().build();
         let conman = TestConnectionManager::new();
@@ -135,9 +99,9 @@ mod tests {
             _ => assert!(false),
         }
 
-        // It should send 5 blockvss messages to each signer (includes myself).
+        // It should send 4 blockvss messages to each signer (except myself).
         let sent_messages = conman.sent.borrow();
-        assert_eq!(sent_messages.len(), 5);
+        assert_eq!(sent_messages.len(), 4);
         for message_type in sent_messages.iter() {
             match message_type {
                 Message {
@@ -153,81 +117,33 @@ mod tests {
     }
 
     /// This is a case of receiving own candidateblock message.
+    /// It should ignore the message because it is from myself and already have.
     #[test]
     fn test_as_master_with_valid_args() {
-        let sender_id = TEST_KEYS.signer_id();
+        let sender_id = sender_id();
         let candidate_block = get_block(0);
         let prev_state = Master::for_test()
             .candidate_block(Some(candidate_block.clone()))
             .build();
         let conman = TestConnectionManager::new();
-        let mut rpc = MockRpc::new();
-        // It should call testproposeblock RPC once.
-        rpc.should_call_testproposedblock(Ok(true));
+        let rpc = MockRpc::new();
         let params = NodeParametersBuilder::new().rpc(rpc).build();
 
         let next_state =
             process_candidateblock(&sender_id, &candidate_block, &prev_state, &conman, &params);
 
-        // It should be set block_key and other field not changed.
-        if let NodeState::Master {
-            shared_block_secrets,
-            block_shared_keys,
-            candidate_block,
-            signatures,
-            round_is_done,
-            ..
-        } = prev_state
-        {
-            match next_state {
-                NodeState::Master {
-                    block_key: Some(_),
-                    shared_block_secrets: shared_block_secrets_target,
-                    block_shared_keys: block_shared_keys_target,
-                    candidate_block: candidate_block_target,
-                    signatures: signatures_target,
-                    round_is_done: round_is_done_target,
-                } if shared_block_secrets_target == shared_block_secrets
-                    && block_shared_keys_target == block_shared_keys
-                    && candidate_block_target == candidate_block
-                    && signatures_target == signatures
-                    && round_is_done_target == round_is_done =>
-                {
-                    ()
-                }
-                ref _e => panic!("assertion failed"),
-            }
-        } else {
-            panic!("prev_state should be a Master");
-        }
-
-        // It should send 5 blockvss messages to each signer (includes myself).
-        let sent_messages = conman.sent.borrow();
-        assert_eq!(sent_messages.len(), 5);
-        for message_type in sent_messages.iter() {
-            match message_type {
-                Message {
-                    message_type:
-                        BlockGenerationRoundMessages(BlockGenerationRoundMessageType::Blockvss(..)),
-                    ..
-                } => assert!(true),
-                m => assert!(false, format!("Sent unexpected message {:?}", m)),
-            }
-        }
-
+        assert_eq!(prev_state, next_state);
         params.rpc.assert();
     }
 
     #[test]
     fn test_as_master_with_invalid_block() {
-        let sender_id = TEST_KEYS.signer_id();
+        let sender_id = sender_id();
         // invalid block
         let candidate_block = Block::new(hex::decode("00000020ed658cc40670cceda23bb0b614821fe6d48a41d107d19f3f3a5608ad3d483092b151160ab71133b428e1f62eaeb598ae858ff66017c99601f29088b7c64a481d6284e145d29b70bf54392d29701031d2af9fed5f9bb21fbb284fa71ceb238f69a6d4095d00010200000000010100000000000000000000000000000000000000000000000000000000000000000c000000035c0101ffffffff0200f2052a010000001976a914cf12dbc04bb0de6fb6a87a5aeb4b2e74c97006b288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf90120000000000000000000000000000000000000000000000000000000000000000000000000").unwrap());
         let prev_state = Master::for_test().build();
         let conman = TestConnectionManager::new();
-        let mut rpc = MockRpc::new();
-        // It should call testproposedblock RPC once.
-        rpc.should_call_testproposedblock_and_returns_invalid_block_error();
+        let rpc = MockRpc::new();
         let params = NodeParametersBuilder::new().rpc(rpc).build();
 
         let next_state =
@@ -245,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_as_member_with_invalid_block() {
-        let sender_id = TEST_KEYS.signer_id();
+        let sender_id = sender_id();
         // invalid block
         let candidate_block = Block::new(hex::decode("00000020ed658cc40670cceda23bb0b614821fe6d48a41d107d19f3f3a5608ad3d483092b151160ab71133b428e1f62eaeb598ae858ff66017c99601f29088b7c64a481d6284e145d29b70bf54392d29701031d2af9fed5f9bb21fbb284fa71ceb238f69a6d4095d00010200000000010100000000000000000000000000000000000000000000000000000000000000000c000000035c0101ffffffff0200f2052a010000001976a914cf12dbc04bb0de6fb6a87a5aeb4b2e74c97006b288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf90120000000000000000000000000000000000000000000000000000000000000000000000000").unwrap());
         let prev_state = Member::for_test().build();
@@ -293,7 +209,7 @@ mod tests {
 
         let prev_state = Member::for_test().master_index(0).build();
         let params = NodeParametersBuilder::new()
-            .private_key(TEST_KEYS.key[0])
+            .private_key(TEST_KEYS.key[2])
             .rpc(rpc)
             .build();
 

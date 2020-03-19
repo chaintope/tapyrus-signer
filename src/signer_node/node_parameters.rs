@@ -12,6 +12,7 @@ pub struct NodeParameters<T: TapyrusApi> {
     pub private_key: PrivateKey,
     pub rpc: std::sync::Arc<T>,
     pub address: Address,
+    /// Own Signer ID. Actually it is signer own public key.
     pub signer_id: SignerID,
     pub self_node_index: usize,
     pub round_duration: u64,
@@ -47,6 +48,12 @@ impl<T: TapyrusApi> NodeParameters<T> {
             self_node_index,
             round_duration,
             skip_waiting_ibd,
+        }
+    }
+
+    pub fn get_signer_id_by_index(&self, index: usize) -> SignerID {
+        SignerID {
+            pubkey: self.pubkey_list[index].clone(),
         }
     }
 

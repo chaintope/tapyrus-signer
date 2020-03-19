@@ -8,7 +8,7 @@ use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::*;
 use curv::{BigInt, FE, GE};
 
-use crate::blockdata::hash::Hash;
+use crate::blockdata::hash::SHA256Hash;
 use crate::errors::Error;
 use crate::signer_node::SharedSecretMap;
 use crate::signer_node::ToShares;
@@ -41,12 +41,9 @@ impl Sign {
     /// return SharedKeys { y, x_i },
     /// where y is a aggregated public key and x_i is a share of player i.
     pub fn verify_vss_and_construct_key(
-        params: &Parameters,
         secret_shares: &SharedSecretMap,
         index: &usize,
     ) -> Result<SharedKeys, Error> {
-        assert_eq!(secret_shares.len(), params.share_count);
-
         let correct_ss = secret_shares
             .values()
             .map(|v| v.vss.validate_share(&v.secret_share, *index))
@@ -72,12 +69,12 @@ impl Sign {
     pub fn sign(
         eph_shared_keys: &SharedKeys,
         priv_shared_keys: &SharedKeys,
-        message: Hash,
-    ) -> Result<LocalSig, Error> {
+        message: SHA256Hash,
+    ) -> LocalSig {
         let message_slice = message.borrow_inner();
         let local_sig =
             LocalSig::compute(&message_slice.clone(), &eph_shared_keys, &priv_shared_keys);
-        Ok(local_sig)
+        local_sig
     }
 
     pub fn aggregate(

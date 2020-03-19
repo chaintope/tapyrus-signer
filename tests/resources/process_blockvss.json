@@ -8,11 +8,18 @@
         "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287"
       ],
       "threshold": 2,
+      "priv_shared_key": {
+        "x_i": "49cee145d04e68edf62fe941332230cf809b0026967c1e38d282879fa04177ca",
+        "y": {
+          "x": "5700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
+          "y": "795417c110e4482230f624e75d6e7fcd6ca11ea393cd21f1760049a7528f3686"
+        }
+      },
       "node_private_key": "cTGpijFpMsDNA6qXXPh2cuUdGNbsjd5TtjTEp71TkzVvcizzsydm",
       "candidate_block": "0100000088c100651c407e4ca48371f3c1e3442f622fcb689c01610027cd49d38ca0a23ffa28200496a678d234c457b097d1b1827b0102b4641f19912fe0160b0d696cbada09ecae58a2e94ef1efaf1aba0130a54fabc72da53667e6a69d5a9e299c8a56590e415e00000101000000010000000000000000000000000000000000000000000000000000000000000000620000000401620101ffffffff0200f2052a010000001976a9145f3f3758e7a4cf159c7bdb441ae4ff80999c62e888ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000",
       "block_key": "619a25871f039bd9eff17e9239c0f6e1e39ca33ee66bfae6893f1524a024eed7",
       "received": {
-        "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
+        "sender": "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
         "block_hash": "0000000000000000000000000000000000000000000000000000000000000000",
         "vss_for_positive": {
           "parameters": {
@@ -49,15 +56,8 @@
         },
         "secret_share_for_negative": "06d80463db0f49cef6e455007146ccc13e56fc9e010617317c0d5ffe3ec59d2a"
       },
-      "priv_shared_key": {
-        "x_i": "49cee145d04e68edf62fe941332230cf809b0026967c1e38d282879fa04177ca",
-        "y": {
-          "x": "5700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
-          "y": "795417c110e4482230f624e75d6e7fcd6ca11ea393cd21f1760049a7528f3686"
-        }
-      },
       "shared_block_secrets": {
-        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2": [
+        "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287": [
           {
             "vss": {
               "parameters": {
@@ -137,14 +137,6 @@
             "secret_share": "10c6ad3ce4dc72f084423a30ba7c26202f0e08845b5b8bc062c2ee6b1f837dab"
           }
         ]
-      },
-      "block_shared_key": {
-        "positive": false,
-        "x_i": "1e4baf14a01d8d2e0983b1b2e70e1a1ff612e365c492bbf3588172e1966ad2b3",
-        "y": {
-          "x": "e4475723cfe6f4b9679b504f384576a08d290930fafc956e359998f4ebe96fbb",
-          "y": "a189b57125db4cbad7eed567bd342fb67d2a012e2c1e21f81f3ea32be1e9827e"
-        }
       }
     },
     "process_blockvss_master_with_1_shared_block_secrets": {
@@ -155,11 +147,18 @@
         "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287"
       ],
       "threshold": 2,
+      "priv_shared_key": {
+        "x_i": "49cee145d04e68edf62fe941332230cf809b0026967c1e38d282879fa04177ca",
+        "y": {
+          "x": "5700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
+          "y": "795417c110e4482230f624e75d6e7fcd6ca11ea393cd21f1760049a7528f3686"
+        }
+      },
       "node_private_key": "cTGpijFpMsDNA6qXXPh2cuUdGNbsjd5TtjTEp71TkzVvcizzsydm",
       "candidate_block": "0100000088c100651c407e4ca48371f3c1e3442f622fcb689c01610027cd49d38ca0a23ffa28200496a678d234c457b097d1b1827b0102b4641f19912fe0160b0d696cbada09ecae58a2e94ef1efaf1aba0130a54fabc72da53667e6a69d5a9e299c8a56590e415e00000101000000010000000000000000000000000000000000000000000000000000000000000000620000000401620101ffffffff0200f2052a010000001976a9145f3f3758e7a4cf159c7bdb441ae4ff80999c62e888ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000",
       "block_key": "619a25871f039bd9eff17e9239c0f6e1e39ca33ee66bfae6893f1524a024eed7",
       "received": {
-        "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
+        "sender": "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
         "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
         "vss_for_positive": {
           "parameters": {
@@ -196,15 +195,8 @@
         },
         "secret_share_for_negative": "06d80463db0f49cef6e455007146ccc13e56fc9e010617317c0d5ffe3ec59d2a"
       },
-      "priv_shared_key": {
-        "x_i": "49cee145d04e68edf62fe941332230cf809b0026967c1e38d282879fa04177ca",
-        "y": {
-          "x": "5700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
-          "y": "795417c110e4482230f624e75d6e7fcd6ca11ea393cd21f1760049a7528f3686"
-        }
-      },
       "shared_block_secrets": {
-        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2": [
+        "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287": [
           {
             "vss": {
               "parameters": {
@@ -245,16 +237,24 @@
           }
         ]
       },
-      "block_shared_key": {
+      "expected_participants": [
+        "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
+        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2"
+      ],
+      "expected_localsig": {
+        "gamma_i": "b42d01fd501709fe749419e404df867b72ea2dbc13ff9404f83ded4a02bb4f94",
+        "e": "c4604e68cdd2ef0ccef3eaf5f453ee0efa73beb9759ffa2295afa704939ec644"
+      },
+      "expected_block_shared_keys": {
         "positive": false,
-        "x_i": "1e4baf14a01d8d2e0983b1b2e70e1a1ff612e365c492bbf3588172e1966ad2b3",
+        "x_i": "0d8501d7bb411a3d854177822c91f3ffc704dae169373032f5be847676e75508",
         "y": {
-          "x": "e4475723cfe6f4b9679b504f384576a08d290930fafc956e359998f4ebe96fbb",
-          "y": "a189b57125db4cbad7eed567bd342fb67d2a012e2c1e21f81f3ea32be1e9827e"
+          "x": "2ba82fcda00d9216bef8c3c5e5d47d1f8ec758d777f8a802780aaf48271940de",
+          "y": "eb2ee580a7a6c3abda257d16adac311a7d6fda959026423225493d663fd14cb3"
         }
       }
     },
-    "process_blockvss_master_with_all_shared_block_secrets": {
+    "process_blockvss_master_with_all_shared_block_secrets_has_participants": {
       "role": "master",
       "public_keys": [
         "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1",
@@ -262,11 +262,18 @@
         "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287"
       ],
       "threshold": 2,
+      "priv_shared_key": {
+        "x_i": "49cee145d04e68edf62fe941332230cf809b0026967c1e38d282879fa04177ca",
+        "y": {
+          "x": "5700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
+          "y": "795417c110e4482230f624e75d6e7fcd6ca11ea393cd21f1760049a7528f3686"
+        }
+      },
       "node_private_key": "cTGpijFpMsDNA6qXXPh2cuUdGNbsjd5TtjTEp71TkzVvcizzsydm",
       "candidate_block": "0100000088c100651c407e4ca48371f3c1e3442f622fcb689c01610027cd49d38ca0a23ffa28200496a678d234c457b097d1b1827b0102b4641f19912fe0160b0d696cbada09ecae58a2e94ef1efaf1aba0130a54fabc72da53667e6a69d5a9e299c8a56590e415e00000101000000010000000000000000000000000000000000000000000000000000000000000000620000000401620101ffffffff0200f2052a010000001976a9145f3f3758e7a4cf159c7bdb441ae4ff80999c62e888ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000",
       "block_key": "619a25871f039bd9eff17e9239c0f6e1e39ca33ee66bfae6893f1524a024eed7",
       "received": {
-        "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
+        "sender": "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
         "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
         "vss_for_positive": {
           "parameters": {
@@ -303,15 +310,8 @@
         },
         "secret_share_for_negative": "06d80463db0f49cef6e455007146ccc13e56fc9e010617317c0d5ffe3ec59d2a"
       },
-      "priv_shared_key": {
-        "x_i": "49cee145d04e68edf62fe941332230cf809b0026967c1e38d282879fa04177ca",
-        "y": {
-          "x": "5700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
-          "y": "795417c110e4482230f624e75d6e7fcd6ca11ea393cd21f1760049a7528f3686"
-        }
-      },
       "shared_block_secrets": {
-        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2": [
+        "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287": [
           {
             "vss": {
               "parameters": {
@@ -392,14 +392,10 @@
           }
         ]
       },
-      "block_shared_key": {
-        "positive": false,
-        "x_i": "1e4baf14a01d8d2e0983b1b2e70e1a1ff612e365c492bbf3588172e1966ad2b3",
-        "y": {
-          "x": "e4475723cfe6f4b9679b504f384576a08d290930fafc956e359998f4ebe96fbb",
-          "y": "a189b57125db4cbad7eed567bd342fb67d2a012e2c1e21f81f3ea32be1e9827e"
-        }
-      }
+      "participants" : [
+        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
+        "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1"
+      ]
     },
     "process_blockvss_member_without_block": {
       "role": "member",
@@ -409,11 +405,18 @@
         "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287"
       ],
       "threshold": 2,
+      "priv_shared_key": {
+        "x_i": "49cee145d04e68edf62fe941332230cf809b0026967c1e38d282879fa04177ca",
+        "y": {
+          "x": "5700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
+          "y": "795417c110e4482230f624e75d6e7fcd6ca11ea393cd21f1760049a7528f3686"
+        }
+      },
       "node_private_key": "cTGpijFpMsDNA6qXXPh2cuUdGNbsjd5TtjTEp71TkzVvcizzsydm",
       "candidate_block": null,
       "block_key": "619a25871f039bd9eff17e9239c0f6e1e39ca33ee66bfae6893f1524a024eed7",
       "received": {
-        "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
+        "sender": "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
         "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
         "vss_for_positive": {
           "parameters": {
@@ -450,15 +453,8 @@
         },
         "secret_share_for_negative": "06d80463db0f49cef6e455007146ccc13e56fc9e010617317c0d5ffe3ec59d2a"
       },
-      "priv_shared_key": {
-        "x_i": "49cee145d04e68edf62fe941332230cf809b0026967c1e38d282879fa04177ca",
-        "y": {
-          "x": "5700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
-          "y": "795417c110e4482230f624e75d6e7fcd6ca11ea393cd21f1760049a7528f3686"
-        }
-      },
       "shared_block_secrets": {
-        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2": [
+        "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287": [
           {
             "vss": {
               "parameters": {
@@ -538,14 +534,6 @@
             "secret_share": "10c6ad3ce4dc72f084423a30ba7c26202f0e08845b5b8bc062c2ee6b1f837dab"
           }
         ]
-      },
-      "block_shared_key": {
-        "positive": false,
-        "x_i": "1e4baf14a01d8d2e0983b1b2e70e1a1ff612e365c492bbf3588172e1966ad2b3",
-        "y": {
-          "x": "e4475723cfe6f4b9679b504f384576a08d290930fafc956e359998f4ebe96fbb",
-          "y": "a189b57125db4cbad7eed567bd342fb67d2a012e2c1e21f81f3ea32be1e9827e"
-        }
       }
     },
     "process_blockvss_member_invalid_block": {
@@ -556,11 +544,18 @@
         "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287"
       ],
       "threshold": 2,
+      "priv_shared_key": {
+        "x_i": "49cee145d04e68edf62fe941332230cf809b0026967c1e38d282879fa04177ca",
+        "y": {
+          "x": "5700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
+          "y": "795417c110e4482230f624e75d6e7fcd6ca11ea393cd21f1760049a7528f3686"
+        }
+      },
       "node_private_key": "cTGpijFpMsDNA6qXXPh2cuUdGNbsjd5TtjTEp71TkzVvcizzsydm",
       "candidate_block": "0100000088c100651c407e4ca48371f3c1e3442f622fcb689c01610027cd49d38ca0a23ffa28200496a678d234c457b097d1b1827b0102b4641f19912fe0160b0d696cbada09ecae58a2e94ef1efaf1aba0130a54fabc72da53667e6a69d5a9e299c8a56590e415e00000101000000010000000000000000000000000000000000000000000000000000000000000000620000000401620101ffffffff0200f2052a010000001976a9145f3f3758e7a4cf159c7bdb441ae4ff80999c62e888ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000",
       "block_key": "619a25871f039bd9eff17e9239c0f6e1e39ca33ee66bfae6893f1524a024eed7",
       "received": {
-        "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
+        "sender": "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
         "block_hash": "0000000000000000000000000000000000000000000000000000000000000000",
         "vss_for_positive": {
           "parameters": {
@@ -597,15 +592,8 @@
         },
         "secret_share_for_negative": "06d80463db0f49cef6e455007146ccc13e56fc9e010617317c0d5ffe3ec59d2a"
       },
-      "priv_shared_key": {
-        "x_i": "49cee145d04e68edf62fe941332230cf809b0026967c1e38d282879fa04177ca",
-        "y": {
-          "x": "5700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
-          "y": "795417c110e4482230f624e75d6e7fcd6ca11ea393cd21f1760049a7528f3686"
-        }
-      },
       "shared_block_secrets": {
-        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2": [
+        "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287": [
           {
             "vss": {
               "parameters": {
@@ -685,14 +673,6 @@
             "secret_share": "10c6ad3ce4dc72f084423a30ba7c26202f0e08845b5b8bc062c2ee6b1f837dab"
           }
         ]
-      },
-      "block_shared_key": {
-        "positive": false,
-        "x_i": "1e4baf14a01d8d2e0983b1b2e70e1a1ff612e365c492bbf3588172e1966ad2b3",
-        "y": {
-          "x": "e4475723cfe6f4b9679b504f384576a08d290930fafc956e359998f4ebe96fbb",
-          "y": "a189b57125db4cbad7eed567bd342fb67d2a012e2c1e21f81f3ea32be1e9827e"
-        }
       }
     },
     "process_blockvss_member_with_1_shared_block_secrets": {
@@ -703,11 +683,18 @@
         "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287"
       ],
       "threshold": 2,
+      "priv_shared_key": {
+        "x_i": "49cee145d04e68edf62fe941332230cf809b0026967c1e38d282879fa04177ca",
+        "y": {
+          "x": "5700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
+          "y": "795417c110e4482230f624e75d6e7fcd6ca11ea393cd21f1760049a7528f3686"
+        }
+      },
       "node_private_key": "cTGpijFpMsDNA6qXXPh2cuUdGNbsjd5TtjTEp71TkzVvcizzsydm",
       "candidate_block": "0100000088c100651c407e4ca48371f3c1e3442f622fcb689c01610027cd49d38ca0a23ffa28200496a678d234c457b097d1b1827b0102b4641f19912fe0160b0d696cbada09ecae58a2e94ef1efaf1aba0130a54fabc72da53667e6a69d5a9e299c8a56590e415e00000101000000010000000000000000000000000000000000000000000000000000000000000000620000000401620101ffffffff0200f2052a010000001976a9145f3f3758e7a4cf159c7bdb441ae4ff80999c62e888ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000",
       "block_key": "619a25871f039bd9eff17e9239c0f6e1e39ca33ee66bfae6893f1524a024eed7",
       "received": {
-        "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
+        "sender": "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
         "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
         "vss_for_positive": {
           "parameters": {
@@ -744,15 +731,8 @@
         },
         "secret_share_for_negative": "06d80463db0f49cef6e455007146ccc13e56fc9e010617317c0d5ffe3ec59d2a"
       },
-      "priv_shared_key": {
-        "x_i": "49cee145d04e68edf62fe941332230cf809b0026967c1e38d282879fa04177ca",
-        "y": {
-          "x": "5700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
-          "y": "795417c110e4482230f624e75d6e7fcd6ca11ea393cd21f1760049a7528f3686"
-        }
-      },
       "shared_block_secrets": {
-        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2": [
+        "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287": [
           {
             "vss": {
               "parameters": {
@@ -792,17 +772,9 @@
             "secret_share": "06acfd73e031d06e8e5d2281bb4b273e88adde436831190179b124783821b7de"
           }
         ]
-      },
-      "block_shared_key": {
-        "positive": false,
-        "x_i": "1e4baf14a01d8d2e0983b1b2e70e1a1ff612e365c492bbf3588172e1966ad2b3",
-        "y": {
-          "x": "e4475723cfe6f4b9679b504f384576a08d290930fafc956e359998f4ebe96fbb",
-          "y": "a189b57125db4cbad7eed567bd342fb67d2a012e2c1e21f81f3ea32be1e9827e"
-        }
       }
     },
-    "process_blockvss_member_with_all_shared_block_secrets": {
+    "process_blockvss_member_had_got_participants_first": {
       "role": "member",
       "public_keys": [
         "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1",
@@ -810,11 +782,18 @@
         "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287"
       ],
       "threshold": 2,
+      "priv_shared_key": {
+        "x_i": "49cee145d04e68edf62fe941332230cf809b0026967c1e38d282879fa04177ca",
+        "y": {
+          "x": "5700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
+          "y": "795417c110e4482230f624e75d6e7fcd6ca11ea393cd21f1760049a7528f3686"
+        }
+      },
       "node_private_key": "cTGpijFpMsDNA6qXXPh2cuUdGNbsjd5TtjTEp71TkzVvcizzsydm",
       "candidate_block": "0100000088c100651c407e4ca48371f3c1e3442f622fcb689c01610027cd49d38ca0a23ffa28200496a678d234c457b097d1b1827b0102b4641f19912fe0160b0d696cbada09ecae58a2e94ef1efaf1aba0130a54fabc72da53667e6a69d5a9e299c8a56590e415e00000101000000010000000000000000000000000000000000000000000000000000000000000000620000000401620101ffffffff0200f2052a010000001976a9145f3f3758e7a4cf159c7bdb441ae4ff80999c62e888ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000",
       "block_key": "619a25871f039bd9eff17e9239c0f6e1e39ca33ee66bfae6893f1524a024eed7",
       "received": {
-        "sender": "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
+        "sender": "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
         "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
         "vss_for_positive": {
           "parameters": {
@@ -851,15 +830,8 @@
         },
         "secret_share_for_negative": "06d80463db0f49cef6e455007146ccc13e56fc9e010617317c0d5ffe3ec59d2a"
       },
-      "priv_shared_key": {
-        "x_i": "49cee145d04e68edf62fe941332230cf809b0026967c1e38d282879fa04177ca",
-        "y": {
-          "x": "5700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
-          "y": "795417c110e4482230f624e75d6e7fcd6ca11ea393cd21f1760049a7528f3686"
-        }
-      },
       "shared_block_secrets": {
-        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2": [
+        "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287": [
           {
             "vss": {
               "parameters": {
@@ -898,54 +870,22 @@
             },
             "secret_share": "06acfd73e031d06e8e5d2281bb4b273e88adde436831190179b124783821b7de"
           }
-        ],
-        "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1": [
-          {
-            "vss": {
-              "parameters": {
-                "threshold": 1,
-                "share_count": 3
-              },
-              "commitments": [
-                {
-                  "x": "02af9cd3ad3cc79ad2283b20b2a5b52ed9c6f30d91ec8cc490c122b04328759c",
-                  "y": "0cc32253aaf52d35a023ab637cafa233cd69913f3cb5e52948dd314da4d9504d"
-                },
-                {
-                  "x": "982165c3378b2c93a789533d0e29aa0b3618b776e51e5651ecaf800ee5676d93",
-                  "y": "1aa500dcfd6e63f9013d6969c5b0a5efebd3ba14cc9c4bf3a20db91abe012829"
-                }
-              ]
-            },
-            "secret_share": "01cee42c945d21e5cc29c477a0b32f525b6ebc7f2730a1280110c418949b3dd1"
-          },
-          {
-            "vss": {
-              "parameters": {
-                "threshold": 1,
-                "share_count": 3
-              },
-              "commitments": [
-                {
-                  "x": "02af9cd3ad3cc79ad2283b20b2a5b52ed9c6f30d91ec8cc490c122b04328759c",
-                  "y": "f33cddac550ad2ca5fdc549c83505dcc32966ec0c34a1ad6b722ceb15b26abe2"
-                },
-                {
-                  "x": "61554458ea561cdd16fc7afceaaf82348670d9c6efd74ee6e6aa5736b2f23be7",
-                  "y": "252efd11ec4ba4941c74c746e76adc1a4c6817191fbe29a8f85dfac422711e5e"
-                }
-              ]
-            },
-            "secret_share": "10c6ad3ce4dc72f084423a30ba7c26202f0e08845b5b8bc062c2ee6b1f837dab"
-          }
         ]
       },
-      "block_shared_key": {
+      "participants" : [
+        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
+        "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287"
+      ],
+      "expected_localsig": {
+        "gamma_i": "b42d01fd501709fe749419e404df867b72ea2dbc13ff9404f83ded4a02bb4f94",
+        "e": "c4604e68cdd2ef0ccef3eaf5f453ee0efa73beb9759ffa2295afa704939ec644"
+      },
+      "expected_block_shared_keys": {
         "positive": false,
-        "x_i": "1e4baf14a01d8d2e0983b1b2e70e1a1ff612e365c492bbf3588172e1966ad2b3",
+        "x_i": "0d8501d7bb411a3d854177822c91f3ffc704dae169373032f5be847676e75508",
         "y": {
-          "x": "e4475723cfe6f4b9679b504f384576a08d290930fafc956e359998f4ebe96fbb",
-          "y": "a189b57125db4cbad7eed567bd342fb67d2a012e2c1e21f81f3ea32be1e9827e"
+          "x": "2ba82fcda00d9216bef8c3c5e5d47d1f8ec758d777f8a802780aaf48271940de",
+          "y": "eb2ee580a7a6c3abda257d16adac311a7d6fda959026423225493d663fd14cb3"
         }
       }
     }

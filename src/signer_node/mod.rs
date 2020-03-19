@@ -7,8 +7,8 @@ mod node_parameters;
 pub mod node_state;
 mod utils;
 
+pub use crate::signer_node::node_parameters::NodeParameters;
 pub use crate::signer_node::node_state::NodeState;
-pub use node_parameters::NodeParameters;
 
 use crate::crypto::multi_party_schnorr::*;
 use crate::net::MessageType::{BlockGenerationRoundMessages, KeyGenerationMessage};
@@ -18,6 +18,8 @@ use crate::net::{
 };
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use crate::sign::Sign;
+use crate::signer_node::message_processor::create_block_vss;
+use crate::signer_node::message_processor::process_blockparticipants;
 use crate::signer_node::message_processor::process_blocksig;
 use crate::signer_node::message_processor::process_blockvss;
 use crate::signer_node::message_processor::process_candidateblock;
@@ -194,7 +196,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     sender_id,
                     ..
                 }) => {
-                    log::debug!("Got new message: {:?}", message_type);
+                    log::debug!(
+                        "Got {} message from {:?}. MessageType: {:?}",
+                        message_type,
+                        sender_id,
+                        message_type
+                    );
 
                     match message_type {
                         KeyGenerationMessage(msg) => {
@@ -315,7 +322,18 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             receiver_id: None,
         });
 
-        Master::default().candidate_block(Some(block)).build()
+        let (keys, shared_secret_for_positive, shared_secret_for_negative) =
+            create_block_vss(block.clone(), &self.params, &self.connection_manager);
+
+        Master::default()
+            .candidate_block(Some(block))
+            .block_key(Some(keys.u_i))
+            .insert_shared_block_secrets(
+                self.params.signer_id.clone(),
+                shared_secret_for_positive,
+                shared_secret_for_negative,
+            )
+            .build()
     }
 
     pub fn process_key_generation_message(
@@ -359,7 +377,19 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 secret_share_for_positive,
                 vss_for_negative,
                 secret_share_for_negative,
+                &self.current_state,
                 &self.priv_shared_keys.as_ref().expect("priv_share_keys should be stored by when the blockvss message communication starts."),
+                &self.connection_manager,
+                &self.params,
+            ),
+            BlockGenerationRoundMessageType::Blockparticipants(
+                blockhash,
+                participants
+            ) => process_blockparticipants(
+                &sender_id,
+                blockhash,
+                participants,
+                &self.priv_shared_keys.as_ref().expect("priv_share_keys should be stored by when the blockparticipants message communication starts."),
                 &self.current_state,
                 &self.connection_manager,
                 &self.params,
@@ -502,6 +532,7 @@ mod tests {
     use crate::tests::helper::keys::TEST_KEYS;
     use crate::tests::helper::{address, enable_log};
     use redis::ControlFlow;
+    use std::collections::HashSet;
     use std::sync::mpsc::{channel, Receiver, Sender};
     use std::sync::Arc;
     use std::thread;
@@ -696,6 +727,7 @@ mod tests {
                 block_shared_keys: None,
                 shared_block_secrets: BidirectionalSharedSecretMap::new(),
                 candidate_block: None,
+                participants: HashSet::new(),
                 master_index: 0,
             },
             rpc,
@@ -721,6 +753,7 @@ mod tests {
         use crate::signer_node::{BidirectionalSharedSecretMap, NodeState};
         use bitcoin::Address;
         use std::cell::Cell;
+        use std::collections::HashSet;
 
         struct MockRpc {
             pub results: [GetBlockchainInfoResult; 2],
@@ -767,6 +800,7 @@ mod tests {
                     block_shared_keys: None,
                     shared_block_secrets: BidirectionalSharedSecretMap::new(),
                     candidate_block: None,
+                    participants: HashSet::new(),
                     master_index: 0,
                 },
                 rpc,

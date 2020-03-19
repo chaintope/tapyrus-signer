@@ -31,8 +31,8 @@ impl TestConnectionManager {
             should_send,
             sent,
         } = self;
-        assert_eq!(should_broadcast, broadcasted.into_inner());
-        assert_eq!(should_send, sent.into_inner());
+        assert_eq!(broadcasted.into_inner(), should_broadcast);
+        assert_eq!(sent.into_inner(), should_send);
     }
 
     pub fn should_broadcast(&mut self, message: Message) {

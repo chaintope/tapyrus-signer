@@ -2,14 +2,15 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use crate::blockdata::hash::Hash;
+use crate::blockdata::hash::SHA256Hash;
 use crate::blockdata::Block;
 use crate::errors;
-use crate::serialize::ByteBufVisitor;
+use crate::serialize::{ByteBufVisitor, HexStrVisitor};
 use bitcoin::PublicKey;
 use redis::{Client, Commands, ControlFlow, PubSubCommands, RedisError};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cmp::Ordering;
+use std::fmt::{Debug, Display};
 use std::sync::mpsc::{channel, Receiver, Sender};
 /// メッセージを受け取って、それを処理するためのモジュール
 /// メッセージの処理は、メッセージの種類とラウンドの状態に依存する。
@@ -21,11 +22,20 @@ use std::time::Duration;
 
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::FE;
+use serde::export::fmt::Error;
+use serde::export::Formatter;
+use std::collections::HashSet;
 
-/// Signerの識別子。公開鍵を識別子にする。
-#[derive(Debug, Eq, Hash, Copy, Clone)]
+/// Signer identifier is his public key.
+#[derive(Eq, Hash, Copy, Clone)]
 pub struct SignerID {
     pub pubkey: PublicKey,
+}
+
+impl Debug for SignerID {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "SignerID({})", self.pubkey)
+    }
 }
 
 impl SignerID {
@@ -63,10 +73,8 @@ impl Serialize for SignerID {
     where
         S: Serializer,
     {
-        use bitcoin::util::psbt::serialize::Serialize;
-
-        let ser = self.pubkey.serialize();
-        serializer.serialize_bytes(&ser[..])
+        let hex = hex::encode(&self.pubkey.key.serialize()[..]);
+        serializer.serialize_str(&hex)
     }
 }
 
@@ -75,7 +83,7 @@ impl<'de> Deserialize<'de> for SignerID {
     where
         D: Deserializer<'de>,
     {
-        let vec = deserializer.deserialize_byte_buf(ByteBufVisitor)?;
+        let vec = deserializer.deserialize_str(HexStrVisitor::new())?;
 
         // TODO: Handle when PublicKey::from_slice returns Error
         let pubkey = PublicKey::from_slice(&vec).unwrap();
@@ -91,10 +99,27 @@ pub enum MessageType {
     BlockGenerationRoundMessages(BlockGenerationRoundMessageType),
 }
 
+impl Display for MessageType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        match self {
+            MessageType::KeyGenerationMessage(m) => write!(f, "{}", m),
+            MessageType::BlockGenerationRoundMessages(m) => write!(f, "{}", m),
+        }
+    }
+}
+
 /// # Key Generation Protocol Messages
 #[derive(PartialEq, Debug, Serialize, Deserialize)]
 pub enum KeyGenerationMessageType {
     Nodevss(VerifiableSS, FE),
+}
+
+impl Display for KeyGenerationMessageType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        match self {
+            KeyGenerationMessageType::Nodevss(_, _) => write!(f, "Nodevss"),
+        }
+    }
 }
 
 /// # Round Messages
@@ -103,9 +128,25 @@ pub enum KeyGenerationMessageType {
 pub enum BlockGenerationRoundMessageType {
     Candidateblock(Block),
     Completedblock(Block),
-    Blockvss(Hash, VerifiableSS, FE, VerifiableSS, FE),
-    Blocksig(Hash, FE, FE),
+    Blockvss(SHA256Hash, VerifiableSS, FE, VerifiableSS, FE),
+    Blockparticipants(SHA256Hash, HashSet<SignerID>),
+    Blocksig(SHA256Hash, FE, FE),
     Roundfailure,
+}
+
+impl Display for BlockGenerationRoundMessageType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        match self {
+            BlockGenerationRoundMessageType::Candidateblock(_) => write!(f, "Candidateblock"),
+            BlockGenerationRoundMessageType::Completedblock(_) => write!(f, "Completedblock"),
+            BlockGenerationRoundMessageType::Blockvss(_, _, _, _, _) => write!(f, "Blockvss"),
+            BlockGenerationRoundMessageType::Blockparticipants(_, _) => {
+                write!(f, "Blockparticipants")
+            }
+            BlockGenerationRoundMessageType::Blocksig(_, _, _) => write!(f, "Blocksig"),
+            BlockGenerationRoundMessageType::Roundfailure => write!(f, "Roundfailure"),
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, Serialize, Deserialize)]
@@ -406,12 +447,15 @@ mod test {
         let pubkey = TEST_KEYS.pubkeys()[0];
         let signer_id: SignerID = SignerID { pubkey };
         let serialized = serde_json::to_string(&signer_id).unwrap();
-        assert_eq!("[3,131,26,105,184,0,152,51,171,91,3,38,1,46,175,72,155,254,163,90,115,33,177,202,21,177,29,136,19,20,35,250,252]", serialized);
+        assert_eq!(
+            "\"03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc\"",
+            serialized
+        );
     }
 
     #[test]
     fn signer_id_deserialize_test() {
-        let serialized = "[3,131,26,105,184,0,152,51,171,91,3,38,1,46,175,72,155,254,163,90,115,33,177,202,21,177,29,136,19,20,35,250,252]";
+        let serialized = "\"03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc\"";
         let signer_id = serde_json::from_str::<SignerID>(serialized).unwrap();
 
         let pubkey = TEST_KEYS.pubkeys()[0];

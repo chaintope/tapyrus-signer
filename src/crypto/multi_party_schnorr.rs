@@ -39,6 +39,10 @@ pub struct KeyGenBroadcastMessage1 {
     com: BigInt,
 }
 
+/// Secret sharing parmeters
+/// `threshold` is the threshold of Secret sharing. If met the threshold, gets it possible to
+/// produce final signature. However, it is a maximum index value of 0..threshold range. So it is
+/// decremented just 1 from real threshold number. (It is difficult to understand. bad.)
 #[derive(Debug)]
 pub struct Parameters {
     pub threshold: usize,   //t

@@ -38,6 +38,7 @@ pub fn address(private_key: &PrivateKey) -> Address {
 
 pub mod test_vectors {
     use crate::blockdata::Block;
+    use crate::crypto::multi_party_schnorr::LocalSig;
     use crate::net::SignerID;
     use crate::signer_node::NodeParameters;
     use crate::signer_node::SharedSecret;
@@ -46,6 +47,7 @@ pub mod test_vectors {
     use bitcoin::{PrivateKey, PublicKey};
     use curv::{FE, GE};
     use serde_json::Value;
+    use std::collections::HashSet;
     use std::fs::read_to_string;
     use std::str::FromStr;
 
@@ -84,6 +86,42 @@ pub mod test_vectors {
         serde_json::from_value(ge.clone()).unwrap()
     }
 
+    /// # json example
+    /// "localsig": {
+    ///   "gamma_i": "b42d01fd501709fe749419e404df867b72ea2dbc13ff9404f83ded4a02bb4f94",
+    ///   "e": "c4604e68cdd2ef0ccef3eaf5f453ee0efa73beb9759ffa2295afa704939ec644"
+    /// }
+    pub fn to_local_sig(v: &Value) -> Option<LocalSig> {
+        if v.is_null() {
+            None
+        } else {
+            Some(LocalSig {
+                gamma_i: to_fe(&v["gamma_i"]),
+                e: to_fe(&v["e"]),
+            })
+        }
+    }
+
+    /// # json example
+    /// "block_shared_keys": {
+    ///   "positive": false,
+    ///   "x_i": "0d8501d7bb411a3d854177822c91f3ffc704dae169373032f5be847676e75508",
+    ///   "y": {
+    ///     "x": "2ba82fcda00d9216bef8c3c5e5d47d1f8ec758d777f8a802780aaf48271940de",
+    ///     "y": "eb2ee580a7a6c3abda257d16adac311a7d6fda959026423225493d663fd14cb3"
+    ///   }
+    /// }
+    pub fn to_block_shared_keys(v: &Value) -> Option<(bool, FE, GE)> {
+        if v.is_null() {
+            None
+        } else {
+            let is_positive = v["positive"].as_bool().unwrap();
+            let x_i = to_fe(&v["x_i"]);
+            let y = to_point(&v["y"]);
+            Some((is_positive, x_i, y))
+        }
+    }
+
     pub fn to_block(block: &Value) -> Option<Block> {
         if block.is_null() {
             None
@@ -96,6 +134,11 @@ pub mod test_vectors {
 
     pub fn to_shared_secret(value: &Value) -> SharedSecret {
         serde_json::from_value(value.clone()).unwrap()
+    }
+
+    pub fn to_participants(value: &Value) -> HashSet<SignerID> {
+        let r: HashSet<String> = serde_json::from_value(value.clone()).unwrap_or(HashSet::new());
+        r.iter().map(|i| to_signer_id(i)).collect()
     }
 
     pub fn to_node_parameters(value: &Value, rpc: MockRpc) -> NodeParameters<MockRpc> {

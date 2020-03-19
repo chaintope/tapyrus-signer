@@ -6,6 +6,9 @@ jobs:
   ci:
     container: rust:1.41
     runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        feature: ["", "--features \"dump\""]
     steps:
       - uses: actions/checkout@v1
       - name: Setup
@@ -14,15 +17,15 @@ jobs:
           apt-get install -y clang
           rustup component add rustfmt-preview
       - name: Build
-        run: cargo build --release
+        run: cargo build ${{ matrix.feature }} --release
       - name: Run unit tests
-        run: cargo test --lib --release -v --no-fail-fast -- --nocapture --test
+        run: cargo test --lib ${{ matrix.feature }} --release -v --no-fail-fast -- --nocapture --test
       - name: Run documentation tests
-        run: cargo test --doc --release -v --no-fail-fast -- --nocapture --test
+        run: cargo test --doc ${{ matrix.feature }} --release -v --no-fail-fast -- --nocapture --test
       - name: Run integration tests
-        run: cargo test --test tapyrus-signer --release -v --no-fail-fast -- --nocapture --test
+        run: cargo test --test tapyrus-signer ${{ matrix.feature }} --release -v --no-fail-fast -- --nocapture --test
       - name: Run benchmark tests
-        run: cargo test --lib --release -v --no-fail-fast -- --nocapture --bench
+        run: cargo test --lib ${{ matrix.feature }} --release -v --no-fail-fast -- --nocapture --bench
       - name: Check Format
         run: cargo fmt --verbose --all -- --check --verbose
 

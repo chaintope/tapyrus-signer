@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 http = "0.1.17"
-bitcoin = "0.20.0"
+bitcoin = { version = "0.20.0", features = ["serde"] }
 secp256k1 = "0.15.3"
 log = "0.4.6"
 env_logger = "0.6.1"
@@ -28,3 +28,7 @@ signal-hook = "0.1.12"
 libc = "0.2.66"
 daemonize = "0.4.1"
 lazy_static = "1.4.0"
+derive_builder = "0.9.0"
+
+[features]
+dump = []
