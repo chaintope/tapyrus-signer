@@ -15,7 +15,7 @@ pub const OPTION_NAME_CONFIG: &str = "config";
 
 /// # Signer Config
 pub const OPTION_NAME_TO_ADDRESS: &str = "coinbase_pay_to_address";
-pub const OPTION_NAME_PUBLIC_KEY: &str = "publickeys";
+pub const OPTION_NAME_PUBLIC_KEYS: &str = "publickeys";
 pub const OPTION_NAME_PRIVATE_KEY: &str = "privatekey";
 pub const OPTION_NAME_THRESHOLD: &str = "threshold";
 
@@ -408,7 +408,7 @@ impl<'a> CommandArgs<'a> {
                 to_address: self.matches.value_of(OPTION_NAME_TO_ADDRESS),
                 public_keys: self
                     .matches
-                    .values_of(OPTION_NAME_PUBLIC_KEY)
+                    .values_of(OPTION_NAME_PUBLIC_KEYS)
                     .map(|vs| vs.collect()),
                 private_key: self.matches.value_of(OPTION_NAME_PRIVATE_KEY),
                 threshold: num,
@@ -475,7 +475,7 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
             .long("to_address")
             .value_name("TO_ADDRESS")
             .help("Coinbase pay to address."))
-        .arg(Arg::with_name(OPTION_NAME_PUBLIC_KEY)
+        .arg(Arg::with_name(OPTION_NAME_PUBLIC_KEYS)
             .short("p")
             .long("publickey")
             .value_name("PUBKEY")
