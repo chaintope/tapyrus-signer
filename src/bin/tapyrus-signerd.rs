@@ -161,71 +161,98 @@ fn start_unix_signal_handling() {
     });
 }
 
-#[test]
-#[should_panic(expected = "Not enough number of public keys. publicKeys.len:")]
-fn test_validate_options_less_threshold() {
+#[cfg(test)]
+mod tests {
+    use crate::{connect_rpc, connect_signer_network, validate_options};
+    use bitcoin::{PrivateKey, PublicKey};
     use std::str::FromStr;
+    use tapyrus_signer::command_args::{RedisConfig, RpcConfig};
 
-    let pubkey_list = vec![PublicKey::from_str(
-        "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
-    )
-    .unwrap()];
-    let threshold = 2;
-    let private_key =
-        PrivateKey::from_wif("cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA").unwrap();
-
-    validate_options(&pubkey_list, &private_key, &threshold).unwrap();
-}
-
-#[test]
-#[should_panic(expected = "Private key is not pair of any one of Public key list.")]
-fn test_validate_options_no_pair() {
-    use std::str::FromStr;
-
-    let pubkey_list = vec![
-        PublicKey::from_str("02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900")
+    fn valid_signer_config() -> (Vec<PublicKey>, u8, PrivateKey) {
+        let pubkey_list = vec![
+            PublicKey::from_str(
+                "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
+            )
             .unwrap(),
-        PublicKey::from_str("02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e")
+            PublicKey::from_str(
+                "033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8",
+            )
             .unwrap(),
-    ];
-    let threshold = 1;
-    let private_key =
-        PrivateKey::from_wif("cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA").unwrap();
+            PublicKey::from_str(
+                "02cbe0ad70ffe110d097db648fda20bef14dc72b5c9979c137c451820c176ac23f",
+            )
+            .unwrap(),
+        ];
+        let threshold = 2;
+        let private_key =
+            PrivateKey::from_wif("cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA").unwrap();
 
-    validate_options(&pubkey_list, &private_key, &threshold).unwrap();
-}
+        (pubkey_list, threshold, private_key)
+    }
 
-#[test]
-#[should_panic(
-    expected = "RPC connect failed. Please confirm RPC connection info. url: http://127.0.0.1:9999, user: '' "
-)]
-fn test_connect_rpc() {
-    use tapyrus_signer::command_args::RpcCommandArgs;
-    let config = RpcConfig {
-        command_args: RpcCommandArgs {
-            host: Some("127.0.0.1"),
-            port: Some("9999"),
-            username: None,
-            password: None,
-        },
-        toml_config: None,
-    };
+    #[test]
+    fn test_validate_options() {
+        let (public_keys, threshold, private_key) = valid_signer_config();
+        assert!(validate_options(&public_keys, &private_key, &threshold).is_ok());
+    }
 
-    connect_rpc(config);
-}
+    #[test]
+    #[should_panic(expected = "Not enough number of public keys. publicKeys.len:")]
+    fn test_validate_options_less_threshold() {
+        let (_, threshold, private_key) = valid_signer_config();
 
-#[test]
-#[should_panic(expected = "Failed to connect redis. Please confirm redis connection info")]
-fn test_connect_signer_network() {
-    use tapyrus_signer::command_args::RedisCommandArgs;
-    // face redis config
-    let config = RedisConfig {
-        command_args: RedisCommandArgs {
-            host: Some("127.0.0.1"),
-            port: Some("9999"),
-        },
-        toml_config: None,
-    };
+        let public_keys = vec![PublicKey::from_str(
+            "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
+        )
+        .unwrap()];
 
-    connect_signer_network(config);
+        validate_options(&public_keys, &private_key, &threshold).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "Private key is not pair of any one of Public key list.")]
+    fn test_validate_options_no_pair() {
+        let (public_keys, threshold, _) = valid_signer_config();
+
+        // Use a private key which is not included valid `public_keys`
+        let private_key =
+            PrivateKey::from_wif("cMxgJm8NwEsriQbYCG3qL2SwhcZmrk5VaDQJHJ14Nk4pFXcnmNAH").unwrap();
+
+        validate_options(&public_keys, &private_key, &threshold).unwrap();
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "RPC connect failed. Please confirm RPC connection info. url: http://127.0.0.1:9999, user: '' "
+    )]
+    fn test_connect_rpc() {
+        use tapyrus_signer::command_args::RpcCommandArgs;
+        let config = RpcConfig {
+            command_args: RpcCommandArgs {
+                host: Some("127.0.0.1"),
+                port: Some("9999"),
+                username: None,
+                password: None,
+            },
+            toml_config: None,
+        };
+
+        connect_rpc(config);
+    }
+
+    #[test]
+    #[should_panic(expected = "Failed to connect redis. Please confirm redis connection info")]
+    fn test_connect_signer_network() {
+        use tapyrus_signer::command_args::RedisCommandArgs;
+        // face redis config
+        let config = RedisConfig {
+            command_args: RedisCommandArgs {
+                host: Some("127.0.0.1"),
+                port: Some("9999"),
+            },
+            toml_config: None,
+        };
+
+        connect_signer_network(config);
+    }
 }
