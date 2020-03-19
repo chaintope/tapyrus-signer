@@ -1,5 +1,5 @@
 name: tapyrus-signer 
-version: &version v0.3.1
+version: git
 summary: Tapyrus Signer
 description: |
         Tapyrus Signer Node 
@@ -16,7 +16,6 @@ apps:
 parts:
   tapyrus-signer:
     source: https://github.com/chaintope/tapyrus-signer.git
-    source-tag: *version
     plugin: rust
     build-packages:
       - libgmp3-dev
