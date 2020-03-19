@@ -26,22 +26,24 @@ pub struct Vss {
 }
 
 impl Vss {
-    fn new(sender_public_key: PublicKey,
+    fn new(
+        sender_public_key: PublicKey,
         receiver_public_key: PublicKey,
         positive_commitments: Vec<Commitment>,
         positive_secret: FE,
         negative_commitments: Vec<Commitment>,
-        negative_secret: FE,) -> Self {
-            assert_eq!(positive_commitments.len(), negative_commitments.len());
-            Vss {
-                sender_public_key: sender_public_key,
-                receiver_public_key: receiver_public_key,
-                positive_commitments: positive_commitments,
-                positive_secret: positive_secret,
-                negative_commitments: negative_commitments,
-                negative_secret: negative_secret,
-            }
+        negative_secret: FE,
+    ) -> Self {
+        assert_eq!(positive_commitments.len(), negative_commitments.len());
+        Vss {
+            sender_public_key: sender_public_key,
+            receiver_public_key: receiver_public_key,
+            positive_commitments: positive_commitments,
+            positive_secret: positive_secret,
+            negative_commitments: negative_commitments,
+            negative_secret: negative_secret,
         }
+    }
 }
 
 #[derive(Clone)]
@@ -51,13 +53,10 @@ pub struct Commitment {
 }
 
 impl Commitment {
-    pub  fn new(x: BigInt, y: BigInt) -> Self {
-        Commitment {
-            x: x, 
-            y: y
-        }
+    pub fn new(x: BigInt, y: BigInt) -> Self {
+        Commitment { x: x, y: y }
     }
-    
+
     pub fn from(p: &GE) -> Self {
         let x = p.x_coor().expect("invalid x-coordinate");
         let y = p.y_coor().expect("invalid y-coordinate");
@@ -91,7 +90,9 @@ impl Encodable for Vss {
 
         let len = self.positive_commitments.len() as u16;
         let mut x = [0u8; 2];
-        x.copy_from_slice(&hex::decode(format!("{:0>4x}", len)).map_err(|_| encode::Error::ParseFailed("len"))?);
+        x.copy_from_slice(
+            &hex::decode(format!("{:0>4x}", len)).map_err(|_| encode::Error::ParseFailed("len"))?,
+        );
         size += x.consensus_encode(&mut s)?;
 
         for c in &self.positive_commitments {
@@ -99,7 +100,9 @@ impl Encodable for Vss {
         }
         let mut secret = [0u8; 32];
         let hex = format!("{:0>64}", self.positive_secret.to_big_int().to_hex());
-        secret.copy_from_slice(&hex::decode(hex).map_err(|_| encode::Error::ParseFailed("positive_secret"))?[..]);
+        secret.copy_from_slice(
+            &hex::decode(hex).map_err(|_| encode::Error::ParseFailed("positive_secret"))?[..],
+        );
         size += secret.consensus_encode(&mut s)?;
 
         for c in &self.negative_commitments {
@@ -107,9 +110,11 @@ impl Encodable for Vss {
         }
         let mut secret = [0u8; 32];
         let hex = format!("{:0>64}", self.negative_secret.to_big_int().to_hex());
-        secret.copy_from_slice(&hex::decode(hex).map_err(|_| encode::Error::ParseFailed("positive_secret"))?[..]);
+        secret.copy_from_slice(
+            &hex::decode(hex).map_err(|_| encode::Error::ParseFailed("positive_secret"))?[..],
+        );
         size += secret.consensus_encode(&mut s)?;
-        
+
         Ok(size)
     }
 }
@@ -117,27 +122,34 @@ impl Encodable for Vss {
 impl Decodable for Vss {
     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Vss, encode::Error> {
         let bytes: [u8; 33] = Decodable::consensus_decode(&mut d)?;
-        let sender_public_key = PublicKey::from_slice(&bytes[..]).map_err(|_| encode::Error::ParseFailed("sender_public_key"))?;
+        let sender_public_key = PublicKey::from_slice(&bytes[..])
+            .map_err(|_| encode::Error::ParseFailed("sender_public_key"))?;
 
         let bytes: [u8; 33] = Decodable::consensus_decode(&mut d)?;
-        let receiver_public_key = PublicKey::from_slice(&bytes[..]).map_err(|_| encode::Error::ParseFailed("receiver_public_key"))?;
+        let receiver_public_key = PublicKey::from_slice(&bytes[..])
+            .map_err(|_| encode::Error::ParseFailed("receiver_public_key"))?;
 
         let bytes: [u8; 2] = Decodable::consensus_decode(&mut d)?;
         let length: u16 = ((bytes[0] as u16) << 8) + (bytes[1] as u16);
-        
-        let positive_commitments: Vec<Commitment> = (0..length).flat_map(|_| Decodable::consensus_decode(&mut d)).collect::<Vec<Commitment>>();
-        
+
+        let positive_commitments: Vec<Commitment> = (0..length)
+            .flat_map(|_| Decodable::consensus_decode(&mut d))
+            .collect::<Vec<Commitment>>();
+
         let bytes: [u8; 32] = Decodable::consensus_decode(&mut d)?;
         let positive_secret = ECScalar::from(&BigInt::from(&bytes[..]));
-        let negative_commitments: Vec<Commitment> = (0..length).flat_map(|_| Decodable::consensus_decode(&mut d)).collect::<Vec<Commitment>>();
+        let negative_commitments: Vec<Commitment> = (0..length)
+            .flat_map(|_| Decodable::consensus_decode(&mut d))
+            .collect::<Vec<Commitment>>();
 
         let bytes: [u8; 32] = Decodable::consensus_decode(&mut d)?;
         let negative_secret = ECScalar::from(&BigInt::from(&bytes[..]));
-        Ok(Vss::new(sender_public_key, 
-            receiver_public_key, 
-            positive_commitments, 
-            positive_secret, 
-            negative_commitments, 
+        Ok(Vss::new(
+            sender_public_key,
+            receiver_public_key,
+            positive_commitments,
+            positive_secret,
+            negative_commitments,
             negative_secret,
         ))
     }
@@ -146,11 +158,17 @@ impl Decodable for Vss {
 impl Encodable for Commitment {
     fn consensus_encode<S: io::Write>(&self, mut s: S) -> Result<usize, encode::Error> {
         let mut x = [0u8; 32];
-        x.copy_from_slice(&hex::decode(format!("{:0>64}", self.x.to_hex())).map_err(|_| encode::Error::ParseFailed("x"))?);
+        x.copy_from_slice(
+            &hex::decode(format!("{:0>64}", self.x.to_hex()))
+                .map_err(|_| encode::Error::ParseFailed("x"))?,
+        );
         x.consensus_encode(&mut s)?;
-        
+
         let mut y = [0u8; 32];
-        y.copy_from_slice(&hex::decode(format!("{:0>64}", self.y.to_hex())).map_err(|_| encode::Error::ParseFailed("y"))?);
+        y.copy_from_slice(
+            &hex::decode(format!("{:0>64}", self.y.to_hex()))
+                .map_err(|_| encode::Error::ParseFailed("y"))?,
+        );
         y.consensus_encode(&mut s)?;
         Ok(64)
     }
@@ -164,15 +182,14 @@ impl Decodable for Commitment {
     }
 }
 
-
-impl fmt::Display for Vss { 
+impl fmt::Display for Vss {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let encoded = serialize(self);
         write!(f, "{}", hex::encode(encoded))
     }
 }
 
-impl fmt::Display for Commitment { 
+impl fmt::Display for Commitment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let encoded = serialize(self);
         write!(f, "{}", hex::encode(encoded))
@@ -188,14 +205,36 @@ mod tests {
         let s = "842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2c89314bbafe84e0a29be49397843808ab8d94118dcc1bdf619d04fee039ccd9f";
         let hex = hex::decode(s).unwrap();
         let c: Commitment = deserialize::<Commitment>(&hex[..]).unwrap();
-        assert_eq!(c.x, BigInt::from_str_radix("842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2", 16).unwrap());
-        assert_eq!(c.y, BigInt::from_str_radix("c89314bbafe84e0a29be49397843808ab8d94118dcc1bdf619d04fee039ccd9f", 16).unwrap());
+        assert_eq!(
+            c.x,
+            BigInt::from_str_radix(
+                "842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
+                16
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            c.y,
+            BigInt::from_str_radix(
+                "c89314bbafe84e0a29be49397843808ab8d94118dcc1bdf619d04fee039ccd9f",
+                16
+            )
+            .unwrap()
+        );
     }
 
     #[test]
     fn test_encode_commitment() {
-        let x = BigInt::from_str_radix("842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2", 16).unwrap();
-        let y = BigInt::from_str_radix("c89314bbafe84e0a29be49397843808ab8d94118dcc1bdf619d04fee039ccd9f", 16).unwrap();
+        let x = BigInt::from_str_radix(
+            "842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
+            16,
+        )
+        .unwrap();
+        let y = BigInt::from_str_radix(
+            "c89314bbafe84e0a29be49397843808ab8d94118dcc1bdf619d04fee039ccd9f",
+            16,
+        )
+        .unwrap();
         let commitment = Commitment::new(x, y);
         assert_eq!(format!("{}", commitment), "842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2c89314bbafe84e0a29be49397843808ab8d94118dcc1bdf619d04fee039ccd9f");
     }
@@ -247,7 +286,7 @@ mod tests {
                 "8ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa8806",
                 16,
             )
-            .unwrap()
+            .unwrap(),
         );
         let vss = Vss {
             sender_public_key: PublicKey::from_str(
@@ -266,5 +305,3 @@ mod tests {
         assert_eq!(format!("{}", vss), "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000002")
     }
 }
-
-
