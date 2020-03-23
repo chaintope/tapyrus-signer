@@ -17,6 +17,7 @@ use std::fs::OpenOptions;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tapyrus_signer::command_args::{CommandArgs, RedisConfig, RpcConfig};
+use tapyrus_signer::crypto::vss::Vss;
 use tapyrus_signer::net::{ConnectionManager, RedisManager};
 use tapyrus_signer::rpc::Rpc;
 use tapyrus_signer::signer_node::{NodeParameters, SignerNode};
@@ -51,6 +52,8 @@ fn main() {
         &signer_config.public_keys(),
         &signer_config.private_key(),
         &signer_config.threshold(),
+        &signer_config.public_key(),
+        &signer_config.node_vss(),
     )
     .unwrap();
 
@@ -96,6 +99,8 @@ fn validate_options(
     public_keys: &Vec<PublicKey>,
     private_key: &PrivateKey,
     threshold: &u8,
+    public_key: &PublicKey,
+    node_vss: &Vec<Vss>,
 ) -> Result<(), tapyrus_signer::errors::Error> {
     if public_keys.len() < *threshold as usize {
         let error_msg = format!(
@@ -114,6 +119,43 @@ fn validate_options(
             ));
         }
     }
+
+    if node_vss.len() < *threshold as usize {
+        let error_msg = format!(
+            "Not enough number of node_vss. node_vss.len: {}, threshold: {}",
+            node_vss.len(),
+            threshold
+        );
+        return Err(tapyrus_signer::errors::Error::InvalidArgs(error_msg));
+    }
+
+    match node_vss
+        .iter()
+        .find(|vss| vss.sender_public_key == *public_key)
+    {
+        Some(_) => (),
+        None => {
+            return Err(tapyrus_signer::errors::Error::InvalidArgs(
+                "The node_vss should include vss that sender is own public key.".to_string(),
+            ));
+        }
+    }
+
+    match node_vss
+        .iter()
+        .find(|vss| vss.receiver_public_key != *public_key)
+    {
+        Some(_) => {
+            return Err(tapyrus_signer::errors::Error::InvalidArgs(
+                "The receiver_public_key in node_vss should be own public key.".to_string(),
+            ))
+        }
+        None => (),
+    }
+
+    // TODO: Check the commitment length equals to threshold
+    // TODO: Verify share
+
     Ok(())
 }
 
@@ -167,8 +209,9 @@ mod tests {
     use bitcoin::{PrivateKey, PublicKey};
     use std::str::FromStr;
     use tapyrus_signer::command_args::{RedisConfig, RpcConfig};
+    use tapyrus_signer::crypto::vss::Vss;
 
-    fn valid_signer_config() -> (Vec<PublicKey>, u8, PrivateKey) {
+    fn valid_signer_config() -> (Vec<PublicKey>, u8, PrivateKey, PublicKey, Vec<Vss>) {
         let pubkey_list = vec![
             PublicKey::from_str(
                 "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
@@ -186,39 +229,126 @@ mod tests {
         let threshold = 2;
         let private_key =
             PrivateKey::from_wif("cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA").unwrap();
+        let public_key = pubkey_list[0].clone();
+        let node_vss = vec![
+            Vss::from_str("03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc00014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000002").unwrap(),
+            Vss::from_str("033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f803831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc00014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000002").unwrap(),
+            Vss::from_str("02cbe0ad70ffe110d097db648fda20bef14dc72b5c9979c137c451820c176ac23f03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc00014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000002").unwrap(),
+        ];
 
-        (pubkey_list, threshold, private_key)
+        (pubkey_list, threshold, private_key, public_key, node_vss)
     }
 
     #[test]
     fn test_validate_options() {
-        let (public_keys, threshold, private_key) = valid_signer_config();
-        assert!(validate_options(&public_keys, &private_key, &threshold).is_ok());
+        let (public_keys, threshold, private_key, public_key, node_vss) = valid_signer_config();
+        assert!(validate_options(
+            &public_keys,
+            &private_key,
+            &threshold,
+            &public_key,
+            &node_vss
+        )
+        .is_ok());
     }
 
     #[test]
     #[should_panic(expected = "Not enough number of public keys. publicKeys.len:")]
     fn test_validate_options_less_threshold() {
-        let (_, threshold, private_key) = valid_signer_config();
+        let (_, threshold, private_key, public_key, node_vss) = valid_signer_config();
 
         let public_keys = vec![PublicKey::from_str(
             "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
         )
         .unwrap()];
 
-        validate_options(&public_keys, &private_key, &threshold).unwrap();
+        validate_options(
+            &public_keys,
+            &private_key,
+            &threshold,
+            &public_key,
+            &node_vss,
+        )
+        .unwrap();
     }
 
     #[test]
     #[should_panic(expected = "Private key is not pair of any one of Public key list.")]
     fn test_validate_options_no_pair() {
-        let (public_keys, threshold, _) = valid_signer_config();
+        let (public_keys, threshold, _, public_key, node_vss) = valid_signer_config();
 
         // Use a private key which is not included valid `public_keys`
         let private_key =
             PrivateKey::from_wif("cMxgJm8NwEsriQbYCG3qL2SwhcZmrk5VaDQJHJ14Nk4pFXcnmNAH").unwrap();
 
-        validate_options(&public_keys, &private_key, &threshold).unwrap();
+        validate_options(
+            &public_keys,
+            &private_key,
+            &threshold,
+            &public_key,
+            &node_vss,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "Not enough number of node_vss.")]
+    fn test_validate_options_less_count_of_node_vss() {
+        let (public_keys, threshold, private_key, public_key, node_vss) = valid_signer_config();
+        let node_vss = node_vss.into_iter().take(1).collect();
+        validate_options(
+            &public_keys,
+            &private_key,
+            &threshold,
+            &public_key,
+            &node_vss,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "The node_vss should include vss that sender is own public key.")]
+    fn test_validate_options_no_my_origin_vss() {
+        let (public_keys, threshold, private_key, public_key, node_vss) = valid_signer_config();
+
+        let node_vss = node_vss
+            .into_iter()
+            .map(|mut vss| {
+                if vss.sender_public_key == public_key {
+                    vss.sender_public_key = PublicKey::from_str(
+                        "0381c5e2983561a2ba3b89d8d746e402b6ec351d025f8d2a8eae50a3f018d8ae20",
+                    )
+                    .unwrap()
+                }
+                vss
+            })
+            .collect();
+        validate_options(
+            &public_keys,
+            &private_key,
+            &threshold,
+            &public_key,
+            &node_vss,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "The receiver_public_key in node_vss should be own public key.")]
+    fn test_validate_options_node_vss_includes_different_receiver() {
+        let (public_keys, threshold, private_key, public_key, mut node_vss) = valid_signer_config();
+        node_vss[2].receiver_public_key = PublicKey::from_str(
+            "0381c5e2983561a2ba3b89d8d746e402b6ec351d025f8d2a8eae50a3f018d8ae20",
+        )
+        .unwrap();
+        validate_options(
+            &public_keys,
+            &private_key,
+            &threshold,
+            &public_key,
+            &node_vss,
+        )
+        .unwrap();
     }
 
     #[test]
