@@ -46,14 +46,14 @@ mod tests {
 
         // check 1, next_master_index should be incremented after process completeblock message.
         let prev_state = Member::for_test().master_index(0).build();
-        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[1]);
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[4]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
 
         match &state {
             NodeState::RoundComplete {
                 next_master_index, ..
             } => assert_eq!(*next_master_index, 1),
-            n => assert!(false, "Should be Member, but state:{:?}", n),
+            n => assert!(false, "Should be RoundComplete, but the state is {:?}", n),
         }
 
         // check 2, next master index should be back to 0 if the previous master index is the last number.
@@ -65,7 +65,7 @@ mod tests {
             NodeState::RoundComplete {
                 next_master_index, ..
             } => assert_eq!(*next_master_index, 0),
-            n => assert!(false, "Should be Member, but state:{:?}", n),
+            n => assert!(false, "Should be RoundComplete, but the state is {:?}", n),
         }
     }
 

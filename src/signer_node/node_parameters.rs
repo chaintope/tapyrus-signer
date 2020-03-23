@@ -36,7 +36,8 @@ impl<T: TapyrusApi> NodeParameters<T> {
         };
 
         let mut pubkey_list = pubkey_list;
-        &pubkey_list.sort();
+        NodeParameters::<T>::sort_publickey(&mut pubkey_list);
+
         let self_node_index = sender_index(&signer_id, &pubkey_list);
         NodeParameters {
             pubkey_list,
@@ -64,5 +65,54 @@ impl<T: TapyrusApi> NodeParameters<T> {
             threshold: t,
             share_count: n.clone(),
         }
+    }
+
+    fn sort_publickey(pubkeys: &mut Vec<PublicKey>) {
+        pubkeys.sort_by_key(|p| {
+            let serialized = p.key.serialize();
+            let hex = hex::encode(&serialized[..]);
+            hex
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::signer_node::NodeParameters;
+    use crate::tests::helper::keys::TEST_KEYS;
+    use crate::tests::helper::rpc::MockRpc;
+    use bitcoin::PublicKey;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_sort_publickey() {
+        let mut pubkeys = TEST_KEYS.pubkeys();
+        NodeParameters::<MockRpc>::sort_publickey(&mut pubkeys);
+
+        assert_eq!(
+            pubkeys,
+            vec![
+                PublicKey::from_str(
+                    "02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506",
+                )
+                .unwrap(),
+                PublicKey::from_str(
+                    "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e",
+                )
+                .unwrap(),
+                PublicKey::from_str(
+                    "02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900",
+                )
+                .unwrap(),
+                PublicKey::from_str(
+                    "02d111519ba1f3013a7a613ecdcc17f4d53fbcb558b70404b5fb0c84ebb90a8d3c",
+                )
+                .unwrap(),
+                PublicKey::from_str(
+                    "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
+                )
+                .unwrap(),
+            ]
+        );
     }
 }
