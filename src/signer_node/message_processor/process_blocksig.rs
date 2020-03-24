@@ -1,6 +1,7 @@
 use crate::blockdata::hash::SHA256Hash;
 use crate::blockdata::Block;
 use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys, Signature};
+use crate::crypto::vss::Vss;
 use crate::errors::Error;
 use crate::net::{
     BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
@@ -48,8 +49,9 @@ where
             .public_keys(params.pubkey_list.clone())
             .threshold(params.threshold as usize)
             .node_privaet_key(params.private_key)
+            .public_key(params.signer_id.pubkey)
             .priv_shared_key(priv_shared_keys.clone())
-            .shared_secrets(shared_secrets.clone())
+            .shared_secrets(params.node_shared_secrets())
             .prev_state(prev_state.clone());
         builder
     };
@@ -133,10 +135,10 @@ where
         candidate_block,
         new_signatures,
         &params.pubkey_list,
-        shared_secrets,
+        &params.node_shared_secrets(),
         &block_shared_keys,
         &shared_block_secrets_by_participants,
-        priv_shared_keys,
+        &params.node_secret_share(),
     ) {
         Ok(sig) => sig,
         Err(e) => {
@@ -270,6 +272,8 @@ pub struct Dump {
     public_keys: Vec<PublicKey>,
     threshold: usize,
     node_privaet_key: PrivateKey,
+    public_key: PublicKey,
+    node_vss: Vec<Vss>,
     received: Received,
     priv_shared_key: SharedKeys,
     shared_secrets: SharedSecretMap,
@@ -317,6 +321,8 @@ mod tests {
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
             .private_key(dump.node_privaet_key)
+            .public_key(dump.public_key)
+            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -350,6 +356,8 @@ mod tests {
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
             .private_key(dump.node_privaet_key)
+            .public_key(dump.public_key)
+            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -385,6 +393,8 @@ mod tests {
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
             .private_key(dump.node_privaet_key)
+            .public_key(dump.public_key)
+            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -441,6 +451,8 @@ mod tests {
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
             .private_key(dump.node_privaet_key)
+            .public_key(dump.public_key)
+            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -461,7 +473,7 @@ mod tests {
     }
 
     #[test]
-    fn test_process_blocksig_receiving_invaid_signature() {
+    fn test_process_blocksig_receiving_invalid_signature() {
         // when node
         //  - receives a valid block,
         //  - has the number of signatures to generate a aggregated signature,
@@ -469,7 +481,7 @@ mod tests {
         // node should return prev_state.
         let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
         let dump: Dump = serde_json::from_value(
-            contents["cases"]["process_blocksig_receiving_invaid_signature"].clone(),
+            contents["cases"]["process_blocksig_receiving_invalid_signature"].clone(),
         )
         .unwrap();
         let conman = TestConnectionManager::new();
@@ -478,6 +490,8 @@ mod tests {
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
             .private_key(dump.node_privaet_key)
+            .public_key(dump.public_key)
+            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -498,7 +512,7 @@ mod tests {
     }
 
     #[test]
-    fn test_process_blocksig_with_invaid_signature() {
+    fn test_process_blocksig_with_invalid_signature() {
         // when node
         //  - receives a valid block,
         //  - has the number of signatures to generate a aggregated signature,
@@ -508,7 +522,7 @@ mod tests {
 
         let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
         let dump: Dump = serde_json::from_value(
-            contents["cases"]["process_blocksig_with_invaid_signature"].clone(),
+            contents["cases"]["process_blocksig_with_invalid_signature"].clone(),
         )
         .unwrap();
         let conman = TestConnectionManager::new();
@@ -517,6 +531,8 @@ mod tests {
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
             .private_key(dump.node_privaet_key)
+            .public_key(dump.public_key)
+            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -558,6 +574,8 @@ mod tests {
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
             .private_key(dump.node_privaet_key)
+            .public_key(dump.public_key)
+            .node_vss(dump.node_vss.clone())
             .build();
 
         let mut conman = TestConnectionManager::new();

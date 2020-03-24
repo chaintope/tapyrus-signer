@@ -83,7 +83,7 @@ where
                 let (block_shared_keys, local_sig) = match generate_local_sig(
                     candidate_block.sighash(),
                     &shared_block_secrets_by_participants,
-                    priv_shared_keys,
+                    &params.node_secret_share(),
                     prev_state,
                     params,
                 ) {
@@ -130,7 +130,7 @@ where
                 let (block_shared_keys, local_sig) = match generate_local_sig(
                     candidate_block.sighash(),
                     &new_shared_block_secrets,
-                    priv_shared_keys,
+                    &params.node_secret_share(),
                     prev_state,
                     params,
                 ) {

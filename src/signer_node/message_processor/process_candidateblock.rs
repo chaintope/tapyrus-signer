@@ -210,6 +210,7 @@ mod tests {
         let prev_state = Member::for_test().master_index(0).build();
         let params = NodeParametersBuilder::new()
             .private_key(TEST_KEYS.key[2])
+            .public_key(TEST_KEYS.pubkeys()[2])
             .rpc(rpc)
             .build();
 

@@ -1,9 +1,14 @@
 use super::utils::sender_index;
-use crate::crypto::multi_party_schnorr::Parameters;
+use crate::crypto::multi_party_schnorr::{Parameters, SharedKeys};
 use crate::crypto::vss::Vss;
 use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
+use crate::sign::Sign;
+use crate::signer_node::{SharedSecret, SharedSecretMap};
 use bitcoin::{Address, PrivateKey, PublicKey};
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::{
+    ShamirSecretSharing, VerifiableSS,
+};
 use std::convert::TryInto;
 use std::sync::Arc;
 
@@ -33,11 +38,7 @@ impl<T: TapyrusApi> NodeParameters<T> {
         round_duration: u64,
         skip_waiting_ibd: bool,
     ) -> NodeParameters<T> {
-        let secp = secp256k1::Secp256k1::new();
-        let self_pubkey = private_key.public_key(&secp);
-        let signer_id = SignerID {
-            pubkey: self_pubkey,
-        };
+        let signer_id = SignerID { pubkey: public_key };
 
         let mut pubkey_list = pubkey_list;
         NodeParameters::<T>::sort_publickey(&mut pubkey_list);
@@ -78,6 +79,43 @@ impl<T: TapyrusApi> NodeParameters<T> {
             let b = b.key.serialize();
             Ord::cmp(&a[..], &b[..])
         });
+    }
+
+    /// Returns Map collection of received shares from all each signers in Key Generation Protocol
+    pub fn node_shared_secrets(&self) -> SharedSecretMap {
+        let mut secret_shares = SharedSecretMap::new();
+        for vss in &self.node_vss {
+            secret_shares.insert(
+                SignerID {
+                    pubkey: vss.sender_public_key,
+                },
+                SharedSecret {
+                    vss: VerifiableSS {
+                        parameters: ShamirSecretSharing {
+                            threshold: (self.threshold - 1) as usize,
+                            share_count: self.node_vss.len(),
+                        },
+                        commitments: vss
+                            .positive_commitments
+                            .iter()
+                            .map(|i| i.to_point())
+                            .collect(),
+                    },
+                    secret_share: vss.positive_secret,
+                },
+            );
+        }
+        secret_shares
+    }
+
+    /// Returns an aggregated share of the node.
+    pub fn node_secret_share(&self) -> SharedKeys {
+        let secret_shares = self.node_shared_secrets();
+
+        let shared_keys =
+            Sign::verify_vss_and_construct_key(&secret_shares, &(self.self_node_index + 1))
+                .expect("invalid vss");
+        shared_keys
     }
 }
 

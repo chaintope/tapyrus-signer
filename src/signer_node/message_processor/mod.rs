@@ -147,15 +147,21 @@ where
         &(params.self_node_index + 1),
     )?;
 
-    let result_for_positive =
-        Sign::sign(&shared_keys_for_positive, priv_shared_keys, block.sighash());
+    let result_for_positive = Sign::sign(
+        &shared_keys_for_positive,
+        &params.node_secret_share(),
+        block.sighash(),
+    );
 
     let shared_keys_for_negative = Sign::verify_vss_and_construct_key(
         &shared_block_secrets.for_negative(),
         &(params.self_node_index + 1),
     )?;
-    let result_for_negative =
-        Sign::sign(&shared_keys_for_negative, priv_shared_keys, block.sighash());
+    let result_for_negative = Sign::sign(
+        &shared_keys_for_negative,
+        &params.node_secret_share(),
+        block.sighash(),
+    );
 
     let p = BigInt::from_str_radix(
         "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
