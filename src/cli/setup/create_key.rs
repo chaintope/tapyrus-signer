@@ -43,3 +43,22 @@ impl<'a> CreateKeyCommand {
         SubCommand::with_name("createkey")
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use bitcoin::{PrivateKey, PublicKey};
+    use std::str::FromStr;
+
+    #[test]
+    fn test_format() {
+        let private_key =
+            PrivateKey::from_wif("KzZtqg6QKr4TaifSWNsSXfH1h7eHDKJL7rGV3w9Tx2tL83GhPdLv").unwrap();
+        let public_key = PublicKey::from_str(
+            "0369d39154c0d011db02085392142e369d920c2531fe38e14484546ee6713465d6",
+        )
+        .unwrap();
+        let response = CreateKeyResponse::new(private_key, public_key);
+        assert_eq!(format!("{}", response), "KzZtqg6QKr4TaifSWNsSXfH1h7eHDKJL7rGV3w9Tx2tL83GhPdLv 0369d39154c0d011db02085392142e369d920c2531fe38e14484546ee6713465d6")
+    }
+}
