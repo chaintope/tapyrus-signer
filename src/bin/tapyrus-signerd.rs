@@ -60,11 +60,19 @@ fn main() {
     let con = connect_signer_network(configs.redis_config());
     let rpc = connect_rpc(configs.rpc_config());
 
+    let node_vss = signer_config.node_vss();
+    let public_keys: Vec<PublicKey> = node_vss
+        .iter()
+        .map(|vss| vss.sender_public_key.clone())
+        .collect();
+
     let params = NodeParameters::new(
         signer_config.to_address(),
-        signer_config.public_keys(),
+        public_keys,
         signer_config.private_key(),
         signer_config.threshold(),
+        signer_config.public_key(),
+        node_vss,
         rpc,
         round_duration,
         general_config.skip_waiting_ibd(),

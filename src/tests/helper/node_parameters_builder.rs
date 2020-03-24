@@ -1,6 +1,8 @@
+use crate::crypto::vss::Vss;
 use crate::signer_node::NodeParameters;
 use crate::tests::helper::address;
 use crate::tests::helper::keys::TEST_KEYS;
+use crate::tests::helper::node_vss::node_vss;
 use crate::tests::helper::rpc::MockRpc;
 use bitcoin::{Address, PrivateKey, PublicKey};
 
@@ -12,6 +14,8 @@ pub struct NodeParametersBuilder {
     address: Address,
     round_duration: u64,
     skip_waiting_ibd: bool,
+    public_key: PublicKey,
+    node_vss: Vec<Vss>,
 }
 
 impl NodeParametersBuilder {
@@ -25,6 +29,8 @@ impl NodeParametersBuilder {
             address: address(&TEST_KEYS.key[0]),
             round_duration: 0,
             skip_waiting_ibd: true,
+            public_key: TEST_KEYS.pubkeys()[0],
+            node_vss: node_vss(0),
         }
     }
 
@@ -34,6 +40,8 @@ impl NodeParametersBuilder {
             self.pubkey_list.clone(),
             self.private_key,
             self.threshold,
+            self.public_key,
+            self.node_vss.clone(),
             self.rpc.take().unwrap_or(MockRpc::new()),
             self.round_duration,
             self.skip_waiting_ibd,
@@ -52,6 +60,16 @@ impl NodeParametersBuilder {
 
     pub fn threshold(&mut self, threshold: u8) -> &mut Self {
         self.threshold = threshold;
+        self
+    }
+
+    pub fn public_key(&mut self, public_key: PublicKey) -> &mut Self {
+        self.public_key = public_key;
+        self
+    }
+
+    pub fn node_vss(&mut self, node_vss: Vec<Vss>) -> &mut Self {
+        self.node_vss = node_vss;
         self
     }
 

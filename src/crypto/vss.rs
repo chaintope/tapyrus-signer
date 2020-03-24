@@ -18,6 +18,7 @@ use std::str::FromStr;
 // | positive secret      | 32        | secret value for r to perform secret sharing scheme                                               |
 // | negative commitments | 64 \* len | commitments for secret value for (n - r). an array of the points on the elliptic curve secp256k1. |
 // | negative secret      | 32        | secret value for (n - r) to perform secret sharing scheme                                         |
+#[derive(Debug, Clone)]
 pub struct Vss {
     pub sender_public_key: PublicKey,
     pub receiver_public_key: PublicKey,
@@ -48,7 +49,7 @@ impl Vss {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Commitment {
     x: BigInt,
     y: BigInt,

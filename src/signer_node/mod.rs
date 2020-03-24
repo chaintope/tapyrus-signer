@@ -530,6 +530,7 @@ mod tests {
     };
     use crate::tests::helper::blocks::get_block;
     use crate::tests::helper::keys::TEST_KEYS;
+    use crate::tests::helper::node_vss::node_vss;
     use crate::tests::helper::{address, enable_log};
     use redis::ControlFlow;
     use std::collections::HashSet;
@@ -625,12 +626,15 @@ mod tests {
         let threshold = 3;
         let private_key = TEST_KEYS.key[0];
         let to_address = address(&private_key);
+        let public_key = pubkey_list[0].clone();
 
         let mut params = NodeParameters::new(
             to_address,
             pubkey_list,
             private_key,
             threshold,
+            public_key,
+            node_vss(0),
             rpc,
             0,
             true,
