@@ -128,7 +128,7 @@ paths:
                         - 02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a590528702a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a590528700014a533a0f869ab38c2e6d3a52a209f48afa6efd5c91c93a21a822bab68c1234ded01182048b0563b81bf5597b422129508b18ca26737b443be25650d333faf70050e2fc1b4988f7185e2c952a3e0ddc59a4fecddd8174bd33322d3da3855adbb769c119f0544696e4ff28e5de2d12606449c07513a3110e009ec9086563429d8c0e08c6a58e0906f57e5884f90a645d25d83abb5704859e6e3ebff87c9968b5b84a533a0f869ab38c2e6d3a52a209f48afa6efd5c91c93a21a822bab68c1234de2fee7dfb74fa9c47e40aa684bdded6af74e735d98c84bbc41da9af2bcc05052f75da2c0d7f01dc3a738ccdae54f6ba5e3444765c4e4c005124dee96dd19e95b85ece382f0ed3990f6fb121bfc4b6343b2c48011539b2ccf3c091ce2a8a015f548fa783a52e7bdc3e3f03c154d9d3b887b8ef2d63a4c31bd26baab76119ba0e3d
                       items:
                         type: string
-                      description: vss(verifiable secret share) of this signer node. 'tapyrus-setup createvss' command outputs these values.
+                      description: vss(verifiable secret share) of this signer node. 'tapyrus-setup createnodevss' command outputs these values.
                     node_secret_share:
                       type: string
                       default: ""

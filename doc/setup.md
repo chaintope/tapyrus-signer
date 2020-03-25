@@ -43,10 +43,10 @@ In the following steps, Signers are supposed to be sorted by public keys and ind
 
 ## Step 3. Generate node verifiable secret shares.
 
-Signer[i] generates "node" VSS(verifiable secret share)[^4] with `tapyrus-setup createvss`.
+Signer[i] generates "node" VSS(verifiable secret share)[^4] with `tapyrus-setup createnodevss`.
 
 ```
-tapyrus-setup createvss --public_key=1:<node_public_key[1]> --public_key=2:<node_public_key[2]> ... --public_key=n:<node_public_key[n]> --private_key=<node_private_key[i]> --networkid=<networkid> --block_height=<block_height> --threshold=<t>
+tapyrus-setup createnodevss --public_key=1:<node_public_key[1]> --public_key=2:<node_public_key[2]> ... --public_key=n:<node_public_key[n]> --private_key=<node_private_key[i]> --networkid=<networkid> --block_height=<block_height> --threshold=<t>
 
 output:
     <node_public_key[1]>: <node_vss[i, 1]>,
@@ -139,7 +139,7 @@ As in Step 3, Signer[i] creates "block" VSS(verifiable secret share).
 
 ```
 
-tapyrus-setup createvss --public_key=1:<block_public_key[1]> --public_key=2:<block_public_key[2]> ... --public_key=n:<block_public_key[n]> --private_key=<block_private_key[i]>
+tapyrus-setup createblockvss --public_key=1:<block_public_key[1]> --public_key=2:<block_public_key[2]> ... --public_key=n:<block_public_key[n]> --private_key=<block_private_key[i]>
 
 output: {
     <block_public_key[1]>: <block_vss[i, 1]>,
