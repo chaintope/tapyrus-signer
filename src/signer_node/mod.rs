@@ -11,13 +11,13 @@ pub use crate::signer_node::node_parameters::NodeParameters;
 pub use crate::signer_node::node_state::NodeState;
 
 use crate::crypto::multi_party_schnorr::*;
+use crate::crypto::vss::Vss;
 use crate::net::MessageType::{BlockGenerationRoundMessages, KeyGenerationMessage};
 use crate::net::{
     BlockGenerationRoundMessageType, ConnectionManager, KeyGenerationMessageType, Message,
     MessageType, SignerID,
 };
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
-use crate::sign::Sign;
 use crate::signer_node::message_processor::create_block_vss;
 use crate::signer_node::message_processor::process_blockparticipants;
 use crate::signer_node::message_processor::process_blocksig;
@@ -27,10 +27,8 @@ use crate::signer_node::message_processor::process_completedblock;
 use crate::signer_node::message_processor::process_nodevss;
 use crate::signer_node::node_state::builder::{Builder, Master, Member};
 use crate::timer::RoundTimeOutObserver;
-use crate::util::*;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-use curv::elliptic::curves::traits::*;
-use curv::{FE, GE};
+use curv::FE;
 use redis::ControlFlow;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -435,29 +433,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     fn create_node_share(&mut self) {
         let params = self.params.sharing_params();
-        let key = Sign::create_key(
+        let (vss_scheme, secret_shares) = Vss::create_node_shares(
             self.params.self_node_index + 1,
-            Sign::private_key_to_big_int(self.params.private_key.key),
-        );
-        let y_vec: Vec<GE> = self
-            .params
-            .pubkey_list
-            .iter()
-            .map(|public_key| {
-                let bytes: Vec<u8> = public_key.key.serialize_uncompressed().to_vec();
-                GE::from_bytes(&bytes[1..]).unwrap()
-            })
-            .collect::<Vec<GE>>();
-        let _y_sum = sum_point(&y_vec);
-        let parties = (0..params.share_count)
-            .map(|i| i + 1)
-            .collect::<Vec<usize>>();
-
-        let (vss_scheme, secret_shares) = VerifiableSS::share_at_indices(
+            &self.params.private_key,
             params.threshold,
             params.share_count,
-            &key.u_i,
-            &parties,
         );
 
         log::info!("Sending VSS to each other signers");

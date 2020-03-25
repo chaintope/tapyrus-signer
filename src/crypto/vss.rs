@@ -1,8 +1,10 @@
 use crate::errors::Error;
 use crate::serialize::HexStrVisitor;
+use crate::sign::Sign;
 use bitcoin::consensus::encode::{self, *};
-use bitcoin::PublicKey;
+use bitcoin::{PrivateKey, PublicKey};
 use curv::arithmetic::traits::Converter;
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::*;
 use curv::{BigInt, FE, GE};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
@@ -18,6 +20,7 @@ use std::str::FromStr;
 // | positive secret      | 32        | secret value for r to perform secret sharing scheme                                               |
 // | negative commitments | 64 \* len | commitments for secret value for (n - r). an array of the points on the elliptic curve secp256k1. |
 // | negative secret      | 32        | secret value for (n - r) to perform secret sharing scheme                                         |
+#[derive(Clone, Debug)]
 pub struct Vss {
     pub sender_public_key: PublicKey,
     pub receiver_public_key: PublicKey,
@@ -28,7 +31,7 @@ pub struct Vss {
 }
 
 impl Vss {
-    fn new(
+    pub fn new(
         sender_public_key: PublicKey,
         receiver_public_key: PublicKey,
         positive_commitments: Vec<Commitment>,
@@ -45,6 +48,34 @@ impl Vss {
             negative_commitments: negative_commitments,
             negative_secret: negative_secret,
         }
+    }
+
+    pub fn create_node_shares(
+        index: usize,
+        private_key: &PrivateKey,
+        threshold: usize,
+        share_count: usize,
+    ) -> (VerifiableSS, Vec<FE>) {
+        assert!(
+            index > 0,
+            "index should be greater or equal to 1: {}",
+            index
+        );
+        assert!(
+            share_count >= threshold,
+            "share count should be greater or equal to threshold. share_count: {}, threshold: {}",
+            share_count,
+            threshold
+        );
+        assert!(
+            share_count >= index,
+            "index should be less or equal to share_count. share_count: {}, index: {}",
+            share_count,
+            index
+        );
+        let key = Sign::create_key(index, Sign::private_key_to_big_int(private_key.key));
+        let parties = (0..share_count).map(|i| i + 1).collect::<Vec<usize>>();
+        VerifiableSS::share_at_indices(threshold - 1, share_count, &key.u_i, &parties)
     }
 }
 
@@ -67,6 +98,12 @@ impl Commitment {
 
     pub fn to_point(&self) -> GE {
         ECPoint::from_coor(&self.x, &self.y)
+    }
+}
+
+impl fmt::Debug for Commitment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.x.to_hex(), self.y.to_hex())
     }
 }
 
@@ -333,5 +370,38 @@ mod tests {
             negative_secret: ECScalar::from(&BigInt::from(2)),
         };
         assert_eq!(format!("{}", vss), "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000002")
+    }
+
+    #[test]
+    fn test_create_node_shares() {
+        let private_key =
+            PrivateKey::from_wif("L4MmwZ4nSacs186WzVfxyuryUUbnfE7PivJBj3GT2a3n5itSudZg").unwrap();
+        let (vss, shares) = Vss::create_node_shares(1, &private_key, 2, 3);
+        assert_eq!(vss.commitments.len(), 2);
+        assert_eq!(shares.len(), 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "index should be greater or equal to 1")]
+    fn test_create_node_shares_zero_index() {
+        let private_key =
+            PrivateKey::from_wif("L4MmwZ4nSacs186WzVfxyuryUUbnfE7PivJBj3GT2a3n5itSudZg").unwrap();
+        Vss::create_node_shares(0, &private_key, 2, 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "share count should be greater or equal to threshold")]
+    fn test_create_node_shares_invalid_large_threshold() {
+        let private_key =
+            PrivateKey::from_wif("L4MmwZ4nSacs186WzVfxyuryUUbnfE7PivJBj3GT2a3n5itSudZg").unwrap();
+        Vss::create_node_shares(1, &private_key, 4, 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "index should be less or equal to share_count")]
+    fn test_create_node_shares_invalid_large_index() {
+        let private_key =
+            PrivateKey::from_wif("L4MmwZ4nSacs186WzVfxyuryUUbnfE7PivJBj3GT2a3n5itSudZg").unwrap();
+        Vss::create_node_shares(4, &private_key, 2, 3);
     }
 }
