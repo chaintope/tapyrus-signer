@@ -522,7 +522,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
-    use crate::rpc::tests::{safety, safety_error, MockRpc};
+    use crate::rpc::tests::{safety, MockRpc};
     use crate::rpc::TapyrusApi;
     use crate::signer_node::{
         master_index, next_master_index, BidirectionalSharedSecretMap, NodeParameters, NodeState,
