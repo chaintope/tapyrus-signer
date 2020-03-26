@@ -95,29 +95,13 @@ impl<'de> Deserialize<'de> for SignerID {
 /// Messages which are sent to and received from other signer nodes
 #[derive(PartialEq, Debug, Serialize, Deserialize)]
 pub enum MessageType {
-    KeyGenerationMessage(KeyGenerationMessageType),
     BlockGenerationRoundMessages(BlockGenerationRoundMessageType),
 }
 
 impl Display for MessageType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         match self {
-            MessageType::KeyGenerationMessage(m) => write!(f, "{}", m),
             MessageType::BlockGenerationRoundMessages(m) => write!(f, "{}", m),
-        }
-    }
-}
-
-/// # Key Generation Protocol Messages
-#[derive(PartialEq, Debug, Serialize, Deserialize)]
-pub enum KeyGenerationMessageType {
-    Nodevss(VerifiableSS, FE),
-}
-
-impl Display for KeyGenerationMessageType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        match self {
-            KeyGenerationMessageType::Nodevss(_, _) => write!(f, "Nodevss"),
         }
     }
 }

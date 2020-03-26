@@ -52,7 +52,8 @@ where
             .public_key(params.signer_id.pubkey)
             .priv_shared_key(priv_shared_keys.clone())
             .shared_secrets(params.node_shared_secrets())
-            .prev_state(prev_state.clone());
+            .prev_state(prev_state.clone())
+            .node_vss(params.node_vss.clone());
         builder
     };
     // extract values from state object.
