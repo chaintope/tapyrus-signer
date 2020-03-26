@@ -138,13 +138,13 @@ As in Step 3, Signer[i] creates "block" VSS(verifiable secret share).
 
 ```
 
-tapyrus-setup createblockvss --public_key=<node_public_key[1]> --public_key=<node_public_key[2]> ... --public_key=n:<node_public_key[n]> --block_private_key=<block_private_key[i]> --node_private_key=<block_private_key[i]> --threshold=<t>
+tapyrus-setup createblockvss --node_public_key=<node_public_key[1]> --node_public_key=<node_public_key[2]> ... --node_public_key=n:<node_public_key[n]> --block_private_key=<block_private_key[i]> --node_private_key=<block_private_key[i]> --threshold=<t>
 
 output: {
-    <block_public_key[1]>: <block_vss[i, 1]>,
-    <block_public_key[2]>: <block_vss[i, 2]>,
+    <node_public_key[1]>: <block_vss[i, 1]>,
+    <node_public_key[2]>: <block_vss[i, 2]>,
     ...
-    <block_public_key[n]>: <block_vss[i, n]>,
+    <node_public_key[n]>: <block_vss[i, n]>,
 }
 
 ```
@@ -160,8 +160,8 @@ Signer[i] does not have to specify a nonce used in the encryption. Nonce is opti
 
 `block_vss[i, j]` contains the following information:
 
-- the public key `block_public_key[i]` which indicates the signer who sends this vss.
-- the public key `block_public_key[j]` which indicates the signer to be received the `block_vss[i, j]`
+- the public key `node_public_key[i]` which indicates the signer who sends this vss.
+- the public key `node_public_key[j]` which indicates the signer to be received the `block_vss[i, j]`
 - "positive"[^6] public commitments `commitments[k]` (k = 1, 2, ..., t)
 - "positive" secret `secret[j]` to perform secret sharing scheme.
 - "negative" public commitments `commitments[k]` (k = 1, 2, ..., t)
