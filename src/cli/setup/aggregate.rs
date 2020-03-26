@@ -16,23 +16,23 @@ use curv::FE;
 use std::fmt;
 use std::str::FromStr;
 
-pub struct CreateAggregateResponse {
+pub struct AggregateResponse {
     aggregated_public_key: PublicKey,
     node_shared_secret: FE,
 }
 
-impl CreateAggregateResponse {
+impl AggregateResponse {
     fn new(aggregated_public_key: PublicKey, node_shared_secret: FE) -> Self {
-        CreateAggregateResponse {
+        AggregateResponse {
             aggregated_public_key: aggregated_public_key,
             node_shared_secret: node_shared_secret,
         }
     }
 }
 
-impl Response for CreateAggregateResponse {}
+impl Response for AggregateResponse {}
 
-impl fmt::Display for CreateAggregateResponse {
+impl fmt::Display for AggregateResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -43,9 +43,9 @@ impl fmt::Display for CreateAggregateResponse {
     }
 }
 
-pub struct CreateAggregateCommand {}
+pub struct AggregateCommand {}
 
-impl<'a> CreateAggregateCommand {
+impl<'a> AggregateCommand {
     pub fn execute(matches: &ArgMatches) -> Result<Box<dyn Response>, Error> {
         let private_key: PrivateKey = matches
             .value_of("private_key")
@@ -95,7 +95,7 @@ impl<'a> CreateAggregateCommand {
             key: shared_keys.y.get_element(),
         };
 
-        Ok(Box::new(CreateAggregateResponse::new(
+        Ok(Box::new(AggregateResponse::new(
             public_key,
             shared_keys.x_i,
         )))
