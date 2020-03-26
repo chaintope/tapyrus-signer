@@ -1,6 +1,7 @@
 use crate::blockdata::Block;
 use crate::cli::setup::index_of;
 use crate::cli::setup::traits::Response;
+use crate::cli::setup::vss_to_bidirectional_shared_secret_map;
 use crate::crypto::multi_party_schnorr::LocalSig;
 use crate::crypto::multi_party_schnorr::SharedKeys;
 use crate::crypto::vss::Vss;
@@ -15,7 +16,6 @@ use bitcoin::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use curv::arithmetic::traits::Converter;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
-use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::{ECPoint, ECScalar};
 use curv::{BigInt, FE, GE};
 use std::fmt;
@@ -97,38 +97,7 @@ impl<'a> SignCommand {
             threshold: (threshold - 1) as usize,
             share_count: public_keys.len(),
         };
-        let mut shared_block_secrets = BidirectionalSharedSecretMap::new();
-        for vss in block_vss_vec.iter() {
-            shared_block_secrets.insert(
-                SignerID {
-                    pubkey: vss.sender_public_key,
-                },
-                (
-                    SharedSecret {
-                        secret_share: vss.positive_secret,
-                        vss: VerifiableSS {
-                            parameters: params.clone(),
-                            commitments: vss
-                                .positive_commitments
-                                .iter()
-                                .map(|c| c.to_point())
-                                .collect(),
-                        },
-                    },
-                    SharedSecret {
-                        secret_share: vss.negative_secret,
-                        vss: VerifiableSS {
-                            parameters: params.clone(),
-                            commitments: vss
-                                .negative_commitments
-                                .iter()
-                                .map(|c| c.to_point())
-                                .collect(),
-                        },
-                    },
-                ),
-            );
-        }
+        let shared_block_secrets = vss_to_bidirectional_shared_secret_map(&block_vss_vec, &params);
 
         let bytes: Vec<u8> = aggregated_public_key.key.serialize_uncompressed().to_vec();
         let point = GE::from_bytes(&bytes[1..]).expect("failed to convert to point");

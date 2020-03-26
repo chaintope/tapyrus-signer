@@ -1,20 +1,18 @@
 use crate::blockdata::Block;
 use crate::cli::setup::index_of;
 use crate::cli::setup::traits::Response;
+use crate::cli::setup::vss_to_bidirectional_shared_secret_map;
+use crate::cli::setup::vss_to_shared_secret_map;
 use crate::crypto::multi_party_schnorr::LocalSig;
 use crate::crypto::multi_party_schnorr::SharedKeys;
 use crate::crypto::vss::Vss;
 use crate::errors::Error;
 use crate::net::SignerID;
 use crate::sign::Sign;
-use crate::signer_node::BidirectionalSharedSecretMap;
-use crate::signer_node::SharedSecret;
-use crate::signer_node::SharedSecretMap;
 
 use bitcoin::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
-use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::{ECPoint, ECScalar};
 use curv::{BigInt, FE, GE};
 use std::collections::BTreeMap;
@@ -119,38 +117,7 @@ impl<'a> ComputeSigCommand {
             threshold: threshold - 1,
             share_count: public_keys.len(),
         };
-        let mut shared_block_secrets = BidirectionalSharedSecretMap::new();
-        for vss in block_vss_vec.iter() {
-            shared_block_secrets.insert(
-                SignerID {
-                    pubkey: vss.sender_public_key,
-                },
-                (
-                    SharedSecret {
-                        secret_share: vss.positive_secret,
-                        vss: VerifiableSS {
-                            parameters: params.clone(),
-                            commitments: vss
-                                .positive_commitments
-                                .iter()
-                                .map(|c| c.to_point())
-                                .collect(),
-                        },
-                    },
-                    SharedSecret {
-                        secret_share: vss.negative_secret,
-                        vss: VerifiableSS {
-                            parameters: params.clone(),
-                            commitments: vss
-                                .negative_commitments
-                                .iter()
-                                .map(|c| c.to_point())
-                                .collect(),
-                        },
-                    },
-                ),
-            );
-        }
+        let shared_block_secrets = vss_to_bidirectional_shared_secret_map(&block_vss_vec, &params);
 
         let bytes: Vec<u8> = aggregated_public_key.key.serialize_uncompressed().to_vec();
         let point = GE::from_bytes(&bytes[1..]).expect("failed to convert to point");
@@ -166,25 +133,8 @@ impl<'a> ComputeSigCommand {
             &block,
         )?;
 
-        let mut shared_secrets = SharedSecretMap::new();
-        for node_vss in &node_vss_vec {
-            shared_secrets.insert(
-                SignerID {
-                    pubkey: node_vss.sender_public_key,
-                },
-                SharedSecret {
-                    vss: VerifiableSS {
-                        parameters: params.clone(),
-                        commitments: node_vss
-                            .positive_commitments
-                            .iter()
-                            .map(|c| c.to_point())
-                            .collect(),
-                    },
-                    secret_share: node_vss.positive_secret,
-                },
-            );
-        }
+        let shared_secrets = vss_to_shared_secret_map(&node_vss_vec, &params);
+
         let mut signatures = BTreeMap::new();
         for (sig, public_key) in keyed_local_sigs {
             signatures.insert(SignerID { pubkey: public_key }, (sig.gamma_i, sig.e));

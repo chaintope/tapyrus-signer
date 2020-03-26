@@ -1,4 +1,12 @@
+use crate::crypto::vss::Vss;
+use crate::net::SignerID;
+use crate::signer_node::BidirectionalSharedSecretMap;
+use crate::signer_node::SharedSecret;
+use crate::signer_node::SharedSecretMap;
 use bitcoin::{PrivateKey, PublicKey};
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::{
+    ShamirSecretSharing, VerifiableSS,
+};
 
 pub mod aggregate;
 pub mod compute_sig;
@@ -16,6 +24,71 @@ pub fn index_of(private_key: &PrivateKey, public_keys: &Vec<PublicKey>) -> usize
         .position(|pk| pk == &public_key)
         .expect("private_key or public_keys is invalid.");
     pos + 1
+}
+
+pub fn vss_to_shared_secret_map(
+    node_vss_vec: &Vec<Vss>,
+    params: &ShamirSecretSharing,
+) -> SharedSecretMap {
+    let mut shared_secrets = SharedSecretMap::new();
+    for node_vss in node_vss_vec {
+        shared_secrets.insert(
+            SignerID {
+                pubkey: node_vss.sender_public_key,
+            },
+            SharedSecret {
+                vss: VerifiableSS {
+                    parameters: params.clone(),
+                    commitments: node_vss
+                        .positive_commitments
+                        .iter()
+                        .map(|c| c.to_point())
+                        .collect(),
+                },
+                secret_share: node_vss.positive_secret,
+            },
+        );
+    }
+    shared_secrets
+}
+
+pub fn vss_to_bidirectional_shared_secret_map(
+    block_vss_vec: &Vec<Vss>,
+    params: &ShamirSecretSharing,
+) -> BidirectionalSharedSecretMap {
+    let mut shared_block_secrets = BidirectionalSharedSecretMap::new();
+    for vss in block_vss_vec.iter() {
+        shared_block_secrets.insert(
+            SignerID {
+                pubkey: vss.sender_public_key,
+            },
+            (
+                SharedSecret {
+                    secret_share: vss.positive_secret,
+                    vss: VerifiableSS {
+                        parameters: params.clone(),
+                        commitments: vss
+                            .positive_commitments
+                            .iter()
+                            .map(|c| c.to_point())
+                            .collect(),
+                    },
+                },
+                SharedSecret {
+                    secret_share: vss.negative_secret,
+                    vss: VerifiableSS {
+                        parameters: params.clone(),
+                        commitments: vss
+                            .negative_commitments
+                            .iter()
+                            .map(|c| c.to_point())
+                            .collect(),
+                    },
+                },
+            ),
+        );
+    }
+    shared_block_secrets
 }
 
 #[cfg(test)]
