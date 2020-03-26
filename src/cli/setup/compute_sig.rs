@@ -105,6 +105,17 @@ impl<'a> ComputeSigCommand {
             })
             .collect::<Vec<(LocalSig, PublicKey)>>();
 
+        assert_eq!(
+            block_vss_vec.len(),
+            node_vss_vec.len(),
+            "the length of block vss should equal to the length of node vss"
+        );
+        assert_eq!(
+            keyed_local_sigs.len(),
+            node_vss_vec.len(),
+            "the length of sig should equal to the length of node vss"
+        );
+
         let mut public_keys: Vec<PublicKey> = block_vss_vec
             .iter()
             .map(|vss| vss.sender_public_key)
