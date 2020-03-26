@@ -1,6 +1,7 @@
 use crate::blockdata::hash::SHA256Hash;
 use crate::blockdata::Block;
-use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys, Signature};
+use crate::crypto::multi_party_schnorr::{SharedKeys, Signature};
+use crate::crypto::vss::Vss;
 use crate::errors::Error;
 use crate::net::{
     BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
@@ -9,13 +10,10 @@ use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
 use crate::signer_node::message_processor::get_valid_block;
 use crate::signer_node::node_state::builder::{Builder, Master};
-use crate::signer_node::utils::sender_index;
-use crate::signer_node::ToVerifiableSS;
-use crate::signer_node::{BidirectionalSharedSecretMap, NodeState};
-use crate::signer_node::{NodeParameters, SharedSecretMap, ToSharedSecretMap};
+use crate::signer_node::NodeState;
+use crate::signer_node::{NodeParameters, SharedSecretMap};
 use bitcoin::{PrivateKey, PublicKey};
-use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-use curv::{FE, GE};
+use curv::FE;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -129,7 +127,7 @@ where
         .filter(|(i, ..)| participants.contains(i))
         .collect();
 
-    let signature = match aggregate_and_verify_signature(
+    let signature = match Vss::aggregate_and_verify_signature(
         candidate_block,
         new_signatures,
         &params.pubkey_list,
@@ -187,55 +185,6 @@ fn store_received_local_sig(
     let mut result = signatures.clone();
     result.insert(sender_id.clone(), (gamma_i, e));
     result
-}
-
-pub fn aggregate_and_verify_signature(
-    block: &Block,
-    signatures: BTreeMap<SignerID, (FE, FE)>,
-    pubkey_list: &Vec<PublicKey>,
-    shared_secrets: &SharedSecretMap,
-    block_shared_keys: &Option<(bool, FE, GE)>,
-    shared_block_secrets: &BidirectionalSharedSecretMap,
-    priv_shared_keys: &SharedKeys,
-) -> Result<Signature, Error> {
-    let parties = signatures
-        .keys()
-        .map(|k| sender_index(k, pubkey_list))
-        .collect::<Vec<usize>>();
-    let key_gen_vss_vec: Vec<VerifiableSS> = shared_secrets.to_vss();
-    let local_sigs: Vec<LocalSig> = signatures
-        .values()
-        .map(|s| LocalSig {
-            gamma_i: s.0,
-            e: s.1,
-        })
-        .collect();
-    let eph_vss_vec: Vec<VerifiableSS> = if block_shared_keys.unwrap().0 {
-        shared_block_secrets.for_positive().to_vss()
-    } else {
-        shared_block_secrets.for_negative().to_vss()
-    };
-
-    match LocalSig::verify_local_sigs(&local_sigs, &parties[..], &key_gen_vss_vec, &eph_vss_vec) {
-        Ok(vss_sum) => {
-            let signature = Sign::aggregate(
-                &vss_sum,
-                &local_sigs,
-                &parties[..],
-                block_shared_keys.unwrap().2,
-            );
-            let public_key = priv_shared_keys.y;
-            let hash = block.sighash().into_inner();
-            match signature.verify(&hash, &public_key) {
-                Ok(_) => Ok(signature),
-                Err(e) => Err(e),
-            }
-        }
-        Err(_) => {
-            log::error!("local signature is invalid.");
-            Err(Error::InvalidSig)
-        }
-    }
 }
 
 fn submitblock<T>(block: &Block, sig: &Signature, rpc: &std::sync::Arc<T>) -> Result<Block, Error>
