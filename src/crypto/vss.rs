@@ -1,3 +1,4 @@
+use crate::crypto::multi_party_schnorr::Keys;
 use crate::errors::Error;
 use crate::serialize::HexStrVisitor;
 use crate::sign::Sign;
@@ -66,6 +67,37 @@ impl Vss {
         let secret = ECScalar::from(&key_as_int);
         let parties = (0..share_count).map(|i| i + 1).collect::<Vec<usize>>();
         VerifiableSS::share_at_indices(threshold - 1, share_count, &secret, &parties)
+    }
+
+    pub fn create_block_shares(
+        key: &Keys,
+        threshold: usize,
+        share_count: usize,
+    ) -> (VerifiableSS, Vec<FE>, VerifiableSS, Vec<FE>) {
+        assert!(
+            share_count >= threshold,
+            "share count should be greater or equal to threshold. share_count: {}, threshold: {}",
+            share_count,
+            threshold
+        );
+        let parties = (0..share_count).map(|i| i + 1).collect::<Vec<usize>>();
+
+        let (vss_scheme_for_positive, secret_shares_for_positive) =
+            VerifiableSS::share_at_indices(threshold - 1, share_count, &key.u_i, &parties);
+
+        let order: BigInt = FE::q();
+        let (vss_scheme_for_negative, secret_shares_for_negative) = VerifiableSS::share_at_indices(
+            threshold - 1,
+            share_count,
+            &(ECScalar::from(&(order - key.u_i.to_big_int()))),
+            &parties,
+        );
+        (
+            vss_scheme_for_positive,
+            secret_shares_for_positive,
+            vss_scheme_for_negative,
+            secret_shares_for_negative,
+        )
     }
 }
 
@@ -377,5 +409,31 @@ mod tests {
         let private_key =
             PrivateKey::from_wif("L4MmwZ4nSacs186WzVfxyuryUUbnfE7PivJBj3GT2a3n5itSudZg").unwrap();
         Vss::create_node_shares(&private_key, 4, 3);
+    }
+
+    #[test]
+    fn test_create_block_shares() {
+        let private_key =
+            PrivateKey::from_wif("L4MmwZ4nSacs186WzVfxyuryUUbnfE7PivJBj3GT2a3n5itSudZg").unwrap();
+        let pk = Sign::private_key_to_big_int(private_key.key);
+        let key = Sign::create_key(1, pk);
+
+        let (vss_for_pos, shares_for_pos, vss_for_neg, shares_for_neg) =
+            Vss::create_block_shares(&key, 2, 3);
+        assert_eq!(vss_for_pos.commitments.len(), 2);
+        assert_eq!(shares_for_pos.len(), 3);
+        assert_eq!(vss_for_neg.commitments.len(), 2);
+        assert_eq!(shares_for_neg.len(), 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "share count should be greater or equal to threshold")]
+    fn test_create_block_shares_invalid_large_threshold() {
+        let private_key =
+            PrivateKey::from_wif("L4MmwZ4nSacs186WzVfxyuryUUbnfE7PivJBj3GT2a3n5itSudZg").unwrap();
+        let pk = Sign::private_key_to_big_int(private_key.key);
+        let key = Sign::create_key(1, pk);
+
+        Vss::create_block_shares(&key, 4, 3);
     }
 }
