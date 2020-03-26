@@ -1,9 +1,11 @@
 use crate::errors::Error;
+use crate::serialize::HexStrVisitor;
 use bitcoin::consensus::encode::{self, *};
 use bitcoin::PublicKey;
 use curv::arithmetic::traits::Converter;
 use curv::elliptic::curves::traits::*;
 use curv::{BigInt, FE, GE};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use std::io;
 use std::str::FromStr;
@@ -73,6 +75,27 @@ impl FromStr for Vss {
     fn from_str(s: &str) -> Result<Self, Error> {
         let hex = hex::decode(s).map_err(|_| Error::InvalidArgs("failed parse hex".to_string()))?;
         Ok(deserialize::<Vss>(&hex[..]).expect("failed parse hex"))
+    }
+}
+
+impl Serialize for Vss {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        let serialized = hex::encode(&serialize(self));
+        serializer.serialize_str(&serialized)
+    }
+}
+
+impl<'de> Deserialize<'de> for Vss {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let vec = deserializer.deserialize_str(HexStrVisitor::new())?;
+        let hex = hex::encode(&vec[..]);
+        Ok(Vss::from_str(&hex).unwrap())
     }
 }
 
@@ -199,6 +222,13 @@ impl fmt::Display for Commitment {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_serde_support() {
+        let vss_str = "\"03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000002\"";
+        let vss: Vss = serde_json::from_str(&vss_str).unwrap();
+        assert_eq!(serde_json::to_string(&vss).unwrap(), vss_str);
+    }
 
     #[test]
     fn test_decode_commitment() {
