@@ -1,11 +1,18 @@
+use crate::blockdata::Block;
 use crate::crypto::multi_party_schnorr::Keys;
+use crate::crypto::multi_party_schnorr::LocalSig;
+use crate::crypto::multi_party_schnorr::SharedKeys;
 use crate::errors::Error;
 use crate::serialize::HexStrVisitor;
 use crate::sign::Sign;
+use crate::signer_node::BidirectionalSharedSecretMap;
+use crate::signer_node::ToSharedSecretMap;
+use crate::util::jacobi;
 use bitcoin::consensus::encode::{self, *};
 use bitcoin::{PrivateKey, PublicKey};
 use curv::arithmetic::traits::Converter;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
+use curv::elliptic::curves::traits::ECScalar;
 use curv::elliptic::curves::traits::*;
 use curv::{BigInt, FE, GE};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
@@ -102,6 +109,42 @@ impl Vss {
             vss_scheme_for_negative,
             secret_shares_for_negative,
         )
+    }
+
+    pub fn create_local_sig_from_shares(
+        priv_shared_keys: &SharedKeys,
+        index: usize,
+        shared_block_secrets: &BidirectionalSharedSecretMap,
+        block: &Block,
+    ) -> Result<(bool, SharedKeys, LocalSig), Error> {
+        let shared_keys_for_positive =
+            Sign::verify_vss_and_construct_key(&shared_block_secrets.for_positive(), &index)?;
+        let local_sig_for_positive = Sign::sign(
+            &shared_keys_for_positive,
+            &priv_shared_keys,
+            block.sighash(),
+        );
+
+        let shared_keys_for_negative =
+            Sign::verify_vss_and_construct_key(&shared_block_secrets.for_negative(), &index)?;
+        let local_sig_for_negative = Sign::sign(
+            &shared_keys_for_negative,
+            &priv_shared_keys,
+            block.sighash(),
+        );
+
+        let p = BigInt::from_str_radix(
+            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
+            16,
+        )
+        .unwrap();
+        let is_positive = jacobi(&shared_keys_for_positive.y.y_coor().unwrap(), &p) == 1;
+        let (shared_keys, local_sig) = if is_positive {
+            (shared_keys_for_positive, local_sig_for_positive)
+        } else {
+            (shared_keys_for_negative, local_sig_for_negative)
+        };
+        Ok((is_positive, shared_keys, local_sig))
     }
 }
 
@@ -285,6 +328,8 @@ impl fmt::Display for Commitment {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::helper::test_vectors::*;
+    use serde_json::Value;
 
     #[test]
     fn test_serde_support() {
@@ -429,5 +474,40 @@ mod tests {
     #[should_panic(expected = "share count should be greater or equal to threshold")]
     fn test_create_block_shares_invalid_large_threshold() {
         Vss::create_block_shares(1, 4, 3);
+    }
+
+    #[test]
+    fn test_create_local_sig_from_shares() {
+        let contents = load_test_vector("./tests/resources/vss.json").unwrap();
+        let v: Value =
+            serde_json::from_value(contents["create_local_sig_from_shares_successfully"].clone())
+                .unwrap();
+        let priv_shared_keys: SharedKeys =
+            serde_json::from_value(v["priv_shared_key"].clone()).unwrap();
+        let block = to_block(&v["candidate_block"]).unwrap();
+        let shared_block_secrets = v["shared_block_secrets"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(k, value)| {
+                (
+                    to_signer_id(k),
+                    (to_shared_secret(&value[0]), to_shared_secret(&value[1])),
+                )
+            })
+            .collect();
+
+        let (is_positive, key, local_sig) =
+            Vss::create_local_sig_from_shares(&priv_shared_keys, 1, &shared_block_secrets, &block)
+                .expect("error occurred in Vss::create_local_sig_from_shares");
+
+        let expected_localsig = to_local_sig(&v["expected_localsig"]).unwrap();
+        let expected_block_shared_keys =
+            to_block_shared_keys(&v["expected_block_shared_keys"]).unwrap();
+
+        assert_eq!(false, is_positive);
+        assert_eq!(local_sig.gamma_i, expected_localsig.gamma_i);
+        assert_eq!(key.x_i, expected_block_shared_keys.1);
+        assert_eq!(key.y, expected_block_shared_keys.2);
     }
 }

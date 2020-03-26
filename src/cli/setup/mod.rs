@@ -4,6 +4,7 @@ pub mod aggregate;
 pub mod create_block_vss;
 pub mod create_key;
 pub mod create_node_vss;
+pub mod sign;
 pub mod traits;
 
 pub fn index_of(private_key: &PrivateKey, public_keys: &Vec<PublicKey>) -> usize {
