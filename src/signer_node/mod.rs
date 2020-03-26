@@ -522,7 +522,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
-    use crate::rpc::tests::{safety, safety_error, MockRpc};
+    use crate::rpc::tests::{safety, MockRpc};
     use crate::rpc::TapyrusApi;
     use crate::signer_node::{
         master_index, next_master_index, BidirectionalSharedSecretMap, NodeParameters, NodeState,
@@ -641,53 +641,6 @@ mod tests {
         let mut node = SignerNode::new(con, params);
         node.current_state = current_state;
         (node, broadcaster)
-    }
-
-    #[test]
-    fn test_pubkey_list_sort() {
-        use bitcoin::util::key::PublicKey;
-        use std::str::FromStr;
-
-        let pubkey_list = vec![
-            PublicKey::from_str(
-                "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
-            )
-            .unwrap(),
-            PublicKey::from_str(
-                "02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900",
-            )
-            .unwrap(),
-            PublicKey::from_str(
-                "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e",
-            )
-            .unwrap(),
-            PublicKey::from_str(
-                "02d111519ba1f3013a7a613ecdcc17f4d53fbcb558b70404b5fb0c84ebb90a8d3c",
-            )
-            .unwrap(),
-            PublicKey::from_str(
-                "02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506",
-            )
-            .unwrap(),
-        ];
-        let threshold = 3;
-        let private_key = TEST_KEYS.key[0];
-        let to_address = address(&private_key);
-
-        let params = NodeParameters::new(
-            to_address,
-            pubkey_list.clone(),
-            private_key,
-            threshold,
-            MockRpc {
-                return_block: safety_error("Not set block.".to_string()),
-            },
-            0,
-            true,
-        );
-
-        assert_ne!(params.pubkey_list[0], pubkey_list[0]);
-        assert_eq!(params.pubkey_list[1], pubkey_list[4]);
     }
 
     #[test]

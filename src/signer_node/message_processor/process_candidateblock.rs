@@ -194,7 +194,7 @@ mod tests {
     /// * The node's status is Member and its index is 4.
     /// * The round master's index is 0.
     ///
-    /// 1. Send candidateblock message from index 0 node(array index is 1).
+    /// 1. Send candidateblock message from index 0 node(array index is 4).
     ///    It must not change master_index assumption.
     /// 2. Send candidateblock message from index 4 node(array index is 0).
     ///    It must change master_index assumption to 4.
@@ -214,7 +214,7 @@ mod tests {
             .build();
 
         // Step 1.
-        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[1]);
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[4]);
         let state =
             process_candidateblock(&sender_id, &candidate_block, &prev_state, &conman, &params);
         assert_eq!(master_index(&state, &params).unwrap(), 0);
