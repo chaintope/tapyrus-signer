@@ -70,16 +70,19 @@ impl Vss {
     }
 
     pub fn create_block_shares(
-        key: &Keys,
+        index: usize,
         threshold: usize,
         share_count: usize,
-    ) -> (VerifiableSS, Vec<FE>, VerifiableSS, Vec<FE>) {
+    ) -> (Keys, VerifiableSS, Vec<FE>, VerifiableSS, Vec<FE>) {
         assert!(
             share_count >= threshold,
             "share count should be greater or equal to threshold. share_count: {}, threshold: {}",
             share_count,
             threshold
         );
+
+        let key = Sign::create_key(index, None);
+
         let parties = (0..share_count).map(|i| i + 1).collect::<Vec<usize>>();
 
         let (vss_scheme_for_positive, secret_shares_for_positive) =
@@ -93,6 +96,7 @@ impl Vss {
             &parties,
         );
         (
+            key,
             vss_scheme_for_positive,
             secret_shares_for_positive,
             vss_scheme_for_negative,
@@ -413,13 +417,8 @@ mod tests {
 
     #[test]
     fn test_create_block_shares() {
-        let private_key =
-            PrivateKey::from_wif("L4MmwZ4nSacs186WzVfxyuryUUbnfE7PivJBj3GT2a3n5itSudZg").unwrap();
-        let pk = Sign::private_key_to_big_int(private_key.key);
-        let key = Sign::create_key(1, pk);
-
-        let (vss_for_pos, shares_for_pos, vss_for_neg, shares_for_neg) =
-            Vss::create_block_shares(&key, 2, 3);
+        let (_key, vss_for_pos, shares_for_pos, vss_for_neg, shares_for_neg) =
+            Vss::create_block_shares(1, 2, 3);
         assert_eq!(vss_for_pos.commitments.len(), 2);
         assert_eq!(shares_for_pos.len(), 3);
         assert_eq!(vss_for_neg.commitments.len(), 2);
@@ -429,11 +428,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "share count should be greater or equal to threshold")]
     fn test_create_block_shares_invalid_large_threshold() {
-        let private_key =
-            PrivateKey::from_wif("L4MmwZ4nSacs186WzVfxyuryUUbnfE7PivJBj3GT2a3n5itSudZg").unwrap();
-        let pk = Sign::private_key_to_big_int(private_key.key);
-        let key = Sign::create_key(1, pk);
-
-        Vss::create_block_shares(&key, 4, 3);
+        Vss::create_block_shares(1, 4, 3);
     }
 }

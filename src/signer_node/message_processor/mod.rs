@@ -71,15 +71,15 @@ where
     C: ConnectionManager,
 {
     let sharing_params = params.sharing_params();
-    let key = Sign::create_key(params.self_node_index + 1, None);
 
     let (
+        key,
         vss_scheme_for_positive,
         secret_shares_for_positive,
         vss_scheme_for_negative,
         secret_shares_for_negative,
     ) = Vss::create_block_shares(
-        &key,
+        params.self_node_index + 1,
         sharing_params.threshold + 1,
         sharing_params.share_count,
     );

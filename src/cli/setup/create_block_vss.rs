@@ -2,7 +2,6 @@ use crate::cli::setup::index_of;
 use crate::cli::setup::traits::Response;
 use crate::crypto::vss::{Commitment, Vss};
 use crate::errors::Error;
-use crate::sign::Sign;
 use bitcoin::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::collections::BTreeMap;
@@ -37,22 +36,17 @@ pub struct CreateBlockVssCommand {}
 
 impl<'a> CreateBlockVssCommand {
     pub fn execute(matches: &ArgMatches) -> Result<Box<dyn Response>, Error> {
-        let node_private_key: PrivateKey = matches
-            .value_of("node_private_key")
+        let private_key: PrivateKey = matches
+            .value_of("private_key")
             .and_then(|key| PrivateKey::from_wif(key).ok())
-            .ok_or(Error::InvalidArgs("node_private_key".to_string()))?;
+            .ok_or(Error::InvalidArgs("private_key".to_string()))?;
 
-        let mut node_public_keys: Vec<PublicKey> = matches
-            .values_of("node_public_key")
-            .ok_or(Error::InvalidArgs("node_public_key".to_string()))?
+        let mut public_keys: Vec<PublicKey> = matches
+            .values_of("public_key")
+            .ok_or(Error::InvalidArgs("public_key".to_string()))?
             .map(|key| PublicKey::from_str(key).map_err(|_| Error::InvalidKey))
             .collect::<Result<Vec<PublicKey>, _>>()?;
-        node_public_keys.sort();
-
-        let block_private_key: PrivateKey = matches
-            .value_of("block_private_key")
-            .and_then(|key| PrivateKey::from_wif(key).ok())
-            .ok_or(Error::InvalidArgs("block_private_key".to_string()))?;
+        public_keys.sort();
 
         let threshold: u64 = matches
             .value_of("threshold")
@@ -61,24 +55,22 @@ impl<'a> CreateBlockVssCommand {
                 "threshold should be integer.".to_string(),
             ))?;
 
-        let index = index_of(&node_private_key, &node_public_keys);
-        let pk = Sign::private_key_to_big_int(block_private_key.key);
-        let key = Sign::create_key(index, pk);
-
+        let index = index_of(&private_key, &public_keys);
         let (
+            _key,
             vss_scheme_for_positive,
             secret_shares_for_positive,
             vss_scheme_for_negative,
             secret_shares_for_negative,
-        ) = Vss::create_block_shares(&key, threshold as usize, node_public_keys.len());
+        ) = Vss::create_block_shares(index, threshold as usize, public_keys.len());
         let mut vss_map = BTreeMap::new();
         let secp = secp256k1::Secp256k1::new();
-        let sender_public_key = PublicKey::from_private_key(&secp, &node_private_key);
+        let sender_public_key = PublicKey::from_private_key(&secp, &private_key);
 
-        for j in 0..node_public_keys.len() {
+        for j in 0..public_keys.len() {
             let vss = Vss {
                 sender_public_key: sender_public_key,
-                receiver_public_key: node_public_keys[j].clone(),
+                receiver_public_key: public_keys[j].clone(),
                 positive_commitments: vss_scheme_for_positive
                     .commitments
                     .iter()
@@ -92,25 +84,20 @@ impl<'a> CreateBlockVssCommand {
                     .collect(),
                 negative_secret: secret_shares_for_negative[j],
             };
-            vss_map.insert(node_public_keys[j].clone(), vss);
+            vss_map.insert(public_keys[j].clone(), vss);
         }
         Ok(Box::new(CreateBlockVssResponse::new(vss_map)))
     }
 
     pub fn args<'b>() -> App<'a, 'b> {
         SubCommand::with_name("createblockvss").args(&[
-            Arg::with_name("block_private_key")
-                .long("block_private_key")
-                .required(true)
-                .number_of_values(1)
-                .takes_value(true),
-            Arg::with_name("node_public_key")
-                .long("node_public_key")
+            Arg::with_name("public_key")
+                .long("public_key")
                 .required(true)
                 .multiple(true)
                 .takes_value(true),
-            Arg::with_name("node_private_key")
-                .long("node_private_key")
+            Arg::with_name("private_key")
+                .long("private_key")
                 .required(true)
                 .number_of_values(1)
                 .takes_value(true),
