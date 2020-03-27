@@ -1,0 +1,210 @@
+openapi: 3.0.0
+info:
+  description: Swagger schema for RPC interface of the Tapyrus Signer, see https://swagger.io/
+  version: 0.3.0
+  title: API Specification
+  termsOfService: ""
+  contact:
+    email: h_yamaguchi@chaintope.com
+  license:
+    name: MIT
+    url: "https://opensource.org/licenses/mit-license.php"
+servers:
+  - url: "http://127.0.0.1:3000"
+tags:
+  - name: federation
+    description: Federation Management API
+    externalDocs:
+      description: Find out more
+      url: >-
+        https://github.com/chaintope/tapyrus-signer/tree/master/doc/federation.md
+paths:
+  /show_federation:
+    post:
+      tags:
+        - federation
+      summary: Show federation
+      description: "Show the federation intended to update in the future block."
+      operationId: show_federation
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - method
+                - id
+                - jsonrpc
+                - params
+              properties:
+                method:
+                  type: string
+                  default: show_federation
+                  example: show_federation
+                  description: Method name
+                id:
+                  type: integer
+                  default: 1
+                  example: 1
+                  format: int32
+                  description: Request ID
+                jsonrpc:
+                  type: string
+                  default: "2.0"
+                  example: "2.0"
+                  description: JSON-RPC Version (2.0)
+                params:
+                  type: object
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Federation"
+        "400":
+          description: Invalid input
+  /update_federation:
+    post:
+      tags:
+        - federation
+      summary: Update federation
+      description: ""
+      operationId: update_federation
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - method
+                - id
+                - jsonrpc
+                - params
+              properties:
+                method:
+                  type: string
+                  default: update_federation
+                  example: update_federation
+                  description: Method name
+                id:
+                  type: integer
+                  default: 1
+                  example: 1
+                  format: int32
+                  description: Request ID
+                jsonrpc:
+                  type: string
+                  default: "2.0"
+                  example: "2.0"
+                  description: JSON-RPC Version (2.0)
+                params:
+                  title: Parameters
+                  type: object
+                  required:
+                    - block_height
+                    - threshold
+                    - node_vss
+                  properties:
+                    block_height:
+                      type: integer
+                      default: 1
+                      example: 99999
+                      description: block height where the update is applied
+                    threshold:
+                      type: integer
+                      default: 0
+                      example: 2
+                      description: the minimum number of signers needed to sign blocks
+                    node_vss:
+                      type: array
+                      example:
+                        - 03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca202a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a590528700017af4e53613ff5b4002ebd4515adc572bd33b8aa12ab3e564e0c180e396bb1c324013f8cbf47b48d7e01d630ce03e902d89842eb1899a480aaafa340459aa76bd7386fcafb62f9557be2803f52d38e77373ce7c80b6cf8223ca104227f2925d78b0d47fbb0e38716bb2d0ffe1556e06edde398055ad90230e2bb843a15906cdeaa3d1a2e5a94bd18baefe8ca72b0822fe60c2cd2b80eb8593f6d8689e5246603d7af4e53613ff5b4002ebd4515adc572bd33b8aa12ab3e564e0c180e396bb1c32bfec07340b84b7281fe29cf31fc16fd2767bd14e7665b7f55505cbfaa6558572e06c270fbcccba266379b3cb1d4a56bc229bc08c6eba351cd718ec5b00a79576a8fe11d8ef27985b1c479b1040f7508339e349f37c6cb91f3a01f0e9778bdc0148857727ce7cf0ac80b615271b84df1f41320865fd126ed4145a4e7f39a3a76b
+                        - 03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee102a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a59052870001465b981f9a9a357a05b0e171bf8d59e3795c7419ca4610c3b3e99b3cb8bd1a7fb7877b5314cc03657fa89842296e53dc980ddbc53796af92f14965599bf0be5114b9252f1b092b616e323ca406ec6e14cb930f7829a3fc6b9949f0af8b5c147f0a37ac32cb1661c1fcb72fdb39bccdf382d3d68de8208c495da31d0c0212a47af841797b3907707864d49dc11353059230b910aacf10dc1ce14ac081cafc3c36465b981f9a9a357a05b0e171bf8d59e3795c7419ca4610c3b3e99b3cb8bd1a7f487884aceb33fc9a805767bdd691ac2367f2243ac869506d0eb69aa5640f3dded4cc1bff85b7b960e42da716e390996e40133dda88765041a081f8f7095fb3b5c852daa90acfb1abc2bc0ec365283b971f91957542bef2baaea650d8aa558eaaa1c62a1ef27e41d1c01e43f1c3302e68f052e9e7222c69affceecd4676667f17
+                        - 02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a590528702a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a590528700014a533a0f869ab38c2e6d3a52a209f48afa6efd5c91c93a21a822bab68c1234ded01182048b0563b81bf5597b422129508b18ca26737b443be25650d333faf70050e2fc1b4988f7185e2c952a3e0ddc59a4fecddd8174bd33322d3da3855adbb769c119f0544696e4ff28e5de2d12606449c07513a3110e009ec9086563429d8c0e08c6a58e0906f57e5884f90a645d25d83abb5704859e6e3ebff87c9968b5b84a533a0f869ab38c2e6d3a52a209f48afa6efd5c91c93a21a822bab68c1234de2fee7dfb74fa9c47e40aa684bdded6af74e735d98c84bbc41da9af2bcc05052f75da2c0d7f01dc3a738ccdae54f6ba5e3444765c4e4c005124dee96dd19e95b85ece382f0ed3990f6fb121bfc4b6343b2c48011539b2ccf3c091ce2a8a015f548fa783a52e7bdc3e3f03c154d9d3b887b8ef2d63a4c31bd26baab76119ba0e3d
+                      items:
+                        type: string
+                      description: vss(verifiable secret share) of this signer node. 'tapyrus-setup createnodevss' command outputs these values.
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid input
+  /rollback_federation:
+    post:
+      tags:
+        - federation
+      summary: Rollback federation.
+      description: ""
+      operationId: rollback_federation
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - method
+                - id
+                - jsonrpc
+                - params
+              properties:
+                method:
+                  type: string
+                  default: show_federation
+                  example: show_federation
+                  description: Method name
+                id:
+                  type: integer
+                  default: 1
+                  example: 1
+                  format: int32
+                  description: Request ID
+                jsonrpc:
+                  type: string
+                  default: "2.0"
+                  example: "2.0"
+                  description: JSON-RPC Version (2.0)
+                params:
+                  title: Parameters
+                  type: object
+                  required:
+                    - block_height
+                  properties:
+                    block_height:
+                      type: integer
+                      default: 1
+                      example: 99999
+                      description: block height where the update is applied
+
+      responses:
+        "400":
+          description: Invalid input
+components:
+  schemas:
+    Federation:
+      type: object
+      properties:
+        block_height:
+          type: integer
+          format: int64
+          example: 1000
+          description: block height where the update is applied
+        threshold:
+          type: integer
+          format: int8
+          example: 2
+          description: the minimum number of signers needed to sign blocks
+        public_keys:
+          type: array
+          example:
+            - 033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8
+            - 020464074b94702e9b07803d247021943bdcc1f8700b92b66defb7fadd76e80acf
+            - 02cbe0ad70ffe110d097db648fda20bef14dc72b5c9979c137c451820c176ac23f
+          items:
+            type: string
+externalDocs:
+  description: Find out more about Swagger
+  url: "https://github.com/chaintope/tapyrus-signer/"
