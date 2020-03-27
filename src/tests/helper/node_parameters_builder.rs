@@ -27,7 +27,7 @@ impl NodeParametersBuilder {
             address: address(&TEST_KEYS.key[0]),
             round_duration: 0,
             skip_waiting_ibd: true,
-            public_key: TEST_KEYS.pubkeys()[0],
+            public_key: TEST_KEYS.pubkeys()[2],
             node_vss: node_vss(0),
         }
     }

@@ -1,6 +1,7 @@
 use super::utils::sender_index;
 use crate::crypto::multi_party_schnorr::{Parameters, SharedKeys};
 use crate::crypto::vss::Vss;
+use crate::errors::Error;
 use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
@@ -53,6 +54,18 @@ impl<T: TapyrusApi> NodeParameters<T> {
             skip_waiting_ibd,
             node_vss,
         }
+    }
+
+    pub fn verify_nodevss(&self) -> Result<(), Error> {
+        if Sign::verify_vss_and_construct_key(&self.node_shared_secrets(), &self.self_node_index)
+            .is_err()
+        {
+            return Err(Error::InvalidArgs(
+                "The nodevss includes invalid share.".to_string(),
+            ));
+        }
+
+        Ok(())
     }
 
     pub fn get_signer_id_by_index(&self, index: usize) -> SignerID {
@@ -120,8 +133,11 @@ impl<T: TapyrusApi> NodeParameters<T> {
 mod tests {
     use crate::signer_node::NodeParameters;
     use crate::tests::helper::keys::TEST_KEYS;
+    use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
     use crate::tests::helper::rpc::MockRpc;
     use bitcoin::PublicKey;
+    use curv::elliptic::curves::traits::ECScalar;
+    use curv::FE;
     use std::str::FromStr;
 
     #[test]
@@ -154,5 +170,14 @@ mod tests {
                 .unwrap(),
             ]
         );
+    }
+
+    #[test]
+    fn test_verify_nodevss() {
+        let mut params = NodeParametersBuilder::new().build();
+        assert!(params.verify_nodevss().is_ok());
+
+        params.node_vss[0].positive_secret = FE::new_random();
+        assert!(params.verify_nodevss().is_err());
     }
 }
