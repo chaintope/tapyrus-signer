@@ -40,7 +40,7 @@ RPC `update_federation` takes the following parameters.
 The following is an example of executing `update_federation` using curl.
 
 ```
-curl -X POST "http://127.0.0.1:3000/update_federation" -H "accept: */*" -H "Content-Type: application/json" -d "{\"method\":\"update_federation\",\"id\":1,\"jsonrpc\":\"2.0\",\"params\":{\"block_height\":99999,\"threshold\":2,,\"vss\":[\"03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2...\",\"03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1...\",\"02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287...\"]}}"
+curl -X POST "http://127.0.0.1:3000/update_federation" -H "accept: */*" -H "Content-Type: application/json" -d "{\"method\":\"update_federation\",\"id\":1,\"jsonrpc\":\"2.0\",\"params\":{\"block_height\":99999,\"threshold\":2,,\"node_vss\":[\"03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2...\",\"03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1...\",\"02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287...\"]}}"
 ```
 
 And signers who received `update_federation` schedule to update this information in the future block.
