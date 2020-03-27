@@ -95,21 +95,6 @@ impl<'de> Deserialize<'de> for SignerID {
 /// Messages which are sent to and received from other signer nodes
 #[derive(PartialEq, Debug, Serialize, Deserialize)]
 pub enum MessageType {
-    BlockGenerationRoundMessages(BlockGenerationRoundMessageType),
-}
-
-impl Display for MessageType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        match self {
-            MessageType::BlockGenerationRoundMessages(m) => write!(f, "{}", m),
-        }
-    }
-}
-
-/// # Round Messages
-/// These messages are used in block generation rounds.
-#[derive(PartialEq, Debug, Serialize, Deserialize)]
-pub enum BlockGenerationRoundMessageType {
     Candidateblock(Block),
     Completedblock(Block),
     Blockvss(SHA256Hash, VerifiableSS, FE, VerifiableSS, FE),
@@ -118,17 +103,15 @@ pub enum BlockGenerationRoundMessageType {
     Roundfailure,
 }
 
-impl Display for BlockGenerationRoundMessageType {
+impl Display for MessageType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         match self {
-            BlockGenerationRoundMessageType::Candidateblock(_) => write!(f, "Candidateblock"),
-            BlockGenerationRoundMessageType::Completedblock(_) => write!(f, "Completedblock"),
-            BlockGenerationRoundMessageType::Blockvss(_, _, _, _, _) => write!(f, "Blockvss"),
-            BlockGenerationRoundMessageType::Blockparticipants(_, _) => {
-                write!(f, "Blockparticipants")
-            }
-            BlockGenerationRoundMessageType::Blocksig(_, _, _) => write!(f, "Blocksig"),
-            BlockGenerationRoundMessageType::Roundfailure => write!(f, "Roundfailure"),
+            MessageType::Candidateblock(_) => write!(f, "Candidateblock"),
+            MessageType::Completedblock(_) => write!(f, "Completedblock"),
+            MessageType::Blockvss(_, _, _, _, _) => write!(f, "Blockvss"),
+            MessageType::Blockparticipants(_, _) => write!(f, "Blockparticipants"),
+            MessageType::Blocksig(_, _, _) => write!(f, "Blocksig"),
+            MessageType::Roundfailure => write!(f, "Roundfailure"),
         }
     }
 }
@@ -373,9 +356,7 @@ mod test {
         };
 
         let message = Message {
-            message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Roundfailure,
-            ),
+            message_type: MessageType::Roundfailure,
             sender_id,
             receiver_id: None,
         };
@@ -403,21 +384,14 @@ mod test {
         };
 
         let message_processor = move |message: Message| {
-            assert_eq!(
-                message.message_type,
-                MessageType::BlockGenerationRoundMessages(
-                    BlockGenerationRoundMessageType::Roundfailure
-                )
-            );
+            assert_eq!(message.message_type, MessageType::Roundfailure);
             ControlFlow::Break(())
         };
 
         let subscriber = connection_manager.subscribe(message_processor, sender_id);
 
         let message = Message {
-            message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Roundfailure,
-            ),
+            message_type: MessageType::Roundfailure,
             sender_id,
             receiver_id: None,
         };

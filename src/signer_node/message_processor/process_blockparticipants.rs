@@ -201,9 +201,7 @@ mod tests {
         let gamma_i: FE = expected_localsig.gamma_i + zero;
 
         conman.should_broadcast(Message {
-            message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Blocksig(blockhash, gamma_i, expected_localsig.e),
-            ),
+            message_type: MessageType::Blocksig(blockhash, gamma_i, expected_localsig.e),
             sender_id: params.signer_id.clone(),
             receiver_id: None,
         });

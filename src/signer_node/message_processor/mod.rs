@@ -14,7 +14,6 @@ use crate::blockdata::Block;
 use crate::crypto::multi_party_schnorr::Keys;
 use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
 use crate::errors::Error;
-use crate::net::BlockGenerationRoundMessageType;
 use crate::net::ConnectionManager;
 use crate::net::Message;
 use crate::net::MessageType;
@@ -96,14 +95,12 @@ where
         }
 
         conman.send_message(Message {
-            message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Blockvss(
-                    block.sighash(),
-                    vss_scheme.clone(),
-                    secret_shares[i],
-                    vss_scheme_for_negative.clone(),
-                    secret_shares_for_negative[i],
-                ),
+            message_type: MessageType::Blockvss(
+                block.sighash(),
+                vss_scheme.clone(),
+                secret_shares[i],
+                vss_scheme_for_negative.clone(),
+                secret_shares_for_negative[i],
             ),
             sender_id: params.signer_id,
             receiver_id: Some(SignerID {
@@ -182,12 +179,10 @@ fn broadcast_localsig<C: ConnectionManager>(
     signer_id: &SignerID,
 ) {
     conman.broadcast_message(Message {
-        message_type: MessageType::BlockGenerationRoundMessages(
-            BlockGenerationRoundMessageType::Blocksig(
-                sighash,
-                local_sig.gamma_i.clone(),
-                local_sig.e.clone(),
-            ),
+        message_type: MessageType::Blocksig(
+            sighash,
+            local_sig.gamma_i.clone(),
+            local_sig.e.clone(),
         ),
         sender_id: signer_id.clone(),
         receiver_id: None,

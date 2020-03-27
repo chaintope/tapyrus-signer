@@ -1,9 +1,7 @@
 use crate::blockdata::hash::SHA256Hash;
 use crate::blockdata::Block;
 use crate::errors::Error;
-use crate::net::{
-    BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
-};
+use crate::net::{ConnectionManager, Message, MessageType, SignerID};
 use crate::rpc::TapyrusApi;
 use crate::signer_node::message_processor::{
     broadcast_localsig, generate_local_sig, get_valid_block,
@@ -164,12 +162,7 @@ fn broadcast_blockparticipants<C: ConnectionManager>(
     self_signer_id: &SignerID,
 ) {
     conman.broadcast_message(Message {
-        message_type: MessageType::BlockGenerationRoundMessages(
-            BlockGenerationRoundMessageType::Blockparticipants(
-                block.sighash(),
-                participants.clone(),
-            ),
-        ),
+        message_type: MessageType::Blockparticipants(block.sighash(), participants.clone()),
         sender_id: self_signer_id.clone(),
         receiver_id: None,
     });
@@ -322,12 +315,7 @@ mod tests {
         );
 
         conman.should_broadcast(Message {
-            message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Blockparticipants(
-                    blockhash,
-                    expected_participants.clone(),
-                ),
-            ),
+            message_type: MessageType::Blockparticipants(blockhash, expected_participants.clone()),
             sender_id: params.signer_id.clone(),
             receiver_id: None,
         });
@@ -337,9 +325,7 @@ mod tests {
         let expected_localsig = expected_localsig.unwrap();
         let gamma_i: FE = expected_localsig.gamma_i + zero;
         conman.should_broadcast(Message {
-            message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Blocksig(blockhash, gamma_i, expected_localsig.e),
-            ),
+            message_type: MessageType::Blocksig(blockhash, gamma_i, expected_localsig.e),
             sender_id: params.signer_id.clone(),
             receiver_id: None,
         });
@@ -596,9 +582,7 @@ mod tests {
         let gamma_i: FE = expected_localsig.gamma_i + zero;
 
         conman.should_broadcast(Message {
-            message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Blocksig(blockhash, gamma_i, expected_localsig.e),
-            ),
+            message_type: MessageType::Blocksig(blockhash, gamma_i, expected_localsig.e),
             sender_id: params.signer_id.clone(),
             receiver_id: None,
         });

@@ -10,10 +10,7 @@ mod utils;
 pub use crate::signer_node::node_parameters::NodeParameters;
 pub use crate::signer_node::node_state::NodeState;
 
-use crate::net::MessageType::BlockGenerationRoundMessages;
-use crate::net::{
-    BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
-};
+use crate::net::{ConnectionManager, Message, MessageType, SignerID};
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use crate::signer_node::message_processor::create_block_vss;
 use crate::signer_node::message_processor::process_blockparticipants;
@@ -192,19 +189,15 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         message_type
                     );
 
-                    match message_type {
-                        BlockGenerationRoundMessages(msg) => {
-                            let next = self.process_round_message(&sender_id, msg);
-                            self.current_state = next;
+                    let next = self.process_round_message(&sender_id, message_type);
+                    self.current_state = next;
 
-                            if let NodeState::RoundComplete {
-                                next_master_index, ..
-                            } = &self.current_state
-                            {
-                                let v = *next_master_index;
-                                self.start_next_round(v)
-                            }
-                        }
+                    if let NodeState::RoundComplete {
+                        next_master_index, ..
+                    } = &self.current_state
+                    {
+                        let v = *next_master_index;
+                        self.start_next_round(v)
                     }
 
                     log::debug!("Current state updated as {:?}", self.current_state);
@@ -301,9 +294,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             block.sighash()
         );
         self.connection_manager.broadcast_message(Message {
-            message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Candidateblock(block.clone()),
-            ),
+            message_type: MessageType::Candidateblock(block.clone()),
             sender_id: self.params.signer_id,
             receiver_id: None,
         });
@@ -325,20 +316,20 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     pub fn process_round_message(
         &mut self,
         sender_id: &SignerID,
-        message: BlockGenerationRoundMessageType,
+        message: MessageType,
     ) -> NodeState {
         match message {
-            BlockGenerationRoundMessageType::Candidateblock(block) => process_candidateblock(
+            MessageType::Candidateblock(block) => process_candidateblock(
                 &sender_id,
                 &block,
                 &self.current_state,
                 &self.connection_manager,
                 &self.params,
             ),
-            BlockGenerationRoundMessageType::Completedblock(block) => {
+            MessageType::Completedblock(block) => {
                 process_completedblock(&sender_id, &block, &self.current_state, &self.params)
             }
-            BlockGenerationRoundMessageType::Blockvss(
+            MessageType::Blockvss(
                 blockhash,
                 vss_for_positive,
                 secret_share_for_positive,
@@ -355,17 +346,15 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 &self.connection_manager,
                 &self.params,
             ),
-            BlockGenerationRoundMessageType::Blockparticipants(blockhash, participants) => {
-                process_blockparticipants(
-                    &sender_id,
-                    blockhash,
-                    participants,
-                    &self.current_state,
-                    &self.connection_manager,
-                    &self.params,
-                )
-            }
-            BlockGenerationRoundMessageType::Blocksig(blockhash, gamma_i, e) => process_blocksig(
+            MessageType::Blockparticipants(blockhash, participants) => process_blockparticipants(
+                &sender_id,
+                blockhash,
+                participants,
+                &self.current_state,
+                &self.connection_manager,
+                &self.params,
+            ),
+            MessageType::Blocksig(blockhash, gamma_i, e) => process_blocksig(
                 &sender_id,
                 blockhash,
                 gamma_i,
@@ -374,7 +363,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 &self.connection_manager,
                 &self.params,
             ),
-            BlockGenerationRoundMessageType::Roundfailure => self.process_roundfailure(&sender_id),
+            MessageType::Roundfailure => self.process_roundfailure(&sender_id),
         }
     }
 

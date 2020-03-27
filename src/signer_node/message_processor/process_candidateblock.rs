@@ -60,8 +60,7 @@ where
 mod tests {
     use super::process_candidateblock;
     use crate::blockdata::Block;
-    use crate::net::MessageType::BlockGenerationRoundMessages;
-    use crate::net::{BlockGenerationRoundMessageType, Message, SignerID};
+    use crate::net::{Message, MessageType, SignerID};
     use crate::signer_node::node_state::builder::{Builder, Master, Member};
     use crate::signer_node::{master_index, NodeState};
     use crate::tests::helper::blocks::get_block;
@@ -105,8 +104,7 @@ mod tests {
         for message_type in sent_messages.iter() {
             match message_type {
                 Message {
-                    message_type:
-                        BlockGenerationRoundMessages(BlockGenerationRoundMessageType::Blockvss(..)),
+                    message_type: MessageType::Blockvss(..),
                     ..
                 } => assert!(true),
                 m => assert!(false, format!("Sent unexpected message {:?}", m)),

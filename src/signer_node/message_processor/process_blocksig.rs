@@ -3,9 +3,7 @@ use crate::blockdata::Block;
 use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys, Signature};
 use crate::crypto::vss::Vss;
 use crate::errors::Error;
-use crate::net::{
-    BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
-};
+use crate::net::{ConnectionManager, Message, MessageType, SignerID};
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
 use crate::signer_node::message_processor::get_valid_block;
@@ -254,9 +252,7 @@ where
 {
     log::info!("Broadcast CompletedBlock message. {:?}", block.hash());
     let message = Message {
-        message_type: MessageType::BlockGenerationRoundMessages(
-            BlockGenerationRoundMessageType::Completedblock(block),
-        ),
+        message_type: MessageType::Completedblock(block),
         sender_id: own_id.clone(),
         receiver_id: None,
     };
@@ -293,7 +289,7 @@ pub struct Received {
 #[cfg(test)]
 mod tests {
     use super::process_blocksig;
-    use crate::net::{BlockGenerationRoundMessageType, Message};
+    use crate::net::Message;
     use crate::signer_node::message_processor::process_blocksig::Dump;
     use crate::signer_node::*;
     use crate::tests::helper::net::TestConnectionManager;
@@ -554,11 +550,7 @@ mod tests {
 
         let mut conman = TestConnectionManager::new();
         conman.should_broadcast(Message {
-            message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Completedblock(
-                    dump.completed_block.unwrap().clone(),
-                ),
-            ),
+            message_type: MessageType::Completedblock(dump.completed_block.unwrap().clone()),
             sender_id: params.signer_id,
             receiver_id: None,
         });
