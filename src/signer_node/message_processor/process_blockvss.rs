@@ -1,6 +1,5 @@
 use crate::blockdata::hash::SHA256Hash;
 use crate::blockdata::Block;
-use crate::crypto::multi_party_schnorr::SharedKeys;
 use crate::errors::Error;
 use crate::net::{
     BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
@@ -24,7 +23,6 @@ pub fn process_blockvss<T, C>(
     vss_for_negative: VerifiableSS,
     secret_share_for_negative: FE,
     prev_state: &NodeState,
-    priv_shared_keys: &SharedKeys,
     conman: &C,
     params: &NodeParameters<T>,
 ) -> NodeState
@@ -83,7 +81,6 @@ where
                 let (block_shared_keys, local_sig) = match generate_local_sig(
                     candidate_block.sighash(),
                     &shared_block_secrets_by_participants,
-                    &params.node_secret_share(),
                     prev_state,
                     params,
                 ) {
@@ -130,7 +127,6 @@ where
                 let (block_shared_keys, local_sig) = match generate_local_sig(
                     candidate_block.sighash(),
                     &new_shared_block_secrets,
-                    &params.node_secret_share(),
                     prev_state,
                     params,
                 ) {
@@ -241,7 +237,7 @@ fn store_received_vss(
 mod tests {
     use super::process_blockvss;
     use crate::blockdata::hash::SHA256Hash;
-    use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
+    use crate::crypto::multi_party_schnorr::LocalSig;
     use crate::net::SignerID;
     use crate::signer_node::node_state::builder::{Builder, Master, Member};
     use crate::signer_node::*;
@@ -270,7 +266,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            priv_shared_keys,
             prev_state,
             params,
             _,
@@ -286,7 +281,6 @@ mod tests {
             vss_for_negative,
             secret_share_for_negative,
             &prev_state,
-            &priv_shared_keys,
             &conman,
             &params,
         );
@@ -316,7 +310,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            priv_shared_keys,
             prev_state,
             params,
             expected_participants,
@@ -359,7 +352,6 @@ mod tests {
             vss_for_negative,
             secret_share_for_negative,
             &prev_state,
-            &priv_shared_keys,
             &conman,
             &params,
         );
@@ -399,7 +391,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            priv_shared_keys,
             prev_state,
             params,
             _,
@@ -419,7 +410,6 @@ mod tests {
             vss_for_negative,
             secret_share_for_negative,
             &prev_state,
-            &priv_shared_keys,
             &conman,
             &params,
         );
@@ -456,7 +446,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            priv_shared_keys,
             prev_state,
             params,
             _,
@@ -472,7 +461,6 @@ mod tests {
             vss_for_negative,
             secret_share_for_negative,
             &prev_state,
-            &priv_shared_keys,
             &conman,
             &params,
         );
@@ -494,7 +482,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            priv_shared_keys,
             prev_state,
             params,
             _,
@@ -510,7 +497,6 @@ mod tests {
             vss_for_negative,
             secret_share_for_negative,
             &prev_state,
-            &priv_shared_keys,
             &conman,
             &params,
         );
@@ -534,7 +520,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            priv_shared_keys,
             prev_state,
             params,
             _,
@@ -554,7 +539,6 @@ mod tests {
             vss_for_negative,
             secret_share_for_negative,
             &prev_state,
-            &priv_shared_keys,
             &conman,
             &params,
         );
@@ -595,7 +579,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            priv_shared_keys,
             prev_state,
             params,
             _,
@@ -628,7 +611,6 @@ mod tests {
             vss_for_negative,
             secret_share_for_negative,
             &prev_state,
-            &priv_shared_keys,
             &conman,
             &params,
         );
@@ -659,7 +641,6 @@ mod tests {
         FE,
         VerifiableSS,
         FE,
-        SharedKeys,
         NodeState,
         NodeParameters<MockRpc>,
         HashSet<SignerID>,
@@ -682,9 +663,6 @@ mod tests {
         let vss_for_negative =
             serde_json::from_value(v["received"]["vss_for_negative"].clone()).unwrap();
         let secret_share_for_negative = to_fe(&v["received"]["secret_share_for_negative"]);
-
-        let priv_shared_key: SharedKeys =
-            serde_json::from_value(v["priv_shared_key"].clone()).unwrap();
 
         let shared_block_secrets = v["shared_block_secrets"]
             .as_object()
@@ -732,7 +710,6 @@ mod tests {
             secret_share_for_positive,
             vss_for_negative,
             secret_share_for_negative,
-            priv_shared_key,
             prev_state,
             params,
             expected_participants,

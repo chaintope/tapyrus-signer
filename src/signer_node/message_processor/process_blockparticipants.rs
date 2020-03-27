@@ -1,5 +1,5 @@
 use crate::blockdata::hash::SHA256Hash;
-use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
+use crate::crypto::multi_party_schnorr::LocalSig;
 use crate::net::{ConnectionManager, SignerID};
 use crate::rpc::TapyrusApi;
 use crate::signer_node::message_processor::{
@@ -14,7 +14,6 @@ pub fn process_blockparticipants<T, C>(
     sender_id: &SignerID,
     blockhash: SHA256Hash,
     participants: HashSet<SignerID>,
-    priv_shared_keys: &SharedKeys,
     prev_state: &NodeState,
     conman: &C,
     params: &NodeParameters<T>,
@@ -77,7 +76,6 @@ where
     let (block_shared_keys, local_sig) = match generate_local_sig(
         block.sighash(),
         &shared_block_secrets_by_participants,
-        priv_shared_keys,
         prev_state,
         params,
     ) {
@@ -134,7 +132,7 @@ fn create_next_state(
 mod tests {
     use super::process_blockparticipants;
     use crate::blockdata::hash::SHA256Hash;
-    use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
+    use crate::crypto::multi_party_schnorr::LocalSig;
     use crate::net::SignerID;
     use crate::signer_node::node_state::builder::{Builder, Master, Member};
     use crate::signer_node::*;
@@ -157,14 +155,13 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (sender, blockhash, participants, priv_shared_key, prev_state, params, _, _) =
+        let (sender, blockhash, participants, prev_state, params, _, _) =
             load_test_case(&contents, "process_blockparticipants_master", rpc);
 
         let next = process_blockparticipants(
             &sender,
             blockhash,
             participants.clone(),
-            &priv_shared_key,
             &prev_state,
             &conman,
             &params,
@@ -192,7 +189,6 @@ mod tests {
             sender,
             blockhash,
             participants,
-            priv_shared_key,
             prev_state,
             params,
             expected_localsig,
@@ -216,7 +212,6 @@ mod tests {
             &sender,
             blockhash,
             participants.clone(),
-            &priv_shared_key,
             &prev_state,
             &conman,
             &params,
@@ -252,26 +247,17 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (
-            sender,
-            blockhash,
-            participants,
-            priv_shared_key,
-            prev_state,
-            params,
-            _,
-            _,
-        ) = load_test_case(
-            &contents,
-            "process_blockparticipants_not_include_the_node",
-            rpc,
-        );
+        let (sender, blockhash, participants, prev_state, params, _, _) =
+            load_test_case(
+                &contents,
+                "process_blockparticipants_not_include_the_node",
+                rpc,
+            );
 
         let next = process_blockparticipants(
             &sender,
             blockhash,
             participants.clone(),
-            &priv_shared_key,
             &prev_state,
             &conman,
             &params,
@@ -307,18 +293,16 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (sender, blockhash, participants, priv_shared_key, prev_state, params, _, _) =
-            load_test_case(
-                &contents,
-                "process_blockparticipants_master_from_fake_master",
-                rpc,
-            );
+        let (sender, blockhash, participants, prev_state, params, _, _) = load_test_case(
+            &contents,
+            "process_blockparticipants_master_from_fake_master",
+            rpc,
+        );
 
         let next = process_blockparticipants(
             &sender,
             blockhash,
             participants.clone(),
-            &priv_shared_key,
             &prev_state,
             &conman,
             &params,
@@ -340,18 +324,16 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (sender, blockhash, participants, priv_shared_key, prev_state, params, _, _) =
-            load_test_case(
-                &contents,
-                "process_blockparticipants_member_from_fake_master",
-                rpc,
-            );
+        let (sender, blockhash, participants, prev_state, params, _, _) = load_test_case(
+            &contents,
+            "process_blockparticipants_member_from_fake_master",
+            rpc,
+        );
 
         let next = process_blockparticipants(
             &sender,
             blockhash,
             participants.clone(),
-            &priv_shared_key,
             &prev_state,
             &conman,
             &params,
@@ -376,26 +358,17 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (
-            sender,
-            blockhash,
-            participants,
-            priv_shared_key,
-            prev_state,
-            params,
-            _,
-            _,
-        ) = load_test_case(
-            &contents,
-            "process_blockparticipants_with_shortage_shared_block_secrets",
-            rpc,
-        );
+        let (sender, blockhash, participants, prev_state, params, _, _) =
+            load_test_case(
+                &contents,
+                "process_blockparticipants_with_shortage_shared_block_secrets",
+                rpc,
+            );
 
         let next = process_blockparticipants(
             &sender,
             blockhash,
             participants.clone(),
-            &priv_shared_key,
             &prev_state,
             &conman,
             &params,
@@ -426,7 +399,6 @@ mod tests {
         SignerID,
         SHA256Hash,
         HashSet<SignerID>,
-        SharedKeys,
         NodeState,
         NodeParameters<MockRpc>,
         Option<LocalSig>,
@@ -453,8 +425,7 @@ mod tests {
                 serde_json::from_value(v["participants"].clone()).unwrap_or(HashSet::new());
             r.iter().map(|i| to_signer_id(i)).collect()
         };
-        let priv_shared_key: SharedKeys =
-            serde_json::from_value(v["priv_shared_key"].clone()).unwrap();
+
         let shared_block_secrets = v["shared_block_secrets"]
             .as_object()
             .unwrap()
@@ -490,7 +461,6 @@ mod tests {
             sender,
             blockhash,
             received_participants,
-            priv_shared_key,
             prev_state,
             params,
             expected_localsig,

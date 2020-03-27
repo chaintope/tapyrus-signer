@@ -128,7 +128,6 @@ where
 fn generate_local_sig<T>(
     blockhash: SHA256Hash,
     shared_block_secrets: &BidirectionalSharedSecretMap,
-    priv_shared_keys: &SharedKeys,
     prev_state: &NodeState,
     params: &NodeParameters<T>,
 ) -> Result<(bool, SharedKeys, LocalSig), Error>

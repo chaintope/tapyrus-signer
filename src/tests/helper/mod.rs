@@ -150,7 +150,6 @@ pub mod test_vectors {
             .iter()
             .map(|i| Vss::from_str(i.as_str().unwrap()).unwrap())
             .collect();
-        let private_key = private_key_from_wif(&value["node_private_key"]);
         let public_keys: Vec<PublicKey> = node_vss
             .iter()
             .map(|i| i.sender_public_key.clone())
@@ -162,7 +161,6 @@ pub mod test_vectors {
             .rpc(rpc)
             .threshold(threshold as u8)
             .pubkey_list(public_keys.clone())
-            .private_key(private_key)
             .public_key(public_key)
             .node_vss(node_vss)
             .build()

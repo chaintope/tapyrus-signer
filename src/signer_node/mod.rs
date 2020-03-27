@@ -10,7 +10,6 @@ mod utils;
 pub use crate::signer_node::node_parameters::NodeParameters;
 pub use crate::signer_node::node_state::NodeState;
 
-use crate::crypto::multi_party_schnorr::*;
 use crate::net::MessageType::BlockGenerationRoundMessages;
 use crate::net::{
     BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
@@ -25,7 +24,6 @@ use crate::signer_node::message_processor::process_completedblock;
 use crate::signer_node::node_state::builder::{Builder, Master, Member};
 use crate::timer::RoundTimeOutObserver;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-use curv::elliptic::curves::traits::ECScalar;
 use curv::FE;
 use redis::ControlFlow;
 use serde::{Deserialize, Serialize};
@@ -51,8 +49,6 @@ pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     /// * New round is started on only receiving completedblock message
     ///   or previous round is timeout.
     round_timer: RoundTimeOutObserver,
-    priv_shared_keys: Option<SharedKeys>,
-    shared_secrets: SharedSecretMap,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -120,12 +116,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             current_state: NodeState::Joining,
             stop_signal: None,
             round_timer: RoundTimeOutObserver::new("round_timer", timer_limit),
-            // Set dummy data. This should be removed soon.
-            priv_shared_keys: Some(SharedKeys {
-                y: curv::GE::random_point(),
-                x_i: curv::FE::new_random(),
-            }),
-            shared_secrets: BTreeMap::new(),
         }
     }
 
@@ -362,35 +352,28 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 vss_for_negative,
                 secret_share_for_negative,
                 &self.current_state,
-                &self.priv_shared_keys.as_ref().expect("priv_share_keys should be stored by when the blockvss message communication starts."),
                 &self.connection_manager,
                 &self.params,
             ),
-            BlockGenerationRoundMessageType::Blockparticipants(
-                blockhash,
-                participants
-            ) => process_blockparticipants(
-                &sender_id,
-                blockhash,
-                participants,
-                &self.priv_shared_keys.as_ref().expect("priv_share_keys should be stored by when the blockparticipants message communication starts."),
-                &self.current_state,
-                &self.connection_manager,
-                &self.params,
-            ),
-            BlockGenerationRoundMessageType::Blocksig(blockhash, gamma_i, e) => {
-                process_blocksig(
+            BlockGenerationRoundMessageType::Blockparticipants(blockhash, participants) => {
+                process_blockparticipants(
                     &sender_id,
                     blockhash,
-                    gamma_i,
-                    e,
-                    &self.priv_shared_keys.as_ref().expect("priv_share_keys should be stored by when the blocksig message communication starts."),
-                    &self.shared_secrets,
+                    participants,
                     &self.current_state,
                     &self.connection_manager,
                     &self.params,
                 )
             }
+            BlockGenerationRoundMessageType::Blocksig(blockhash, gamma_i, e) => process_blocksig(
+                &sender_id,
+                blockhash,
+                gamma_i,
+                e,
+                &self.current_state,
+                &self.connection_manager,
+                &self.params,
+            ),
             BlockGenerationRoundMessageType::Roundfailure => self.process_roundfailure(&sender_id),
         }
     }
@@ -572,7 +555,6 @@ mod tests {
         let mut params = NodeParameters::new(
             to_address,
             pubkey_list,
-            private_key,
             threshold,
             public_key,
             node_vss(0),

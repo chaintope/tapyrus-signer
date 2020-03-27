@@ -4,12 +4,11 @@ use crate::tests::helper::address;
 use crate::tests::helper::keys::TEST_KEYS;
 use crate::tests::helper::node_vss::node_vss;
 use crate::tests::helper::rpc::MockRpc;
-use bitcoin::{Address, PrivateKey, PublicKey};
+use bitcoin::{Address, PublicKey};
 
 pub struct NodeParametersBuilder {
     pubkey_list: Vec<PublicKey>,
     threshold: u8,
-    private_key: PrivateKey,
     rpc: Option<MockRpc>,
     address: Address,
     round_duration: u64,
@@ -24,7 +23,6 @@ impl NodeParametersBuilder {
         Self {
             pubkey_list: TEST_KEYS.pubkeys(),
             threshold: 3,
-            private_key: TEST_KEYS.key[0],
             rpc: None,
             address: address(&TEST_KEYS.key[0]),
             round_duration: 0,
@@ -38,7 +36,6 @@ impl NodeParametersBuilder {
         NodeParameters::new(
             self.address.clone(),
             self.pubkey_list.clone(),
-            self.private_key,
             self.threshold,
             self.public_key,
             self.node_vss.clone(),
@@ -50,11 +47,6 @@ impl NodeParametersBuilder {
 
     pub fn pubkey_list(&mut self, pubkey_list: Vec<PublicKey>) -> &mut Self {
         self.pubkey_list = pubkey_list;
-        self
-    }
-
-    pub fn private_key(&mut self, private_key: PrivateKey) -> &mut Self {
-        self.private_key = private_key;
         self
     }
 

@@ -5,7 +5,7 @@ use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
 use crate::signer_node::{SharedSecret, SharedSecretMap};
-use bitcoin::{Address, PrivateKey, PublicKey};
+use bitcoin::{Address, PublicKey};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::{
     ShamirSecretSharing, VerifiableSS,
 };
@@ -15,7 +15,6 @@ use std::sync::Arc;
 pub struct NodeParameters<T: TapyrusApi> {
     pub pubkey_list: Vec<PublicKey>,
     pub threshold: u8,
-    pub private_key: PrivateKey,
     pub rpc: std::sync::Arc<T>,
     pub address: Address,
     /// Own Signer ID. Actually it is signer own public key.
@@ -30,7 +29,6 @@ impl<T: TapyrusApi> NodeParameters<T> {
     pub fn new(
         to_address: Address,
         pubkey_list: Vec<PublicKey>,
-        private_key: PrivateKey,
         threshold: u8,
         public_key: PublicKey,
         node_vss: Vec<Vss>,
@@ -47,7 +45,6 @@ impl<T: TapyrusApi> NodeParameters<T> {
         NodeParameters {
             pubkey_list,
             threshold,
-            private_key,
             rpc: Arc::new(rpc),
             address: to_address,
             signer_id,

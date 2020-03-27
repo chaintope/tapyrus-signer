@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use crate::crypto::vss::Vss;
 use crate::signer_node::ROUND_INTERVAL_DEFAULT_SECS;
-use bitcoin::{Address, PrivateKey, PublicKey};
+use bitcoin::{Address, PublicKey};
 use clap::{App, Arg};
 use log;
 use serde::Deserialize;
@@ -16,8 +16,6 @@ pub const OPTION_NAME_CONFIG: &str = "config";
 
 /// # Signer Config
 pub const OPTION_NAME_TO_ADDRESS: &str = "coinbase_pay_to_address";
-pub const OPTION_NAME_PUBLIC_KEYS: &str = "publickeys";
-pub const OPTION_NAME_PRIVATE_KEY: &str = "privatekey";
 pub const OPTION_NAME_THRESHOLD: &str = "threshold";
 pub const OPTION_NAME_PUBLIC_KEY: &str = "publickey";
 pub const OPTION_NAME_NODE_VSS: &str = "nodevss";
@@ -120,8 +118,6 @@ pub struct CommandArgs<'a> {
 
 pub struct SignerCommandArgs<'a> {
     to_address: Option<&'a str>,
-    private_key: Option<&'a str>,
-    public_keys: Option<Vec<&'a str>>,
     threshold: Option<u8>,
     public_key: Option<&'a str>,
     node_vss: Option<Vec<&'a str>>,
@@ -142,52 +138,10 @@ impl<'a> SignerConfig<'a> {
             .to_address
             .or(value_within_config)
             .and_then(|s| match Address::from_str(s) {
-                Ok(p) => {
-                    assert_eq!(
-                        p.network,
-                        self.private_key().network,
-                        "Network should be same among with to_address and WIF of private_key"
-                    );
-                    Some(p)
-                }
+                Ok(p) => Some(p),
                 Err(e) => panic!(format!("'{}' is invalid address. error msg: {:?}", s, e)),
             })
             .expect("Must be specified to_address.")
-    }
-
-    pub fn public_keys(&self) -> Vec<PublicKey> {
-        let vec_string: Option<&Vec<String>> = self
-            .toml_config
-            .and_then(|config| config.publickeys.as_ref());
-        let pubkeys_within_config: Option<Vec<&str>> =
-            vec_string.map(|v| v.iter().map(|s| &s as &str).collect());
-        // TODO: maybe panic is not suitable? should be return result<vec, error> ?
-        let specified = self
-            .command_args
-            .public_keys
-            .as_ref()
-            .or(pubkeys_within_config.as_ref())
-            .expect("Must be specified public_keys.");
-        let parse_results: Vec<Result<PublicKey, String>> = specified
-            .iter()
-            .map(|s| {
-                PublicKey::from_str(s)
-                    .or_else(|_e| Err(format!("'{}' is invalid public key format.\n", s)))
-            })
-            .collect();
-
-        // separate invalid pubkey while doing convert.
-        let mut iter = parse_results.iter();
-        let errors: Vec<&String> = iter
-            .by_ref()
-            .filter(|r| r.is_err())
-            .map(|r| r.as_ref().err().unwrap())
-            .collect();
-        if !errors.is_empty() {
-            panic!("{:?}", errors.into_iter().fold(String::new(), |s, e| s + e));
-        }
-        // all keys are valid
-        parse_results.into_iter().map(|r| r.unwrap()).collect()
     }
 
     pub fn threshold(&self) -> u8 {
@@ -196,24 +150,6 @@ impl<'a> SignerConfig<'a> {
             .threshold
             .or(self.toml_config.and_then(|config| config.threshold))
             .expect("Must be specified threshold.")
-    }
-
-    pub fn private_key(&self) -> PrivateKey {
-        let private_key_within_config: Option<&str> = self
-            .toml_config
-            .and_then(|config| config.privatekey.as_ref())
-            .map(|p| p as &str);
-        self.command_args
-            .private_key
-            .or(private_key_within_config)
-            .and_then(|s| match PrivateKey::from_str(s) {
-                Ok(p) => Some(p),
-                Err(e) => panic!(format!(
-                    "'{}' is invalid WIF format!. error msg: {:?}",
-                    s, e
-                )),
-            })
-            .expect("Must be specified private_key.")
     }
 
     pub fn public_key(&self) -> PublicKey {
@@ -461,11 +397,6 @@ impl<'a> CommandArgs<'a> {
         SignerConfig {
             command_args: SignerCommandArgs {
                 to_address: self.matches.value_of(OPTION_NAME_TO_ADDRESS),
-                public_keys: self
-                    .matches
-                    .values_of(OPTION_NAME_PUBLIC_KEYS)
-                    .map(|vs| vs.collect()),
-                private_key: self.matches.value_of(OPTION_NAME_PRIVATE_KEY),
                 threshold: num,
                 public_key: self.matches.value_of(OPTION_NAME_PUBLIC_KEY),
                 node_vss: self
@@ -535,20 +466,11 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
             .long("to_address")
             .value_name("TO_ADDRESS")
             .help("Coinbase pay to address."))
-        .arg(Arg::with_name(OPTION_NAME_PUBLIC_KEYS)
-            .long("publickeys")
-            .value_name("PUBKEY")
-            .multiple(true)
-            .help("Tapyrus signer public key. not need '0x' prefix. example: 03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc"))
         .arg(Arg::with_name(OPTION_NAME_THRESHOLD)
             .short("t")
             .long("threshold")
             .value_name("NUM")
             .help("The threshold of enough signer. it must be less than specified public keys."))
-        .arg(Arg::with_name(OPTION_NAME_PRIVATE_KEY)
-            .long("privatekey")
-            .value_name("PRIVATE_KEY")
-            .help("The PrivateKey of this signer node. WIF format."))
         .arg(Arg::with_name(OPTION_NAME_PUBLIC_KEY)
             .short("p")
             .long("publickey")
@@ -648,29 +570,10 @@ fn test_load_from_file() {
     let matches = get_options()
         .get_matches_from(vec!["node", "-c=tests/resources/signer_config_sample.toml"]);
     let args = CommandArgs::load(matches).unwrap();
-    let pubkeys = args.signer_config().public_keys();
-    assert_eq!(pubkeys.len(), 3);
-    assert_eq!(
-        pubkeys[0].to_string(),
-        "033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8"
-    );
-    assert_eq!(
-        pubkeys[1].to_string(),
-        "020464074b94702e9b07803d247021943bdcc1f8700b92b66defb7fadd76e80acf"
-    );
-    assert_eq!(
-        pubkeys[2].to_string(),
-        "02cbe0ad70ffe110d097db648fda20bef14dc72b5c9979c137c451820c176ac23f"
-    );
 
     let threshold = args.signer_config().threshold();
     assert_eq!(threshold, 2);
 
-    let privkey = args.signer_config().private_key();
-    assert_eq!(
-        privkey.to_wif(),
-        "cMtJPWz8D1KmTseJa778nWTS93uePrrN5FtUARUZHu7RsjuSTjGX"
-    );
     let public_key = args.signer_config().public_key();
     assert_eq!(
         public_key.to_string(),
@@ -718,10 +621,7 @@ fn test_priority_commandline() {
     let matches = get_options().get_matches_from(vec![
         "node",
         "-c=tests/resources/signer_config.toml",
-        "--publickeys=020464074b94702e9b07803d247021943bdcc1f8700b92b66defb7fadd76e80acf",
-        "--publickeys=033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8",
         "--threshold=1",
-        "--privatekey=L4Bw5GTJXL7Nd5wjprXim2sMpNgTSieZ14FCaHax7zzRnHbx19sc",
         "-p=033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8",
         "--nodevss=03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000001",
         "--nodevss=03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000002",
@@ -737,24 +637,10 @@ fn test_priority_commandline() {
         "--logfile=/tmp/tapyrus-signer.log",
     ]);
     let args = CommandArgs::load(matches).unwrap();
-    let pubkeys = args.signer_config().public_keys();
-    assert_eq!(pubkeys.len(), 2);
-    assert_eq!(
-        pubkeys[0].to_string(),
-        "020464074b94702e9b07803d247021943bdcc1f8700b92b66defb7fadd76e80acf"
-    );
-    assert_eq!(
-        pubkeys[1].to_string(),
-        "033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8"
-    );
+
     let threshold = args.signer_config().threshold();
     assert_eq!(threshold, 1);
 
-    let privkey = args.signer_config().private_key();
-    assert_eq!(
-        privkey.to_wif(),
-        "L4Bw5GTJXL7Nd5wjprXim2sMpNgTSieZ14FCaHax7zzRnHbx19sc"
-    );
     let public_key = args.signer_config().public_key();
     assert_eq!(
         public_key.to_string(),
@@ -794,32 +680,6 @@ fn test_priority_commandline() {
 }
 
 #[test]
-#[should_panic(
-    expected = "\\'aaaa\\' is invalid public key format.\\n\\'bbbb\\' is invalid public key format.\\n"
-)]
-fn test_invid_pubkeys() {
-    let matches = get_options().get_matches_from(vec![
-        "node",
-        "-c=tests/resources/signer_config.toml",
-        "--publickeys=aaaa",
-        "--publickeys=bbbb",
-    ]);
-    let args = CommandArgs::load(matches).unwrap();
-    let _pubkeys = args.signer_config().public_keys();
-}
-
-#[test]
-#[should_panic(expected = "Must be specified public_keys.")]
-fn test_no_pubkeys() {
-    let matches = get_options().get_matches_from(vec!["node"]);
-    let args = CommandArgs {
-        matches,
-        config: Some(ConfigToml::default()),
-    };
-    let _pubkeys = args.signer_config().public_keys();
-}
-
-#[test]
 #[should_panic(expected = "Must be specified threshold.")]
 fn test_no_thrshold() {
     let matches = get_options().get_matches_from(vec!["node"]);
@@ -828,38 +688,6 @@ fn test_no_thrshold() {
         config: Some(ConfigToml::default()),
     };
     let _threshold = args.signer_config().threshold();
-}
-
-#[test]
-#[should_panic(expected = "Must be specified private_key.")]
-fn test_no_private_key() {
-    let matches = get_options().get_matches_from(vec!["node"]);
-    let args = CommandArgs {
-        matches,
-        config: Some(ConfigToml::default()),
-    };
-    let _privkey = args.signer_config().private_key();
-}
-
-#[test]
-#[should_panic(expected = "'aabbccdd' is invalid WIF format!. error msg:")]
-fn test_invalid_private_key() {
-    let matches = get_options().get_matches_from(vec!["node"]);
-    let args = CommandArgs {
-        matches,
-        config: Some(ConfigToml {
-            signer: Some(SignerToml {
-                to_address: None,
-                publickeys: None,
-                threshold: Some(0),
-                privatekey: Some("aabbccdd".to_string()),
-                publickey: None,
-                nodevss: None,
-            }),
-            ..ConfigToml::default()
-        }),
-    };
-    let _privkey = args.signer_config().private_key();
 }
 
 #[test]
@@ -932,29 +760,6 @@ fn test_invalid_to_address() {
                 publickeys: None,
                 threshold: Some(0),
                 privatekey: None,
-                publickey: None,
-                nodevss: None,
-            }),
-            ..ConfigToml::default()
-        }),
-    };
-    let _to_address = args.signer_config().to_address();
-}
-
-#[test]
-#[should_panic(expected = "Network should be same among with to_address and WIF of private_key")]
-fn test_invalid_network_among_with_to_address_and_private_key() {
-    let matches = get_options().get_matches_from(vec!["node"]);
-    let args = CommandArgs {
-        matches,
-        config: Some(ConfigToml {
-            signer: Some(SignerToml {
-                to_address: Some("mkWk6dDtB6A1UtenWN3W24osVmbsyYD2oM".to_string()),
-                publickeys: None,
-                threshold: Some(0),
-                privatekey: Some(
-                    "KzEdPiFuaQktBK8WdsbuzXARzzyJ9uZWB9dnq78UF17Pe1fra33P".to_string(),
-                ),
                 publickey: None,
                 nodevss: None,
             }),

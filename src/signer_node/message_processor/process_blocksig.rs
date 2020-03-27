@@ -14,7 +14,7 @@ use crate::signer_node::utils::sender_index;
 use crate::signer_node::ToVerifiableSS;
 use crate::signer_node::{BidirectionalSharedSecretMap, NodeState};
 use crate::signer_node::{NodeParameters, SharedSecretMap, ToSharedSecretMap};
-use bitcoin::{PrivateKey, PublicKey};
+use bitcoin::PublicKey;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::{FE, GE};
 use derive_builder::Builder;
@@ -26,8 +26,6 @@ pub fn process_blocksig<T, C>(
     blockhash: SHA256Hash,
     gamma_i: FE,
     e: FE,
-    priv_shared_keys: &SharedKeys,
-    shared_secrets: &SharedSecretMap,
     prev_state: &NodeState,
     conman: &C,
     params: &NodeParameters<T>,
@@ -48,10 +46,7 @@ where
             })
             .public_keys(params.pubkey_list.clone())
             .threshold(params.threshold as usize)
-            .node_privaet_key(params.private_key)
             .public_key(params.signer_id.pubkey)
-            .priv_shared_key(priv_shared_keys.clone())
-            .shared_secrets(params.node_shared_secrets())
             .prev_state(prev_state.clone())
             .node_vss(params.node_vss.clone());
         builder
@@ -272,12 +267,9 @@ where
 pub struct Dump {
     public_keys: Vec<PublicKey>,
     threshold: usize,
-    node_privaet_key: PrivateKey,
     public_key: PublicKey,
     node_vss: Vec<Vss>,
     received: Received,
-    priv_shared_key: SharedKeys,
-    shared_secrets: SharedSecretMap,
     prev_state: NodeState,
     #[builder(setter(strip_option), default)]
     completed_block: Option<Block>,
@@ -321,7 +313,6 @@ mod tests {
             .rpc(MockRpc::new())
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
-            .private_key(dump.node_privaet_key)
             .public_key(dump.public_key)
             .node_vss(dump.node_vss.clone())
             .build();
@@ -331,8 +322,6 @@ mod tests {
             dump.received.block_hash.clone(),
             dump.received.gamma_i.clone(),
             dump.received.e.clone(),
-            &dump.priv_shared_key,
-            &dump.shared_secrets,
             &dump.prev_state,
             &conman,
             &params,
@@ -356,7 +345,6 @@ mod tests {
             .rpc(MockRpc::new())
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
-            .private_key(dump.node_privaet_key)
             .public_key(dump.public_key)
             .node_vss(dump.node_vss.clone())
             .build();
@@ -366,8 +354,6 @@ mod tests {
             dump.received.block_hash.clone(),
             dump.received.gamma_i.clone(),
             dump.received.e.clone(),
-            &dump.priv_shared_key,
-            &dump.shared_secrets,
             &dump.prev_state,
             &conman,
             &params,
@@ -393,7 +379,6 @@ mod tests {
             .rpc(MockRpc::new())
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
-            .private_key(dump.node_privaet_key)
             .public_key(dump.public_key)
             .node_vss(dump.node_vss.clone())
             .build();
@@ -403,8 +388,6 @@ mod tests {
             dump.received.block_hash.clone(),
             dump.received.gamma_i.clone(),
             dump.received.e.clone(),
-            &dump.priv_shared_key,
-            &dump.shared_secrets,
             &dump.prev_state,
             &conman,
             &params,
@@ -451,7 +434,6 @@ mod tests {
             .rpc(MockRpc::new())
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
-            .private_key(dump.node_privaet_key)
             .public_key(dump.public_key)
             .node_vss(dump.node_vss.clone())
             .build();
@@ -461,8 +443,6 @@ mod tests {
             dump.received.block_hash.clone(),
             dump.received.gamma_i.clone(),
             dump.received.e.clone(),
-            &dump.priv_shared_key,
-            &dump.shared_secrets,
             &dump.prev_state,
             &conman,
             &params,
@@ -490,7 +470,6 @@ mod tests {
             .rpc(MockRpc::new())
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
-            .private_key(dump.node_privaet_key)
             .public_key(dump.public_key)
             .node_vss(dump.node_vss.clone())
             .build();
@@ -500,8 +479,6 @@ mod tests {
             dump.received.block_hash.clone(),
             dump.received.gamma_i.clone(),
             dump.received.e.clone(),
-            &dump.priv_shared_key,
-            &dump.shared_secrets,
             &dump.prev_state,
             &conman,
             &params,
@@ -531,7 +508,6 @@ mod tests {
             .rpc(MockRpc::new())
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
-            .private_key(dump.node_privaet_key)
             .public_key(dump.public_key)
             .node_vss(dump.node_vss.clone())
             .build();
@@ -541,8 +517,6 @@ mod tests {
             dump.received.block_hash.clone(),
             dump.received.gamma_i.clone(),
             dump.received.e.clone(),
-            &dump.priv_shared_key,
-            &dump.shared_secrets,
             &dump.prev_state,
             &conman,
             &params,
@@ -574,7 +548,6 @@ mod tests {
             .rpc(rpc)
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
-            .private_key(dump.node_privaet_key)
             .public_key(dump.public_key)
             .node_vss(dump.node_vss.clone())
             .build();
@@ -595,8 +568,6 @@ mod tests {
             dump.received.block_hash.clone(),
             dump.received.gamma_i.clone(),
             dump.received.e.clone(),
-            &dump.priv_shared_key,
-            &dump.shared_secrets,
             &dump.prev_state,
             &conman,
             &params,
