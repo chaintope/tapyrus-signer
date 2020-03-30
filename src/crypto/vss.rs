@@ -73,9 +73,10 @@ impl Vss {
             share_count,
             index
         );
-        let key = Sign::create_key(index, Sign::private_key_to_big_int(private_key.key));
+        let key_as_int = Sign::private_key_to_big_int(private_key.key).expect("failed to parse private_key");
+        let secret = ECScalar::from(&key_as_int);
         let parties = (0..share_count).map(|i| i + 1).collect::<Vec<usize>>();
-        VerifiableSS::share_at_indices(threshold - 1, share_count, &key.u_i, &parties)
+        VerifiableSS::share_at_indices(threshold - 1, share_count, &secret, &parties)
     }
 }
 
