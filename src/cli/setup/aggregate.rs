@@ -8,6 +8,7 @@ use crate::signer_node::SharedSecret;
 use crate::signer_node::SharedSecretMap;
 use bitcoin::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
+use curv::arithmetic::traits::Converter;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::ECPoint;
@@ -34,12 +35,8 @@ impl Response for AggregateResponse {}
 
 impl fmt::Display for AggregateResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} {}",
-            self.aggregated_public_key,
-            self.node_shared_secret.to_big_int(),
-        )
+        let secret = format!("{:0>64}", self.node_shared_secret.to_big_int().to_hex());
+        write!(f, "{} {}", self.aggregated_public_key, secret,)
     }
 }
 
@@ -116,5 +113,26 @@ impl<'a> AggregateCommand {
                 .takes_value(true)
                 .help("private key of this signer with an extend WIF format"),
         ])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use bitcoin::PublicKey;
+    use curv::elliptic::curves::traits::ECScalar;
+    use curv::BigInt;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_aggregate_response() {
+        let public_key = PublicKey::from_str(
+            "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
+        )
+        .unwrap();
+        let response = AggregateResponse::new(public_key, ECScalar::from(&BigInt::from(0xff)));
+
+        assert_eq!(format!("{}", response), "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2 00000000000000000000000000000000000000000000000000000000000000ff");
     }
 }
