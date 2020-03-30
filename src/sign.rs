@@ -14,6 +14,7 @@ use crate::signer_node::SharedSecretMap;
 use crate::signer_node::ToShares;
 use crate::signer_node::ToVerifiableSS;
 use crate::util::*;
+use secp256k1::rand::thread_rng;
 
 pub struct Sign;
 
@@ -27,7 +28,11 @@ impl Sign {
     pub fn create_key(index: usize, pk: Option<BigInt>) -> Keys {
         let u: FE = match pk {
             Some(i) => ECScalar::from(&i),
-            None => ECScalar::new_random(),
+            None => {
+                let seckey = secp256k1::SecretKey::new(&mut thread_rng());
+                let bn = BigInt::from(&seckey[..]);
+                ECScalar::from(&bn)
+            }
         };
         let y = &ECPoint::generator() * &u;
 
@@ -133,6 +138,12 @@ fn test_create_key() {
     )
     .unwrap();
     assert_eq!(key.y_i, Secp256k1Point::from_coor(&x, &y));
+
+    // When generate random secret key.
+    // it should not raise any panic and no repetition.
+    let keys: Vec<FE> = (0..10).map(|_| Sign::create_key(1, None).u_i).collect();
+    keys.iter()
+        .any(|i| keys.iter().filter(|j| *i == **j).count() > 1);
 }
 
 #[test]
