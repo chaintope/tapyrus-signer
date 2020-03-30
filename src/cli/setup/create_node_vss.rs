@@ -1,4 +1,3 @@
-use crate::cli::setup::index_of;
 use crate::cli::setup::traits::Response;
 use crate::crypto::vss::{Commitment, Vss};
 use crate::errors::Error;
@@ -55,9 +54,8 @@ impl<'a> CreateNodeVssCommand {
                 "threshold should be integer.".to_string(),
             ))?;
 
-        let index = index_of(&private_key, &public_keys);
         let (vss_scheme, secret_shares) =
-            Vss::create_node_shares(index, &private_key, threshold as usize, public_keys.len());
+            Vss::create_node_shares(&private_key, threshold as usize, public_keys.len());
 
         let mut vss_map = BTreeMap::new();
         let secp = secp256k1::Secp256k1::new();

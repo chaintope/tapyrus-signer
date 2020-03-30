@@ -51,29 +51,18 @@ impl Vss {
     }
 
     pub fn create_node_shares(
-        index: usize,
         private_key: &PrivateKey,
         threshold: usize,
         share_count: usize,
     ) -> (VerifiableSS, Vec<FE>) {
-        assert!(
-            index > 0,
-            "index should be greater or equal to 1: {}",
-            index
-        );
         assert!(
             share_count >= threshold,
             "share count should be greater or equal to threshold. share_count: {}, threshold: {}",
             share_count,
             threshold
         );
-        assert!(
-            share_count >= index,
-            "index should be less or equal to share_count. share_count: {}, index: {}",
-            share_count,
-            index
-        );
-        let key_as_int = Sign::private_key_to_big_int(private_key.key).expect("failed to parse private_key");
+        let key_as_int =
+            Sign::private_key_to_big_int(private_key.key).expect("failed to parse private_key");
         let secret = ECScalar::from(&key_as_int);
         let parties = (0..share_count).map(|i| i + 1).collect::<Vec<usize>>();
         VerifiableSS::share_at_indices(threshold - 1, share_count, &secret, &parties)
@@ -377,17 +366,9 @@ mod tests {
     fn test_create_node_shares() {
         let private_key =
             PrivateKey::from_wif("L4MmwZ4nSacs186WzVfxyuryUUbnfE7PivJBj3GT2a3n5itSudZg").unwrap();
-        let (vss, shares) = Vss::create_node_shares(1, &private_key, 2, 3);
+        let (vss, shares) = Vss::create_node_shares(&private_key, 2, 3);
         assert_eq!(vss.commitments.len(), 2);
         assert_eq!(shares.len(), 3);
-    }
-
-    #[test]
-    #[should_panic(expected = "index should be greater or equal to 1")]
-    fn test_create_node_shares_zero_index() {
-        let private_key =
-            PrivateKey::from_wif("L4MmwZ4nSacs186WzVfxyuryUUbnfE7PivJBj3GT2a3n5itSudZg").unwrap();
-        Vss::create_node_shares(0, &private_key, 2, 3);
     }
 
     #[test]
@@ -395,14 +376,6 @@ mod tests {
     fn test_create_node_shares_invalid_large_threshold() {
         let private_key =
             PrivateKey::from_wif("L4MmwZ4nSacs186WzVfxyuryUUbnfE7PivJBj3GT2a3n5itSudZg").unwrap();
-        Vss::create_node_shares(1, &private_key, 4, 3);
-    }
-
-    #[test]
-    #[should_panic(expected = "index should be less or equal to share_count")]
-    fn test_create_node_shares_invalid_large_index() {
-        let private_key =
-            PrivateKey::from_wif("L4MmwZ4nSacs186WzVfxyuryUUbnfE7PivJBj3GT2a3n5itSudZg").unwrap();
-        Vss::create_node_shares(4, &private_key, 2, 3);
+        Vss::create_node_shares(&private_key, 4, 3);
     }
 }
