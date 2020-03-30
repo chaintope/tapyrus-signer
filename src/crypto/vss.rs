@@ -5,7 +5,7 @@ use bitcoin::PublicKey;
 use curv::arithmetic::traits::Converter;
 use curv::elliptic::curves::traits::*;
 use curv::{BigInt, FE, GE};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use std::io;
 use std::str::FromStr;
@@ -95,7 +95,7 @@ impl<'de> Deserialize<'de> for Vss {
     {
         let vec = deserializer.deserialize_str(HexStrVisitor::new())?;
         let hex = hex::encode(&vec[..]);
-        Ok(Vss::from_str(&hex).unwrap())
+        Vss::from_str(&hex).map_err(de::Error::custom)
     }
 }
 
