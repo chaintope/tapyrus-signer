@@ -47,15 +47,7 @@ impl<'a> CreateNodeVssCommand {
             .collect::<Result<Vec<PublicKey>, _>>()?;
         public_keys.sort();
 
-        let threshold: u64 = matches
-            .value_of("threshold")
-            .and_then(|t| t.parse::<u64>().ok())
-            .ok_or(Error::InvalidArgs(
-                "threshold should be integer.".to_string(),
-            ))?;
-
-        let (vss_scheme, secret_shares) =
-            Vss::create_node_shares(&private_key, threshold as usize, public_keys.len());
+        let (vss_scheme, secret_shares) = Vss::create_node_shares(&private_key, public_keys.len());
 
         let mut vss_map = BTreeMap::new();
         let secp = secp256k1::Secp256k1::new();
@@ -88,11 +80,6 @@ impl<'a> CreateNodeVssCommand {
                 .takes_value(true),
             Arg::with_name("private_key")
                 .long("private_key")
-                .required(true)
-                .number_of_values(1)
-                .takes_value(true),
-            Arg::with_name("threshold")
-                .long("threshold")
                 .required(true)
                 .number_of_values(1)
                 .takes_value(true),
