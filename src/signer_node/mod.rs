@@ -3,7 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 mod message_processor;
-mod node_parameters;
+pub mod node_parameters;
 pub mod node_state;
 mod utils;
 

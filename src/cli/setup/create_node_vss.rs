@@ -1,6 +1,8 @@
 use crate::cli::setup::traits::Response;
 use crate::crypto::vss::{Commitment, Vss};
 use crate::errors::Error;
+use crate::signer_node::node_parameters::NodeParameters;
+use crate::rpc::Rpc;
 use bitcoin::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::collections::BTreeMap;
@@ -45,7 +47,7 @@ impl<'a> CreateNodeVssCommand {
             .ok_or(Error::InvalidArgs("public_key".to_string()))?
             .map(|key| PublicKey::from_str(key).map_err(|_| Error::InvalidKey))
             .collect::<Result<Vec<PublicKey>, _>>()?;
-        public_keys.sort();
+        NodeParameters::<Rpc>::sort_publickey(&mut public_keys);
 
         let (vss_scheme, secret_shares) = Vss::create_node_shares(&private_key, public_keys.len());
 
