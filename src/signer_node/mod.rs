@@ -433,10 +433,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     fn create_node_share(&mut self) {
         let params = self.params.sharing_params();
-        let (vss_scheme, secret_shares) = Vss::create_node_shares(
-            &self.params.private_key,
-            params.share_count,
-        );
+        let (vss_scheme, secret_shares) =
+            Vss::create_node_shares(&self.params.private_key, params.share_count);
 
         log::info!("Sending VSS to each other signers");
 

@@ -1,8 +1,8 @@
 use crate::cli::setup::traits::Response;
 use crate::crypto::vss::{Commitment, Vss};
 use crate::errors::Error;
-use crate::signer_node::node_parameters::NodeParameters;
 use crate::rpc::Rpc;
+use crate::signer_node::node_parameters::NodeParameters;
 use bitcoin::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::collections::BTreeMap;
@@ -98,10 +98,14 @@ mod tests {
     fn test_execute() {
         let matches = CreateNodeVssCommand::args().get_matches_from(vec![
             "createnodevss",
-            "--public_key", "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
-            "--public_key", "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1",
-            "--public_key", "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
-            "--private_key", "cQYYBMFS9dRR3Mt16gW4jixCqSiMhCwuDMHUBs6WeHMTxMnsq8Gh"
+            "--public_key",
+            "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
+            "--public_key",
+            "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1",
+            "--public_key",
+            "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
+            "--private_key",
+            "cQYYBMFS9dRR3Mt16gW4jixCqSiMhCwuDMHUBs6WeHMTxMnsq8Gh",
         ]);
         let response = CreateNodeVssCommand::execute(&matches);
         assert!(response.is_ok());
@@ -111,8 +115,10 @@ mod tests {
     fn test_execute_invalid_public_key() {
         let matches = CreateNodeVssCommand::args().get_matches_from(vec![
             "createnodevss",
-            "--public_key", "x",
-            "--private_key", "cQYYBMFS9dRR3Mt16gW4jixCqSiMhCwuDMHUBs6WeHMTxMnsq8Gh"
+            "--public_key",
+            "x",
+            "--private_key",
+            "cQYYBMFS9dRR3Mt16gW4jixCqSiMhCwuDMHUBs6WeHMTxMnsq8Gh",
         ]);
         let response = CreateNodeVssCommand::execute(&matches);
         assert_eq!(format!("{}", response.err().unwrap()), "InvalidKey");
@@ -122,10 +128,15 @@ mod tests {
     fn test_execute_invalid_private_key() {
         let matches = CreateNodeVssCommand::args().get_matches_from(vec![
             "createnodevss",
-            "--public_key", "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
-            "--private_key", "x"
+            "--public_key",
+            "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
+            "--private_key",
+            "x",
         ]);
         let response = CreateNodeVssCommand::execute(&matches);
-        assert_eq!(format!("{}", response.err().unwrap()), "InvalidArgs(\"private_key\")");
+        assert_eq!(
+            format!("{}", response.err().unwrap()),
+            "InvalidArgs(\"private_key\")"
+        );
     }
 }
