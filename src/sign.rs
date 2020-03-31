@@ -139,11 +139,8 @@ fn test_create_key() {
     .unwrap();
     assert_eq!(key.y_i, Secp256k1Point::from_coor(&x, &y));
 
-    // When generate random secret key.
-    // it should not raise any panic and no repetition.
-    let keys: Vec<FE> = (0..10).map(|_| Sign::create_key(1, None).u_i).collect();
-    keys.iter()
-        .any(|i| keys.iter().filter(|j| *i == **j).count() > 1);
+    // When generate random secret key, it should not raise any panic.
+    Sign::create_key(1, None);
 }
 
 #[test]
