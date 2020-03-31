@@ -70,7 +70,7 @@ impl<'a> SignCommand {
             .value_of("node_secret_share")
             .and_then(|s| {
                 Some(ECScalar::from(
-                    &BigInt::from_str(s).expect("node_secret_share is invalid"),
+                    &BigInt::from_str_radix(s, 16).expect("node_secret_share is invalid"),
                 ))
             })
             .ok_or(Error::InvalidArgs("node_secret_share".to_string()))?;
