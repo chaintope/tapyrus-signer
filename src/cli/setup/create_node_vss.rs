@@ -49,7 +49,15 @@ impl<'a> CreateNodeVssCommand {
             .collect::<Result<Vec<PublicKey>, _>>()?;
         NodeParameters::<Rpc>::sort_publickey(&mut public_keys);
 
-        let (vss_scheme, secret_shares) = Vss::create_node_shares(&private_key, public_keys.len());
+        let threshold: u64 = matches
+            .value_of("threshold")
+            .and_then(|t| t.parse::<u64>().ok())
+            .ok_or(Error::InvalidArgs(
+                "threshold should be integer.".to_string(),
+            ))?;
+
+        let (vss_scheme, secret_shares) =
+            Vss::create_node_shares(&private_key, threshold as usize, public_keys.len());
 
         let mut vss_map = BTreeMap::new();
         let secp = secp256k1::Secp256k1::new();
@@ -86,6 +94,11 @@ impl<'a> CreateNodeVssCommand {
                 .required(true)
                 .takes_value(true)
                 .help("private key of this signer with an extend WIF format"),
+            Arg::with_name("threshold")
+                .long("threshold")
+                .required(true)
+                .takes_value(true)
+                .help("the minimum number of signers required to sign block"),
         ])
     }
 }
