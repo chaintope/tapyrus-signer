@@ -3,7 +3,9 @@ use crate::cli::setup::traits::Response;
 use crate::crypto::vss::Vss;
 use crate::errors::Error;
 use crate::net::SignerID;
+use crate::rpc::Rpc;
 use crate::sign::Sign;
+use crate::signer_node::NodeParameters;
 use crate::signer_node::SharedSecret;
 use crate::signer_node::SharedSecretMap;
 use bitcoin::{PrivateKey, PublicKey};
@@ -59,7 +61,7 @@ impl<'a> AggregateCommand {
             .iter()
             .map(|vss| vss.sender_public_key)
             .collect::<Vec<PublicKey>>();
-        public_keys.sort();
+        NodeParameters::<Rpc>::sort_publickey(&mut public_keys);
 
         let mut vss_map = SharedSecretMap::new();
         for vss in &vss_vec {
