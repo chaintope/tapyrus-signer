@@ -2,6 +2,9 @@ use crate::cli::setup::index_of;
 use crate::cli::setup::traits::Response;
 use crate::crypto::vss::{Commitment, Vss};
 use crate::errors::Error;
+use crate::rpc::Rpc;
+use crate::signer_node::NodeParameters;
+
 use bitcoin::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::collections::BTreeMap;
@@ -46,7 +49,7 @@ impl<'a> CreateBlockVssCommand {
             .ok_or(Error::InvalidArgs("public_key".to_string()))?
             .map(|key| PublicKey::from_str(key).map_err(|_| Error::InvalidKey))
             .collect::<Result<Vec<PublicKey>, _>>()?;
-        public_keys.sort();
+        NodeParameters::<Rpc>::sort_publickey(&mut public_keys);
 
         let threshold: u64 = matches
             .value_of("threshold")
