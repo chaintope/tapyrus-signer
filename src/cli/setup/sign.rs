@@ -39,7 +39,7 @@ impl fmt::Display for SignResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{:0>64}{:0>64}{:0>66}",
+            "{:0>64}{:0>64}{}",
             self.local_sig.gamma_i.to_big_int().to_hex(),
             self.local_sig.e.to_big_int().to_hex(),
             hex::encode(&self.public_key.key.serialize()[..]),
