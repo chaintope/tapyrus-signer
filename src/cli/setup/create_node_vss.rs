@@ -111,6 +111,8 @@ mod tests {
     fn test_execute() {
         let matches = CreateNodeVssCommand::args().get_matches_from(vec![
             "createnodevss",
+            "--threshold",
+            "2",
             "--public_key",
             "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
             "--public_key",
@@ -128,6 +130,8 @@ mod tests {
     fn test_execute_invalid_public_key() {
         let matches = CreateNodeVssCommand::args().get_matches_from(vec![
             "createnodevss",
+            "--threshold",
+            "2",
             "--public_key",
             "x",
             "--private_key",
@@ -141,6 +145,8 @@ mod tests {
     fn test_execute_invalid_private_key() {
         let matches = CreateNodeVssCommand::args().get_matches_from(vec![
             "createnodevss",
+            "--threshold",
+            "2",
             "--public_key",
             "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
             "--private_key",
