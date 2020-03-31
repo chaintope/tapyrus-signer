@@ -111,7 +111,6 @@ impl<'a> AggregateCommand {
             Arg::with_name("private_key")
                 .long("private_key")
                 .required(true)
-                .number_of_values(1)
                 .takes_value(true)
                 .help("private key of this signer with an extend WIF format"),
         ])
