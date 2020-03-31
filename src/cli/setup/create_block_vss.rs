@@ -95,17 +95,20 @@ impl<'a> CreateBlockVssCommand {
                 .long("public_key")
                 .required(true)
                 .multiple(true)
-                .takes_value(true),
+                .takes_value(true)
+                .help("compressed public key of the each signer with a hex format string"),
             Arg::with_name("private_key")
                 .long("private_key")
                 .required(true)
                 .number_of_values(1)
-                .takes_value(true),
+                .takes_value(true)
+                .help("private key of this signer with an extend WIF format"),
             Arg::with_name("threshold")
                 .long("threshold")
                 .required(true)
                 .number_of_values(1)
-                .takes_value(true),
+                .takes_value(true)
+                .help("the minimum number of signers required to sign block"),
         ])
     }
 }
