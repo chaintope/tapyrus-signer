@@ -7,6 +7,7 @@ pub mod keys;
 pub mod net;
 pub mod node_parameters_builder;
 pub mod node_state_builder;
+pub mod node_vss;
 pub mod rpc;
 
 pub fn enable_log(log_level: Option<log::Level>) {
