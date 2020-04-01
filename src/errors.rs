@@ -28,6 +28,7 @@ pub enum Error {
     RedisError(RedisError),
     /// Errors for using incomplete block(like no proof block) as usual block.
     IncompleteBlock,
+    InvalidFederation(String),
 }
 
 impl std::fmt::Display for Error {
