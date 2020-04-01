@@ -58,13 +58,17 @@ impl PartialEq for SignerID {
 
 impl PartialOrd for SignerID {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.pubkey.to_bytes().partial_cmp(&other.pubkey.to_bytes())
+        let a = self.pubkey.key.serialize();
+        let b = other.pubkey.key.serialize();
+        PartialOrd::partial_cmp(&a[..], &b[..])
     }
 }
 
 impl Ord for SignerID {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.pubkey.to_bytes().cmp(&other.pubkey.to_bytes())
+        let a = self.pubkey.key.serialize();
+        let b = other.pubkey.key.serialize();
+        Ord::cmp(&a[..], &b[..])
     }
 }
 
