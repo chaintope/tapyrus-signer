@@ -2,6 +2,7 @@ extern crate tapyrus_signer;
 
 use clap::App;
 use tapyrus_signer::cli::setup::aggregate::AggregateCommand;
+use tapyrus_signer::cli::setup::compute_sig::ComputeSigCommand;
 use tapyrus_signer::cli::setup::create_block_vss::CreateBlockVssCommand;
 use tapyrus_signer::cli::setup::create_key::CreateKeyCommand;
 use tapyrus_signer::cli::setup::create_node_vss::CreateNodeVssCommand;
@@ -16,6 +17,7 @@ fn main() {
         .subcommand(AggregateCommand::args())
         .subcommand(CreateBlockVssCommand::args())
         .subcommand(SignCommand::args())
+        .subcommand(ComputeSigCommand::args())
         .get_matches();
     let result: Result<Box<dyn Response>, Error> = match matches.subcommand_name() {
         Some("createkey") => CreateKeyCommand::execute(
@@ -41,6 +43,11 @@ fn main() {
         Some("sign") => {
             SignCommand::execute(matches.subcommand_matches("sign").expect("invalid args"))
         }
+        Some("computesig") => ComputeSigCommand::execute(
+            matches
+                .subcommand_matches("computesig")
+                .expect("invalid args"),
+        ),
         None => return println!("No subcommand was used"),
         _ => unreachable!(),
     };

@@ -2,11 +2,16 @@ use crate::blockdata::Block;
 use crate::crypto::multi_party_schnorr::Keys;
 use crate::crypto::multi_party_schnorr::LocalSig;
 use crate::crypto::multi_party_schnorr::SharedKeys;
+use crate::crypto::multi_party_schnorr::Signature;
 use crate::errors::Error;
+use crate::net::SignerID;
 use crate::serialize::HexStrVisitor;
 use crate::sign::Sign;
+use crate::signer_node::utils::sender_index;
 use crate::signer_node::BidirectionalSharedSecretMap;
+use crate::signer_node::SharedSecretMap;
 use crate::signer_node::ToSharedSecretMap;
+use crate::signer_node::ToVerifiableSS;
 use crate::util::jacobi;
 use bitcoin::consensus::encode::{self, *};
 use bitcoin::{PrivateKey, PublicKey};
@@ -16,6 +21,7 @@ use curv::elliptic::curves::traits::ECScalar;
 use curv::elliptic::curves::traits::*;
 use curv::{BigInt, FE, GE};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::io;
 use std::str::FromStr;
@@ -145,6 +151,47 @@ impl Vss {
             (shared_keys_for_negative, local_sig_for_negative)
         };
         Ok((is_positive, shared_keys, local_sig))
+    }
+
+    pub fn aggregate_and_verify_signature(
+        block: &Block,
+        signatures: BTreeMap<SignerID, (FE, FE)>,
+        pubkey_list: &Vec<PublicKey>,
+        shared_secrets: &SharedSecretMap,
+        block_shared_keys: &Option<(bool, FE, GE)>,
+        shared_block_secrets: &BidirectionalSharedSecretMap,
+        priv_shared_keys: &SharedKeys,
+    ) -> Result<Signature, Error> {
+        let parties = signatures
+            .keys()
+            .map(|k| sender_index(k, pubkey_list))
+            .collect::<Vec<usize>>();
+        let key_gen_vss_vec: Vec<VerifiableSS> = shared_secrets.to_vss();
+        let local_sigs: Vec<LocalSig> = signatures
+            .values()
+            .map(|s| LocalSig {
+                gamma_i: s.0,
+                e: s.1,
+            })
+            .collect();
+        let eph_vss_vec: Vec<VerifiableSS> = if block_shared_keys.unwrap().0 {
+            shared_block_secrets.for_positive().to_vss()
+        } else {
+            shared_block_secrets.for_negative().to_vss()
+        };
+
+        let vss_sum =
+            LocalSig::verify_local_sigs(&local_sigs, &parties[..], &key_gen_vss_vec, &eph_vss_vec)?;
+        let signature = Sign::aggregate(
+            &vss_sum,
+            &local_sigs,
+            &parties[..],
+            block_shared_keys.unwrap().2,
+        );
+        let public_key = priv_shared_keys.y;
+        let hash = block.sighash().into_inner();
+        signature.verify(&hash, &public_key)?;
+        Ok(signature)
     }
 }
 

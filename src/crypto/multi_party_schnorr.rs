@@ -180,6 +180,7 @@ impl Keys {
     }
 }
 
+#[derive(Clone)]
 pub struct LocalSig {
     pub gamma_i: FE,
     pub e: FE,
