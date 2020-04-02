@@ -358,8 +358,6 @@ impl<'a> GeneralConfig<'a> {
     }
 }
 
-/// command example:
-/// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e --privatekey=cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA -t 2
 impl<'a> CommandArgs<'a> {
     /// constructor.
     /// Basically, search config file as file name signer_config.toml in current dir.
@@ -451,8 +449,6 @@ fn read_config(file_path: &str) -> Result<ConfigToml, crate::errors::Error> {
     Ok(toml)
 }
 
-/// command example:
-/// ./target/debug/node -p=03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc -p=02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900 -p=02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e --privatekey=cUwpWhH9CbYwjUWzfz1UVaSjSQm9ALXWRqeFFiZKnn8cV6wqNXQA -t 2
 pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
     App::new("node")
         .about("Tapyrus siner node")
