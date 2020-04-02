@@ -130,8 +130,9 @@ mod tests {
     use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
     use crate::tests::helper::rpc::MockRpc;
     use bitcoin::PublicKey;
+    use curv::arithmetic::traits::Converter;
     use curv::elliptic::curves::traits::ECScalar;
-    use curv::FE;
+    use curv::BigInt;
     use std::str::FromStr;
 
     #[test]
@@ -171,7 +172,9 @@ mod tests {
         let mut params = NodeParametersBuilder::new().build();
         assert!(params.verify_nodevss().is_ok());
 
-        params.node_vss[0].positive_secret = FE::new_random();
+        let secret =
+            BigInt::from_hex("fca3cd89e0a73a7da43e5a79ab47c3e03ce2e7e7ec0def56b6c7dfaf5a095738");
+        params.node_vss[0].positive_secret = ECScalar::from(&secret);
         assert!(params.verify_nodevss().is_err());
     }
 }

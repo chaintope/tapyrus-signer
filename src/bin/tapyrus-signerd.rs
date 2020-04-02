@@ -76,7 +76,9 @@ fn main() {
     );
 
     // Verify share
-    params.verify_nodevss().expect("The nodevss has invalid vss");
+    params
+        .verify_nodevss()
+        .expect("The nodevss has invalid vss");
 
     let node = &mut SignerNode::new(con, params);
     node.start();
