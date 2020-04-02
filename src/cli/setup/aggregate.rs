@@ -1,18 +1,15 @@
 use crate::cli::setup::index_of;
 use crate::cli::setup::traits::Response;
+use crate::cli::setup::vss_to_shared_secret_map;
 use crate::crypto::vss::Vss;
 use crate::errors::Error;
-use crate::net::SignerID;
 use crate::rpc::Rpc;
 use crate::sign::Sign;
 use crate::signer_node::NodeParameters;
-use crate::signer_node::SharedSecret;
-use crate::signer_node::SharedSecretMap;
 use bitcoin::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use curv::arithmetic::traits::Converter;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
-use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::ECPoint;
 use curv::elliptic::curves::traits::ECScalar;
 use curv::FE;
@@ -63,28 +60,12 @@ impl<'a> AggregateCommand {
             .collect::<Vec<PublicKey>>();
         NodeParameters::<Rpc>::sort_publickey(&mut public_keys);
 
-        let mut vss_map = SharedSecretMap::new();
-        for vss in &vss_vec {
-            vss_map.insert(
-                SignerID::new(vss.sender_public_key.clone()),
-                SharedSecret {
-                    vss: VerifiableSS {
-                        // threshold is not used in 'aggregate' command
-                        parameters: ShamirSecretSharing {
-                            threshold: 1,
-                            share_count: vss_vec.len(),
-                        },
-                        commitments: vss
-                            .positive_commitments
-                            .iter()
-                            .cloned()
-                            .map(|c| c.to_point())
-                            .collect(),
-                    },
-                    secret_share: vss.positive_secret,
-                },
-            );
-        }
+        // threshold is not used in 'aggregate' command
+        let params = ShamirSecretSharing {
+            threshold: 1,
+            share_count: vss_vec.len(),
+        };
+        let vss_map = vss_to_shared_secret_map(&vss_vec, &params);
 
         let index = index_of(&private_key, &public_keys);
         let shared_keys = Sign::verify_vss_and_construct_key(&vss_map, &index)?;
