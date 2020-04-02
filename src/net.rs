@@ -483,7 +483,7 @@ mod test {
         );
         let carol = SignerID::new(
             PublicKey::from_str(
-                "02a85a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e",
+                "0461cc17fc4755599a903c59b2f2b886824afc1dd746632bb053ca2f4297f4b10fc02b133f1644f0fd64a74a7a6b35f78bf5d3354c0be5bb66d16d8fc499fa2a82",
             )
             .unwrap(),
         );
