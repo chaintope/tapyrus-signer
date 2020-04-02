@@ -173,27 +173,22 @@ impl<'a> ComputeSigCommand {
             Arg::with_name("private_key")
                 .long("private_key")
                 .required(true)
-                .number_of_values(1)
                 .takes_value(true),
             Arg::with_name("threshold")
                 .long("threshold")
                 .required(true)
-                .number_of_values(1)
                 .takes_value(true),
             Arg::with_name("block")
                 .long("block")
                 .required(true)
-                .number_of_values(1)
                 .takes_value(true),
             Arg::with_name("node_secret_share")
                 .long("node_secret_share")
                 .required(true)
-                .number_of_values(1)
                 .takes_value(true),
             Arg::with_name("aggregated_public_key")
                 .long("aggregated_public_key")
                 .required(true)
-                .number_of_values(1)
                 .takes_value(true),
             Arg::with_name("node_vss")
                 .long("node_vss")
