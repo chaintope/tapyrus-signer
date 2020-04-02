@@ -57,15 +57,9 @@ impl<T: TapyrusApi> NodeParameters<T> {
     }
 
     pub fn verify_nodevss(&self) -> Result<(), Error> {
-        if Sign::verify_vss_and_construct_key(&self.node_shared_secrets(), &self.self_node_index)
-            .is_err()
-        {
-            return Err(Error::InvalidArgs(
-                "The nodevss includes invalid share.".to_string(),
-            ));
-        }
-
-        Ok(())
+        Sign::verify_vss_and_construct_key(&self.node_shared_secrets(), &self.self_node_index)
+            .map_err(|_| Error::InvalidArgs("The nodevss includes invalid share.".to_string()))
+            .map(|_| ())
     }
 
     pub fn get_signer_id_by_index(&self, index: usize) -> SignerID {
