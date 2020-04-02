@@ -101,9 +101,7 @@ impl TapyrusApi for Rpc {
 
     fn testproposedblock(&self, block: &Block) -> Result<bool, Error> {
         let blockhex = serde_json::Value::from(block.hex());
-        let acceptnonstdtxn = serde_json::Value::Bool(true);
-        let args = [blockhex, acceptnonstdtxn];
-        self.call::<bool>("testproposedblock", &args)
+        self.call::<bool>("testproposedblock", &[blockhex])
     }
 
     fn submitblock(&self, block: &Block) -> Result<(), Error> {
