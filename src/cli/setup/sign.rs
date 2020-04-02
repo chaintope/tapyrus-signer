@@ -6,11 +6,8 @@ use crate::crypto::multi_party_schnorr::LocalSig;
 use crate::crypto::multi_party_schnorr::SharedKeys;
 use crate::crypto::vss::Vss;
 use crate::errors::Error;
-use crate::net::SignerID;
 use crate::rpc::Rpc;
-use crate::signer_node::BidirectionalSharedSecretMap;
 use crate::signer_node::NodeParameters;
-use crate::signer_node::SharedSecret;
 
 use bitcoin::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
