@@ -83,7 +83,7 @@ impl<T: TapyrusApi> NodeParameters<T> {
         }
     }
 
-    fn sort_publickey(pubkeys: &mut Vec<PublicKey>) {
+    pub fn sort_publickey(pubkeys: &mut Vec<PublicKey>) {
         pubkeys.sort_by(|a, b| {
             let a = a.key.serialize();
             let b = b.key.serialize();

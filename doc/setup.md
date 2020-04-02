@@ -99,7 +99,7 @@ output: <aggregated_public_key> <node_secret_share[i]>
 - `node_vss[i, i]` is produced by Signer[i] themselves in Step 3.
 - `private_key[i]` is the private key of Signer[i], generated in Step 2.
 - `aggregated_public_key` is an aggregated public key.
-- `node_secret_share[i]` is the secret key share of Signer[i].
+- `node_secret_share[i]` is the secret key share of Signer[i] with a hex format.
 
 Note that `node_secret_share[i]` is not encrpyted because it is not intended to send to any other signers. It should be kept secret from others.
 
@@ -177,11 +177,12 @@ output: <local_sig[i]>
 - `aggregated_public_key` is an aggregated public key, generated in Step 4.
 - `node_secret_share[i]` is the secret key share of Signer[i], generated in Step 4.
 - `block` is the genesis block without block proof.
-- `local_sig[i]` is the "local signature" described as γi in the paper [^4]. signer[i] may reveal `local_sig[i]`.
+- `local_sig[i]` is the "local signature" constains γi in the paper [^4]. signer[i] may reveal `local_sig[i]`.
 
-`local_sig[i]` is encoded hex string of ( r | s ).
+`local_sig[i]` is encoded hex string of ( r | s | `public_key`).
    - r - the unsigned big-endian 256-bit encoding of the Schnorr signature's r integer.
    - s - the unsigned big-endian 256-bit encoding of the Schnorr signature's s integer.
+   - `public_key` is the public key of Signer[i].
 
 Then each signer broadcasts their local_sig.
 

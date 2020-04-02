@@ -185,7 +185,7 @@ fn store_received_local_sig(
     result
 }
 
-fn aggregate_and_verify_signature(
+pub fn aggregate_and_verify_signature(
     block: &Block,
     signatures: BTreeMap<SignerID, (FE, FE)>,
     pubkey_list: &Vec<PublicKey>,

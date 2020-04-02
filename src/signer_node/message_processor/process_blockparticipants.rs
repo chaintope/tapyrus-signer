@@ -245,12 +245,11 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (sender, blockhash, participants, prev_state, params, _, _) =
-            load_test_case(
-                &contents,
-                "process_blockparticipants_not_include_the_node",
-                rpc,
-            );
+        let (sender, blockhash, participants, prev_state, params, _, _) = load_test_case(
+            &contents,
+            "process_blockparticipants_not_include_the_node",
+            rpc,
+        );
 
         let next = process_blockparticipants(
             &sender,
@@ -356,12 +355,11 @@ mod tests {
 
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
-        let (sender, blockhash, participants, prev_state, params, _, _) =
-            load_test_case(
-                &contents,
-                "process_blockparticipants_with_shortage_shared_block_secrets",
-                rpc,
-            );
+        let (sender, blockhash, participants, prev_state, params, _, _) = load_test_case(
+            &contents,
+            "process_blockparticipants_with_shortage_shared_block_secrets",
+            rpc,
+        );
 
         let next = process_blockparticipants(
             &sender,
