@@ -8,7 +8,9 @@ use crate::crypto::multi_party_schnorr::SharedKeys;
 use crate::crypto::vss::Vss;
 use crate::errors::Error;
 use crate::net::SignerID;
+use crate::rpc::Rpc;
 use crate::sign::Sign;
+use crate::signer_node::NodeParameters;
 
 use bitcoin::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
@@ -120,7 +122,7 @@ impl<'a> ComputeSigCommand {
             .iter()
             .map(|vss| vss.sender_public_key)
             .collect();
-        public_keys.sort();
+        NodeParameters::<Rpc>::sort_publickey(&mut public_keys);
 
         let index = index_of(&private_key, &public_keys);
 
