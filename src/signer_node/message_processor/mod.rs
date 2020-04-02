@@ -23,12 +23,8 @@ use crate::net::Message;
 use crate::net::MessageType;
 use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
-use crate::sign::Sign;
+use crate::signer_node::SharedSecret;
 use crate::signer_node::{BidirectionalSharedSecretMap, NodeParameters, NodeState};
-use crate::signer_node::{SharedSecret, ToSharedSecretMap};
-use crate::util::jacobi;
-use curv::elliptic::curves::traits::ECPoint;
-use curv::BigInt;
 
 fn get_valid_block(state: &NodeState, blockhash: SHA256Hash) -> Result<&Block, Error> {
     let block_opt = match state {
@@ -135,34 +131,12 @@ where
         shared_block_secrets.len()
     );
     let block = get_valid_block(prev_state, blockhash)?;
-    let shared_keys_for_positive = Sign::verify_vss_and_construct_key(
-        &shared_block_secrets.for_positive(),
-        &(params.self_node_index + 1),
-    )?;
-
-    let result_for_positive =
-        Sign::sign(&shared_keys_for_positive, priv_shared_keys, block.sighash());
-
-    let shared_keys_for_negative = Sign::verify_vss_and_construct_key(
-        &shared_block_secrets.for_negative(),
-        &(params.self_node_index + 1),
-    )?;
-    let result_for_negative =
-        Sign::sign(&shared_keys_for_negative, priv_shared_keys, block.sighash());
-
-    let p = BigInt::from_str_radix(
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
-        16,
+    Vss::create_local_sig_from_shares(
+        priv_shared_keys,
+        params.self_node_index + 1,
+        shared_block_secrets,
+        &block,
     )
-    .unwrap();
-    let is_positive = jacobi(&shared_keys_for_positive.y.y_coor().unwrap(), &p) == 1;
-    let (shared_keys, local_sig) = if is_positive {
-        (shared_keys_for_positive, result_for_positive)
-    } else {
-        (shared_keys_for_negative, result_for_negative)
-    };
-
-    return Ok((is_positive, shared_keys, local_sig));
 }
 
 fn broadcast_localsig<C: ConnectionManager>(
