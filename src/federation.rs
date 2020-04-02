@@ -55,7 +55,7 @@ impl Federations {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Federation {
     /// The id of the signer who runs this node.
     signer_id: SignerID,
@@ -192,12 +192,36 @@ impl Federation {
 
         Ok(())
     }
+
+    pub fn from(pubkey: PublicKey, ser: SerFederation) -> Self {
+        Self::new(pubkey, ser.block_height, ser.threshold, ser.nodevss)
+    }
+
+    pub fn to_ser(self) -> SerFederation {
+        SerFederation {
+            block_height: self.block_height,
+            threshold: self.threshold,
+            nodevss: self.nodevss,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SerFederations {
+    federation: Vec<SerFederation>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SerFederation {
+    block_height: u64,
+    threshold: u8,
+    nodevss: Vec<Vss>,
 }
 
 #[cfg(test)]
 mod tests {
     use crate::errors::Error;
-    use crate::federation::{Federation, Federations};
+    use crate::federation::{Federation, Federations, SerFederation};
     use crate::net::SignerID;
     use crate::tests::helper::keys::TEST_KEYS;
     use crate::tests::helper::node_vss::node_vss;
@@ -297,5 +321,17 @@ mod tests {
             }
             _ => assert!(false, "it should error"),
         }
+    }
+
+    #[test]
+    fn test_serialize_deserialize() {
+        let federation = valid_federation();
+
+        let ser = federation.clone().to_ser();
+        let str = toml::to_string(&ser).unwrap();
+        println!("{}", str);
+        let deserialized =
+            Federation::from(federation.signer_id.pubkey, toml::from_str(&str).unwrap());
+        assert_eq!(federation, deserialized);
     }
 }
