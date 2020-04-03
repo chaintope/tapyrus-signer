@@ -32,6 +32,7 @@ impl Federations {
     pub fn validate(&self) -> Result<(), Error> {
         if self.federations.len() == 0 {
             return Err(Error::InvalidFederation(
+                None,
                 "At least the node must have one federation",
             ));
         }
@@ -143,6 +144,7 @@ impl Federation {
         let is_overlap = unique_set.len() < signers.len();
         if is_overlap {
             return Err(Error::InvalidFederation(
+                Some(self.block_height),
                 "nodevss has overlapping sender vss.",
             ));
         }
@@ -153,7 +155,7 @@ impl Federation {
             .iter()
             .any(|i| i.receiver_public_key != self.signer_id.pubkey)
         {
-            return Err(Error::InvalidFederation("The nodevss has wrong receiver value. All VSS's receiver_public_key should be equal with publich key of the signer who runs the node."));
+            return Err(Error::InvalidFederation(Some(self.block_height), "The nodevss has wrong receiver value. All VSS's receiver_public_key should be equal with publich key of the signer who runs the node."));
         }
 
         // Check all commitment length is correct.
@@ -163,6 +165,7 @@ impl Federation {
             .any(|vss| vss.positive_commitments.len() != self.threshold as usize)
         {
             return Err(Error::InvalidFederation(
+                Some(self.block_height),
                 "The nodevss has wrong vss which has wrong number of commitments.",
             ));
         }
@@ -172,6 +175,7 @@ impl Federation {
             .is_err()
         {
             return Err(Error::InvalidFederation(
+                Some(self.block_height),
                 "The nodevss includes invalid share.",
             ));
         }
@@ -214,7 +218,7 @@ mod tests {
 
         let federations = Federations::new(vec![]);
         match federations.validate() {
-            Err(Error::InvalidFederation(m)) => {
+            Err(Error::InvalidFederation(_, m)) => {
                 assert_eq!(m, "At least the node must have one federation")
             }
             _ => assert!(false, "it should error"),
@@ -230,7 +234,7 @@ mod tests {
         let mut federation = valid_federation();
         federation.nodevss.push(federation.nodevss[0].clone());
         match federation.validate() {
-            Err(Error::InvalidFederation(m)) => {
+            Err(Error::InvalidFederation(_, m)) => {
                 assert_eq!(m, "nodevss has overlapping sender vss.")
             }
             _ => assert!(false, "it should error"),
@@ -240,7 +244,7 @@ mod tests {
         let mut federation = valid_federation();
         federation.nodevss[0].receiver_public_key = TEST_KEYS.pubkeys()[0];
         match federation.validate() {
-            Err(Error::InvalidFederation(m)) => {
+            Err(Error::InvalidFederation(_, m)) => {
                 assert_eq!(m, "The nodevss has wrong receiver value. All VSS's receiver_public_key should be equal with publich key of the signer who runs the node.")
             }
             _ => assert!(false, "it should error"),
@@ -253,7 +257,7 @@ mod tests {
             commitments.drain(0..1);
         }
         match federation.validate() {
-            Err(Error::InvalidFederation(m)) => assert_eq!(
+            Err(Error::InvalidFederation(_, m)) => assert_eq!(
                 m,
                 "The nodevss has wrong vss which has wrong number of commitments."
             ),
@@ -264,7 +268,7 @@ mod tests {
         let mut federation = valid_federation();
         federation.nodevss[0].positive_secret = ECScalar::new_random();
         match federation.validate() {
-            Err(Error::InvalidFederation(m)) => {
+            Err(Error::InvalidFederation(_, m)) => {
                 assert_eq!(m, "The nodevss includes invalid share.")
             }
             _ => assert!(false, "it should error"),
