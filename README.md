@@ -40,24 +40,13 @@ If you want to understand what is going on in TSN, We recommend to read section 
 
 ## Overview of Tapyrus Signer Network(TSN) How it works
 
-TSN's communication proceeds in two phases below roughly.
+After 5 seconds of idling, the block generation round will begin. Each round is divided into roles - one master and 
+the other members - with the aim of building consensus on the candidate blocks proposed by the master.
 
-1. Network Initialization
-2. Block Generation Rounds
+If the agreement among all the signers exceeds the threshold in the round, the block becomes legitimate and is 
+broadcast to the Tapyrus blockchain network. Then the next round begins, and block generation continues.
 
-### 1. Network Initialization.
-
-This phase corresponds to "Key Generation Protocol" in the paper. In this phase, each signer generates Verifiable Secret 
-Shares(VSSs) and commitments from own private key then shares to each other signers. This communication uses 'nodevss' 
-message.
-
-After this communication, each signer gets aggregated public key and own share.
-
-### 2. Block Generation Rounds.
-
-After finished Network Initialization, each node can start Block Generation Rounds. Each round has a single Master and 
-other Members. The master proposes caididate block and if number of members who agree the proposition met threshold, 
-the block is going to be accepted Tapyrus network.
+The following describes in detail the messages used to exchange between the signer nodes and the specific algorithms.
 
 ## Message Types
 
@@ -68,7 +57,6 @@ All messages has signer id field which is specify by signer public key.
 
 | Message Type      | Payload        | Description                                                  |
 | ----------------- | -------------- | ------------------------------------------------------------ |
-| nodevss           | NodeVss        | Each signers send VSS in Key Generation Protocol.            |
 | candidateblock    | Block          | Round master broadcasts to signer network a candidate block. |
 | blockvss          | BlockVSS       | Send vss for random secret.                                  |
 | blockparticipants | Vec &lt; PublicKey &gt; | Round master notify `signature issuing protocol` is going to be executed with the signers who are represented in payload keys |
@@ -86,41 +74,6 @@ means a message will be sent to a channel where subscribed by a specific node.
 ### Structure of payload
 
 All messages are formatted as JSON when it is sent.
-
-#### NodeVSS Structure
-
-* `Nodevss[0]` Object of additional data for VSS.
-     * `parameter` Object of secret sharing parameters
-          * `threshold` Integer value of threshold - 1.
-          * `share_count` Integer value of signer count. (And also it is the number which shares should be created.)
-     * `commitments` Array of commitment. A commitment is a point of secp256k1 curve. Which has x and y cordinates. 
-* `Nodevss[1]` Secret Share. Hex formatted scalar value of secp256k1 curve.
-
-*Example*
-```json
-{
-  "Nodevss": [
-    {
-      "parameters": {
-        "threshold": 1,
-        "share_count": 3
-      },
-      "commitments": [
-        {
-          "x": "9143ba242fbfddea166f5e234855cb59a54c00a44cc2584e744cf3d505f66ee5",
-          "y": "a6de6dec85914000243e07207a3a58e6756da1ee4f8018ba5027c023464f3230"
-        },
-        {
-          "x": "a0b8ea6e47eae45d45fd50e1ac8707b39e76526d5ebae0b1b89cf571d9bbd3c9",
-          "y": "d011ed6b3dc123575b5178040a61bdc020e8e180f04b55d7dac7d0b940473a44"
-        }
-      ]
-    },
-    "33e25200b179838c20774ea4291c94c3090e546fd80e96feb3efc0d45be1ed2a"
-  ]
-}
-
-```
 
 #### BlockVSS Structure
 

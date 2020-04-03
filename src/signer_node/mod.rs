@@ -10,13 +10,7 @@ pub mod utils;
 pub use crate::signer_node::node_parameters::NodeParameters;
 pub use crate::signer_node::node_state::NodeState;
 
-use crate::crypto::multi_party_schnorr::*;
-use crate::crypto::vss::Vss;
-use crate::net::MessageType::{BlockGenerationRoundMessages, KeyGenerationMessage};
-use crate::net::{
-    BlockGenerationRoundMessageType, ConnectionManager, KeyGenerationMessageType, Message,
-    MessageType, SignerID,
-};
+use crate::net::{ConnectionManager, Message, MessageType, SignerID};
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use crate::signer_node::message_processor::create_block_vss;
 use crate::signer_node::message_processor::process_blockparticipants;
@@ -24,7 +18,6 @@ use crate::signer_node::message_processor::process_blocksig;
 use crate::signer_node::message_processor::process_blockvss;
 use crate::signer_node::message_processor::process_candidateblock;
 use crate::signer_node::message_processor::process_completedblock;
-use crate::signer_node::message_processor::process_nodevss;
 use crate::signer_node::node_state::builder::{Builder, Master, Member};
 use crate::timer::RoundTimeOutObserver;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
@@ -53,8 +46,6 @@ pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     /// * New round is started on only receiving completedblock message
     ///   or previous round is timeout.
     round_timer: RoundTimeOutObserver,
-    priv_shared_keys: Option<SharedKeys>,
-    shared_secrets: SharedSecretMap,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -122,8 +113,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             current_state: NodeState::Joining,
             stop_signal: None,
             round_timer: RoundTimeOutObserver::new("round_timer", timer_limit),
-            priv_shared_keys: None,
-            shared_secrets: BTreeMap::new(),
         }
     }
 
@@ -155,7 +144,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         // To avoid that nodes which is late to startup can't receive messages.
         log::info!("Idle 5 secs... ");
         std::thread::sleep(Duration::from_secs(5));
-        self.create_node_share();
 
         // Start First Round
         log::info!("Start block creation rounds.");
@@ -201,22 +189,15 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                         message_type
                     );
 
-                    match message_type {
-                        KeyGenerationMessage(msg) => {
-                            self.process_key_generation_message(&sender_id, msg);
-                        }
-                        BlockGenerationRoundMessages(msg) => {
-                            let next = self.process_round_message(&sender_id, msg);
-                            self.current_state = next;
+                    let next = self.process_round_message(&sender_id, message_type);
+                    self.current_state = next;
 
-                            if let NodeState::RoundComplete {
-                                next_master_index, ..
-                            } = &self.current_state
-                            {
-                                let v = *next_master_index;
-                                self.start_next_round(v)
-                            }
-                        }
+                    if let NodeState::RoundComplete {
+                        next_master_index, ..
+                    } = &self.current_state
+                    {
+                        let v = *next_master_index;
+                        self.start_next_round(v)
                     }
 
                     log::debug!("Current state updated as {:?}", self.current_state);
@@ -313,9 +294,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             block.sighash()
         );
         self.connection_manager.broadcast_message(Message {
-            message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Candidateblock(block.clone()),
-            ),
+            message_type: MessageType::Candidateblock(block.clone()),
             sender_id: self.params.signer_id,
             receiver_id: None,
         });
@@ -334,35 +313,23 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             .build()
     }
 
-    pub fn process_key_generation_message(
-        &mut self,
-        sender_id: &SignerID,
-        message: KeyGenerationMessageType,
-    ) {
-        match message {
-            KeyGenerationMessageType::Nodevss(vss, secret_share) => {
-                process_nodevss(&sender_id, vss, secret_share, self);
-            }
-        }
-    }
-
     pub fn process_round_message(
         &mut self,
         sender_id: &SignerID,
-        message: BlockGenerationRoundMessageType,
+        message: MessageType,
     ) -> NodeState {
         match message {
-            BlockGenerationRoundMessageType::Candidateblock(block) => process_candidateblock(
+            MessageType::Candidateblock(block) => process_candidateblock(
                 &sender_id,
                 &block,
                 &self.current_state,
                 &self.connection_manager,
                 &self.params,
             ),
-            BlockGenerationRoundMessageType::Completedblock(block) => {
+            MessageType::Completedblock(block) => {
                 process_completedblock(&sender_id, &block, &self.current_state, &self.params)
             }
-            BlockGenerationRoundMessageType::Blockvss(
+            MessageType::Blockvss(
                 blockhash,
                 vss_for_positive,
                 secret_share_for_positive,
@@ -376,36 +343,27 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 vss_for_negative,
                 secret_share_for_negative,
                 &self.current_state,
-                &self.priv_shared_keys.as_ref().expect("priv_share_keys should be stored by when the blockvss message communication starts."),
                 &self.connection_manager,
                 &self.params,
             ),
-            BlockGenerationRoundMessageType::Blockparticipants(
-                blockhash,
-                participants
-            ) => process_blockparticipants(
+            MessageType::Blockparticipants(blockhash, participants) => process_blockparticipants(
                 &sender_id,
                 blockhash,
                 participants,
-                &self.priv_shared_keys.as_ref().expect("priv_share_keys should be stored by when the blockparticipants message communication starts."),
                 &self.current_state,
                 &self.connection_manager,
                 &self.params,
             ),
-            BlockGenerationRoundMessageType::Blocksig(blockhash, gamma_i, e) => {
-                process_blocksig(
-                    &sender_id,
-                    blockhash,
-                    gamma_i,
-                    e,
-                    &self.priv_shared_keys.as_ref().expect("priv_share_keys should be stored by when the blocksig message communication starts."),
-                    &self.shared_secrets,
-                    &self.current_state,
-                    &self.connection_manager,
-                    &self.params,
-                )
-            }
-            BlockGenerationRoundMessageType::Roundfailure => self.process_roundfailure(&sender_id),
+            MessageType::Blocksig(blockhash, gamma_i, e) => process_blocksig(
+                &sender_id,
+                blockhash,
+                gamma_i,
+                e,
+                &self.current_state,
+                &self.connection_manager,
+                &self.params,
+            ),
+            MessageType::Roundfailure => self.process_roundfailure(&sender_id),
         }
     }
 
@@ -429,30 +387,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     fn process_roundfailure(&self, _sender_id: &SignerID) -> NodeState {
         self.current_state.clone()
-    }
-
-    fn create_node_share(&mut self) {
-        let params = self.params.sharing_params();
-        let (vss_scheme, secret_shares) = Vss::create_node_shares(
-            &self.params.private_key,
-            params.threshold,
-            params.share_count,
-        );
-
-        log::info!("Sending VSS to each other signers");
-
-        for i in 0..self.params.pubkey_list.len() {
-            self.connection_manager.send_message(Message {
-                message_type: MessageType::KeyGenerationMessage(KeyGenerationMessageType::Nodevss(
-                    vss_scheme.clone(),
-                    secret_shares[i],
-                )),
-                sender_id: self.params.signer_id,
-                receiver_id: Some(SignerID {
-                    pubkey: self.params.pubkey_list[i],
-                }),
-            });
-        }
     }
 }
 
@@ -509,6 +443,7 @@ mod tests {
     };
     use crate::tests::helper::blocks::get_block;
     use crate::tests::helper::keys::TEST_KEYS;
+    use crate::tests::helper::node_vss::node_vss;
     use crate::tests::helper::{address, enable_log};
     use redis::ControlFlow;
     use std::collections::HashSet;
@@ -604,12 +539,14 @@ mod tests {
         let threshold = 3;
         let private_key = TEST_KEYS.key[0];
         let to_address = address(&private_key);
+        let public_key = pubkey_list[0].clone();
 
         let mut params = NodeParameters::new(
             to_address,
             pubkey_list,
-            private_key,
             threshold,
+            public_key,
+            node_vss(0),
             rpc,
             0,
             true,

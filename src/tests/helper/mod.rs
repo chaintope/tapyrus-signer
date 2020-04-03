@@ -1,4 +1,4 @@
-use crate::net::{BlockGenerationRoundMessageType, Message, MessageType, SignerID};
+use crate::net::{Message, MessageType, SignerID};
 use crate::tests::helper::keys::TEST_KEYS;
 use bitcoin::{Address, PrivateKey};
 
@@ -7,6 +7,7 @@ pub mod keys;
 pub mod net;
 pub mod node_parameters_builder;
 pub mod node_state_builder;
+pub mod node_vss;
 pub mod rpc;
 
 pub fn enable_log(log_level: Option<log::Level>) {
@@ -22,9 +23,7 @@ pub fn enable_log(log_level: Option<log::Level>) {
 pub fn create_message() -> Message {
     let signer_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
     Message {
-        message_type: MessageType::BlockGenerationRoundMessages(
-            BlockGenerationRoundMessageType::Roundfailure,
-        ),
+        message_type: MessageType::Roundfailure,
         sender_id: signer_id,
         receiver_id: None,
     }
@@ -39,6 +38,7 @@ pub fn address(private_key: &PrivateKey) -> Address {
 pub mod test_vectors {
     use crate::blockdata::Block;
     use crate::crypto::multi_party_schnorr::LocalSig;
+    use crate::crypto::vss::Vss;
     use crate::net::SignerID;
     use crate::signer_node::NodeParameters;
     use crate::signer_node::SharedSecret;
@@ -142,19 +142,25 @@ pub mod test_vectors {
     }
 
     pub fn to_node_parameters(value: &Value, rpc: MockRpc) -> NodeParameters<MockRpc> {
-        let private_key = private_key_from_wif(&value["node_private_key"]);
-        let public_keys: Vec<PublicKey> = value["public_keys"]
+        let node_vss: Vec<Vss> = value["node_vss"]
             .as_array()
             .unwrap()
             .iter()
-            .map(|pk| to_public_key(pk))
+            .map(|i| Vss::from_str(i.as_str().unwrap()).unwrap())
+            .collect();
+        let public_keys: Vec<PublicKey> = node_vss
+            .iter()
+            .map(|i| i.sender_public_key.clone())
             .collect();
         let threshold = value["threshold"].as_u64().unwrap();
+        let public_key = to_public_key(&value["public_key"]);
+
         NodeParametersBuilder::new()
             .rpc(rpc)
             .threshold(threshold as u8)
             .pubkey_list(public_keys.clone())
-            .private_key(private_key)
+            .public_key(public_key)
+            .node_vss(node_vss)
             .build()
     }
 }

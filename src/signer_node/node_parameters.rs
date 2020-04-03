@@ -1,15 +1,21 @@
 use super::utils::sender_index;
-use crate::crypto::multi_party_schnorr::Parameters;
+use crate::crypto::multi_party_schnorr::{Parameters, SharedKeys};
+use crate::crypto::vss::Vss;
+use crate::errors::Error;
 use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
-use bitcoin::{Address, PrivateKey, PublicKey};
+use crate::sign::Sign;
+use crate::signer_node::{SharedSecret, SharedSecretMap};
+use bitcoin::{Address, PublicKey};
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::{
+    ShamirSecretSharing, VerifiableSS,
+};
 use std::convert::TryInto;
 use std::sync::Arc;
 
 pub struct NodeParameters<T: TapyrusApi> {
     pub pubkey_list: Vec<PublicKey>,
     pub threshold: u8,
-    pub private_key: PrivateKey,
     pub rpc: std::sync::Arc<T>,
     pub address: Address,
     /// Own Signer ID. Actually it is signer own public key.
@@ -17,23 +23,21 @@ pub struct NodeParameters<T: TapyrusApi> {
     pub self_node_index: usize,
     pub round_duration: u64,
     pub skip_waiting_ibd: bool,
+    pub node_vss: Vec<Vss>,
 }
 
 impl<T: TapyrusApi> NodeParameters<T> {
     pub fn new(
         to_address: Address,
         pubkey_list: Vec<PublicKey>,
-        private_key: PrivateKey,
         threshold: u8,
+        public_key: PublicKey,
+        node_vss: Vec<Vss>,
         rpc: T,
         round_duration: u64,
         skip_waiting_ibd: bool,
     ) -> NodeParameters<T> {
-        let secp = secp256k1::Secp256k1::new();
-        let self_pubkey = private_key.public_key(&secp);
-        let signer_id = SignerID {
-            pubkey: self_pubkey,
-        };
+        let signer_id = SignerID { pubkey: public_key };
 
         let mut pubkey_list = pubkey_list;
         NodeParameters::<T>::sort_publickey(&mut pubkey_list);
@@ -42,14 +46,20 @@ impl<T: TapyrusApi> NodeParameters<T> {
         NodeParameters {
             pubkey_list,
             threshold,
-            private_key,
             rpc: Arc::new(rpc),
             address: to_address,
             signer_id,
             self_node_index,
             round_duration,
             skip_waiting_ibd,
+            node_vss,
         }
+    }
+
+    pub fn verify_nodevss(&self) -> Result<(), Error> {
+        Sign::verify_vss_and_construct_key(&self.node_shared_secrets(), &self.self_node_index)
+            .map_err(|_| Error::InvalidArgs("The nodevss includes invalid share.".to_string()))
+            .map(|_| ())
     }
 
     pub fn get_signer_id_by_index(&self, index: usize) -> SignerID {
@@ -74,14 +84,55 @@ impl<T: TapyrusApi> NodeParameters<T> {
             Ord::cmp(&a[..], &b[..])
         });
     }
+
+    /// Returns Map collection of received shares from all each signers in Key Generation Protocol
+    pub fn node_shared_secrets(&self) -> SharedSecretMap {
+        let mut secret_shares = SharedSecretMap::new();
+        for vss in &self.node_vss {
+            secret_shares.insert(
+                SignerID {
+                    pubkey: vss.sender_public_key,
+                },
+                SharedSecret {
+                    vss: VerifiableSS {
+                        parameters: ShamirSecretSharing {
+                            threshold: (self.threshold - 1) as usize,
+                            share_count: self.node_vss.len(),
+                        },
+                        commitments: vss
+                            .positive_commitments
+                            .iter()
+                            .map(|i| i.to_point())
+                            .collect(),
+                    },
+                    secret_share: vss.positive_secret,
+                },
+            );
+        }
+        secret_shares
+    }
+
+    /// Returns an aggregated share of the node.
+    pub fn node_secret_share(&self) -> SharedKeys {
+        let secret_shares = self.node_shared_secrets();
+
+        let shared_keys =
+            Sign::verify_vss_and_construct_key(&secret_shares, &(self.self_node_index + 1))
+                .expect("invalid vss");
+        shared_keys
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::signer_node::NodeParameters;
     use crate::tests::helper::keys::TEST_KEYS;
+    use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
     use crate::tests::helper::rpc::MockRpc;
     use bitcoin::PublicKey;
+    use curv::arithmetic::traits::Converter;
+    use curv::elliptic::curves::traits::ECScalar;
+    use curv::BigInt;
     use std::str::FromStr;
 
     #[test]
@@ -114,5 +165,16 @@ mod tests {
                 .unwrap(),
             ]
         );
+    }
+
+    #[test]
+    fn test_verify_nodevss() {
+        let mut params = NodeParametersBuilder::new().build();
+        assert!(params.verify_nodevss().is_ok());
+
+        let secret =
+            BigInt::from_hex("fca3cd89e0a73a7da43e5a79ab47c3e03ce2e7e7ec0def56b6c7dfaf5a095738");
+        params.node_vss[0].positive_secret = ECScalar::from(&secret);
+        assert!(params.verify_nodevss().is_err());
     }
 }

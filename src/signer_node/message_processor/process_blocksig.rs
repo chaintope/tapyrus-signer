@@ -1,18 +1,16 @@
 use crate::blockdata::hash::SHA256Hash;
 use crate::blockdata::Block;
-use crate::crypto::multi_party_schnorr::{SharedKeys, Signature};
+use crate::crypto::multi_party_schnorr::Signature;
 use crate::crypto::vss::Vss;
 use crate::errors::Error;
-use crate::net::{
-    BlockGenerationRoundMessageType, ConnectionManager, Message, MessageType, SignerID,
-};
+use crate::net::{ConnectionManager, Message, MessageType, SignerID};
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
 use crate::signer_node::message_processor::get_valid_block;
 use crate::signer_node::node_state::builder::{Builder, Master};
+use crate::signer_node::NodeParameters;
 use crate::signer_node::NodeState;
-use crate::signer_node::{NodeParameters, SharedSecretMap};
-use bitcoin::{PrivateKey, PublicKey};
+use bitcoin::PublicKey;
 use curv::FE;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -23,8 +21,6 @@ pub fn process_blocksig<T, C>(
     blockhash: SHA256Hash,
     gamma_i: FE,
     e: FE,
-    priv_shared_keys: &SharedKeys,
-    shared_secrets: &SharedSecretMap,
     prev_state: &NodeState,
     conman: &C,
     params: &NodeParameters<T>,
@@ -45,10 +41,9 @@ where
             })
             .public_keys(params.pubkey_list.clone())
             .threshold(params.threshold as usize)
-            .node_privaet_key(params.private_key)
-            .priv_shared_key(priv_shared_keys.clone())
-            .shared_secrets(shared_secrets.clone())
-            .prev_state(prev_state.clone());
+            .public_key(params.signer_id.pubkey)
+            .prev_state(prev_state.clone())
+            .node_vss(params.node_vss.clone());
         builder
     };
     // extract values from state object.
@@ -131,10 +126,10 @@ where
         candidate_block,
         new_signatures,
         &params.pubkey_list,
-        shared_secrets,
+        &params.node_shared_secrets(),
         &block_shared_keys,
         &shared_block_secrets_by_participants,
-        priv_shared_keys,
+        &params.node_secret_share(),
     ) {
         Ok(sig) => sig,
         Err(e) => {
@@ -205,9 +200,7 @@ where
 {
     log::info!("Broadcast CompletedBlock message. {:?}", block.hash());
     let message = Message {
-        message_type: MessageType::BlockGenerationRoundMessages(
-            BlockGenerationRoundMessageType::Completedblock(block),
-        ),
+        message_type: MessageType::Completedblock(block),
         sender_id: own_id.clone(),
         receiver_id: None,
     };
@@ -218,10 +211,9 @@ where
 pub struct Dump {
     public_keys: Vec<PublicKey>,
     threshold: usize,
-    node_privaet_key: PrivateKey,
+    public_key: PublicKey,
+    node_vss: Vec<Vss>,
     received: Received,
-    priv_shared_key: SharedKeys,
-    shared_secrets: SharedSecretMap,
     prev_state: NodeState,
     #[builder(setter(strip_option), default)]
     completed_block: Option<Block>,
@@ -245,7 +237,7 @@ pub struct Received {
 #[cfg(test)]
 mod tests {
     use super::process_blocksig;
-    use crate::net::{BlockGenerationRoundMessageType, Message};
+    use crate::net::Message;
     use crate::signer_node::message_processor::process_blocksig::Dump;
     use crate::signer_node::*;
     use crate::tests::helper::net::TestConnectionManager;
@@ -265,7 +257,8 @@ mod tests {
             .rpc(MockRpc::new())
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
-            .private_key(dump.node_privaet_key)
+            .public_key(dump.public_key)
+            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -273,8 +266,6 @@ mod tests {
             dump.received.block_hash.clone(),
             dump.received.gamma_i.clone(),
             dump.received.e.clone(),
-            &dump.priv_shared_key,
-            &dump.shared_secrets,
             &dump.prev_state,
             &conman,
             &params,
@@ -298,7 +289,8 @@ mod tests {
             .rpc(MockRpc::new())
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
-            .private_key(dump.node_privaet_key)
+            .public_key(dump.public_key)
+            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -306,8 +298,6 @@ mod tests {
             dump.received.block_hash.clone(),
             dump.received.gamma_i.clone(),
             dump.received.e.clone(),
-            &dump.priv_shared_key,
-            &dump.shared_secrets,
             &dump.prev_state,
             &conman,
             &params,
@@ -333,7 +323,8 @@ mod tests {
             .rpc(MockRpc::new())
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
-            .private_key(dump.node_privaet_key)
+            .public_key(dump.public_key)
+            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -341,8 +332,6 @@ mod tests {
             dump.received.block_hash.clone(),
             dump.received.gamma_i.clone(),
             dump.received.e.clone(),
-            &dump.priv_shared_key,
-            &dump.shared_secrets,
             &dump.prev_state,
             &conman,
             &params,
@@ -389,7 +378,8 @@ mod tests {
             .rpc(MockRpc::new())
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
-            .private_key(dump.node_privaet_key)
+            .public_key(dump.public_key)
+            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -397,8 +387,6 @@ mod tests {
             dump.received.block_hash.clone(),
             dump.received.gamma_i.clone(),
             dump.received.e.clone(),
-            &dump.priv_shared_key,
-            &dump.shared_secrets,
             &dump.prev_state,
             &conman,
             &params,
@@ -410,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    fn test_process_blocksig_receiving_invaid_signature() {
+    fn test_process_blocksig_receiving_invalid_signature() {
         // when node
         //  - receives a valid block,
         //  - has the number of signatures to generate a aggregated signature,
@@ -418,7 +406,7 @@ mod tests {
         // node should return prev_state.
         let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
         let dump: Dump = serde_json::from_value(
-            contents["cases"]["process_blocksig_receiving_invaid_signature"].clone(),
+            contents["cases"]["process_blocksig_receiving_invalid_signature"].clone(),
         )
         .unwrap();
         let conman = TestConnectionManager::new();
@@ -426,7 +414,8 @@ mod tests {
             .rpc(MockRpc::new())
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
-            .private_key(dump.node_privaet_key)
+            .public_key(dump.public_key)
+            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -434,8 +423,6 @@ mod tests {
             dump.received.block_hash.clone(),
             dump.received.gamma_i.clone(),
             dump.received.e.clone(),
-            &dump.priv_shared_key,
-            &dump.shared_secrets,
             &dump.prev_state,
             &conman,
             &params,
@@ -447,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    fn test_process_blocksig_with_invaid_signature() {
+    fn test_process_blocksig_with_invalid_signature() {
         // when node
         //  - receives a valid block,
         //  - has the number of signatures to generate a aggregated signature,
@@ -457,7 +444,7 @@ mod tests {
 
         let contents = load_test_vector("./tests/resources/process_blocksig.json").unwrap();
         let dump: Dump = serde_json::from_value(
-            contents["cases"]["process_blocksig_with_invaid_signature"].clone(),
+            contents["cases"]["process_blocksig_with_invalid_signature"].clone(),
         )
         .unwrap();
         let conman = TestConnectionManager::new();
@@ -465,7 +452,8 @@ mod tests {
             .rpc(MockRpc::new())
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
-            .private_key(dump.node_privaet_key)
+            .public_key(dump.public_key)
+            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -473,8 +461,6 @@ mod tests {
             dump.received.block_hash.clone(),
             dump.received.gamma_i.clone(),
             dump.received.e.clone(),
-            &dump.priv_shared_key,
-            &dump.shared_secrets,
             &dump.prev_state,
             &conman,
             &params,
@@ -506,16 +492,13 @@ mod tests {
             .rpc(rpc)
             .threshold(dump.threshold as u8)
             .pubkey_list(dump.public_keys.clone())
-            .private_key(dump.node_privaet_key)
+            .public_key(dump.public_key)
+            .node_vss(dump.node_vss.clone())
             .build();
 
         let mut conman = TestConnectionManager::new();
         conman.should_broadcast(Message {
-            message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Completedblock(
-                    dump.completed_block.unwrap().clone(),
-                ),
-            ),
+            message_type: MessageType::Completedblock(dump.completed_block.unwrap().clone()),
             sender_id: params.signer_id,
             receiver_id: None,
         });
@@ -525,8 +508,6 @@ mod tests {
             dump.received.block_hash.clone(),
             dump.received.gamma_i.clone(),
             dump.received.e.clone(),
-            &dump.priv_shared_key,
-            &dump.shared_secrets,
             &dump.prev_state,
             &conman,
             &params,

@@ -3,13 +3,11 @@ mod process_blocksig;
 mod process_blockvss;
 mod process_candidateblock;
 mod process_completedblock;
-mod process_nodevss;
 pub use process_blockparticipants::process_blockparticipants;
 pub use process_blocksig::process_blocksig;
 pub use process_blockvss::process_blockvss;
 pub use process_candidateblock::process_candidateblock;
 pub use process_completedblock::process_completedblock;
-pub use process_nodevss::process_nodevss;
 
 use crate::blockdata::hash::SHA256Hash;
 use crate::blockdata::Block;
@@ -17,7 +15,6 @@ use crate::crypto::multi_party_schnorr::Keys;
 use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
 use crate::crypto::vss::Vss;
 use crate::errors::Error;
-use crate::net::BlockGenerationRoundMessageType;
 use crate::net::ConnectionManager;
 use crate::net::Message;
 use crate::net::MessageType;
@@ -87,14 +84,12 @@ where
         }
 
         conman.send_message(Message {
-            message_type: MessageType::BlockGenerationRoundMessages(
-                BlockGenerationRoundMessageType::Blockvss(
-                    block.sighash(),
-                    vss_scheme_for_positive.clone(),
-                    secret_shares_for_positive[i],
-                    vss_scheme_for_negative.clone(),
-                    secret_shares_for_negative[i],
-                ),
+            message_type: MessageType::Blockvss(
+                block.sighash(),
+                vss_scheme_for_positive.clone(),
+                secret_shares_for_positive[i],
+                vss_scheme_for_negative.clone(),
+                secret_shares_for_negative[i],
             ),
             sender_id: params.signer_id,
             receiver_id: Some(SignerID {
@@ -119,7 +114,6 @@ where
 fn generate_local_sig<T>(
     blockhash: SHA256Hash,
     shared_block_secrets: &BidirectionalSharedSecretMap,
-    priv_shared_keys: &SharedKeys,
     prev_state: &NodeState,
     params: &NodeParameters<T>,
 ) -> Result<(bool, SharedKeys, LocalSig), Error>
@@ -132,7 +126,7 @@ where
     );
     let block = get_valid_block(prev_state, blockhash)?;
     Vss::create_local_sig_from_shares(
-        priv_shared_keys,
+        &params.node_secret_share(),
         params.self_node_index + 1,
         shared_block_secrets,
         &block,
@@ -146,12 +140,10 @@ fn broadcast_localsig<C: ConnectionManager>(
     signer_id: &SignerID,
 ) {
     conman.broadcast_message(Message {
-        message_type: MessageType::BlockGenerationRoundMessages(
-            BlockGenerationRoundMessageType::Blocksig(
-                sighash,
-                local_sig.gamma_i.clone(),
-                local_sig.e.clone(),
-            ),
+        message_type: MessageType::Blocksig(
+            sighash,
+            local_sig.gamma_i.clone(),
+            local_sig.e.clone(),
         ),
         sender_id: signer_id.clone(),
         receiver_id: None,

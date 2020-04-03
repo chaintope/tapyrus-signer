@@ -227,7 +227,7 @@ impl FromStr for Vss {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Error> {
         let hex = hex::decode(s).map_err(|_| Error::InvalidArgs("failed parse hex".to_string()))?;
-        Ok(deserialize::<Vss>(&hex[..]).expect("failed parse hex"))
+        Ok(deserialize::<Vss>(&hex[..])?)
     }
 }
 
