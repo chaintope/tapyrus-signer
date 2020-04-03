@@ -37,6 +37,16 @@ impl Federations {
             ));
         }
 
+        // Check the block
+        let unique_block_height: HashSet<u64> =
+            self.federations.iter().map(|i| i.block_height).collect();
+        if unique_block_height.len() != self.federations.len() {
+            return Err(Error::InvalidFederation(
+                None,
+                "The federations include block height duplication. The block height in all federations should be unique.",
+            ));
+        }
+
         for federation in &self.federations {
             federation.validate()?;
         }
@@ -45,7 +55,7 @@ impl Federations {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Federation {
     /// The id of the signer who runs this node.
     signer_id: SignerID,
@@ -222,6 +232,15 @@ mod tests {
         match federations.validate() {
             Err(Error::InvalidFederation(_, m)) => {
                 assert_eq!(m, "At least the node must have one federation")
+            }
+            _ => assert!(false, "it should error"),
+        }
+
+        let federation = valid_federation();
+        let federations = Federations::new(vec![federation.clone(), federation]);
+        match federations.validate() {
+            Err(Error::InvalidFederation(None, m)) => {
+                assert_eq!(m, "The federations include block height duplication. The block height in all federations should be unique.")
             }
             _ => assert!(false, "it should error"),
         }
