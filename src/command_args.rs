@@ -10,7 +10,7 @@ use bitcoin::{Address, PublicKey};
 use clap::{App, Arg};
 use log;
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub const OPTION_NAME_CONFIG: &str = "config";
 
@@ -19,6 +19,7 @@ pub const OPTION_NAME_TO_ADDRESS: &str = "coinbase_pay_to_address";
 pub const OPTION_NAME_THRESHOLD: &str = "threshold";
 pub const OPTION_NAME_PUBLIC_KEY: &str = "publickey";
 pub const OPTION_NAME_NODE_VSS: &str = "nodevss";
+pub const OPTION_NAME_FEDERATIONS_FILE: &str = "federations-file";
 
 /// # RPC Config
 pub const OPTION_NAME_RPC_ENDPOINT_HOST: &str = "rpc_endpoint_host";
@@ -76,6 +77,7 @@ struct SignerToml {
     threshold: Option<u8>,
     publickey: Option<String>,
     nodevss: Option<Vec<String>>,
+    federations_file: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -121,6 +123,7 @@ pub struct SignerCommandArgs<'a> {
     threshold: Option<u8>,
     public_key: Option<&'a str>,
     node_vss: Option<Vec<&'a str>>,
+    federations_file: Option<&'a str>,
 }
 
 pub struct SignerConfig<'a> {
@@ -198,6 +201,18 @@ impl<'a> SignerConfig<'a> {
         }
         // all VSSs are valid
         parse_results.into_iter().map(|r| r.unwrap()).collect()
+    }
+
+    pub fn federations_file(&self) -> &Path {
+        let value_within_config: Option<&str> = self
+            .toml_config
+            .and_then(|config| config.federations_file.as_ref())
+            .map(|p| p as &str);
+        self.command_args
+            .federations_file
+            .or(value_within_config)
+            .and_then(|s| Some(Path::new(s)))
+            .expect("Must be specified federations-file.")
     }
 }
 
@@ -401,6 +416,7 @@ impl<'a> CommandArgs<'a> {
                     .matches
                     .values_of(OPTION_NAME_NODE_VSS)
                     .map(|vs| vs.collect()),
+                federations_file: self.matches.value_of(OPTION_NAME_FEDERATIONS_FILE),
             },
             toml_config: self.config.as_ref().and_then(|c| c.signer.as_ref()),
         }
@@ -477,6 +493,10 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
             .value_name("NODE_VSS")
             .multiple(true)
             .help("Node VSS. Verifiable Secret Share for key generation protocol in distributed schnorr signature method."))
+        .arg(Arg::with_name(OPTION_NAME_FEDERATIONS_FILE)
+            .long("federations-file")
+            .value_name("FILE")
+            .help("The path to TOML file of the federations of the chain."))
         .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_HOST)
             .long("rpchost")
             .value_name("HOST_NAME or IP")
@@ -589,6 +609,10 @@ fn test_load_from_file() {
         node_vss[2].to_string(),
         "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000003"
     );
+    assert_eq!(
+        args.signer_config().federations_file(),
+        Path::new("/tmp/federations.toml")
+    );
 
     // rpc parameters are loaded from toml data.
     assert_eq!(args.rpc_config().host(), "localhost");
@@ -622,6 +646,7 @@ fn test_priority_commandline() {
         "--nodevss=03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000001",
         "--nodevss=03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000002",
         "--nodevss=03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000003",
+        "--federations-file=/tmp/federations.toml",
         "--rpchost=tapyrus.dev.chaintope.com",
         "--rpcport=12345",
         "--rpcuser=test",
@@ -655,6 +680,10 @@ fn test_priority_commandline() {
     assert_eq!(
         node_vss[2].to_string(),
         "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000003"
+    );
+    assert_eq!(
+        args.signer_config().federations_file(),
+        Path::new("/tmp/federations.toml")
     );
 
     // rpc parameters are loaded from toml data.
@@ -700,6 +729,7 @@ fn test_invalid_public_key() {
                 privatekey: None,
                 publickey: Some("aabbccdd".to_string()),
                 nodevss: None,
+                federations_file: None,
             }),
             ..ConfigToml::default()
         }),
@@ -758,6 +788,7 @@ fn test_invalid_to_address() {
                 privatekey: None,
                 publickey: None,
                 nodevss: None,
+                federations_file: None,
             }),
             ..ConfigToml::default()
         }),
