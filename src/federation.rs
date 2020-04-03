@@ -29,7 +29,7 @@ impl Federations {
     pub fn validate(&self) -> Result<(), Error> {
         if self.vec.len() == 0 {
             return Err(Error::InvalidFederation(
-                "At least the node must have one federation".to_string(),
+                "At least the node must have one federation",
             ));
         }
 
@@ -138,7 +138,7 @@ impl Federation {
             .any(|i| signers.iter().filter(|j| i == *j).count() > 1);
         if is_overlap {
             return Err(Error::InvalidFederation(
-                "nodevss has overlapping sender vss.".to_string(),
+                "nodevss has overlapping sender vss.",
             ));
         }
 
@@ -148,7 +148,7 @@ impl Federation {
             .iter()
             .any(|i| i.receiver_public_key != self.signer_id.pubkey)
         {
-            return Err(Error::InvalidFederation("The nodevss has wrong receiver value. All VSS's receiver_public_key should be equal with publich key of the signer who runs the node.".to_string()));
+            return Err(Error::InvalidFederation("The nodevss has wrong receiver value. All VSS's receiver_public_key should be equal with publich key of the signer who runs the node."));
         }
 
         // Check all commitment length is correct.
@@ -158,7 +158,7 @@ impl Federation {
             .any(|vss| vss.positive_commitments.len() != self.threshold as usize)
         {
             return Err(Error::InvalidFederation(
-                "The nodevss has wrong vss which has wrong number of commitments.".to_string(),
+                "The nodevss has wrong vss which has wrong number of commitments.",
             ));
         }
 
@@ -167,7 +167,7 @@ impl Federation {
             .is_err()
         {
             return Err(Error::InvalidFederation(
-                "The nodevss includes invalid share.".to_string(),
+                "The nodevss includes invalid share.",
             ));
         }
 
@@ -210,7 +210,7 @@ mod tests {
         let federations = Federations::new(vec![]);
         match federations.validate() {
             Err(Error::InvalidFederation(m)) => {
-                assert_eq!(m, "At least the node must have one federation".to_string())
+                assert_eq!(m, "At least the node must have one federation")
             }
             _ => assert!(false, "it should error"),
         }
@@ -226,7 +226,7 @@ mod tests {
         federation.nodevss.push(federation.nodevss[0].clone());
         match federation.validate() {
             Err(Error::InvalidFederation(m)) => {
-                assert_eq!(m, "nodevss has overlapping sender vss.".to_string())
+                assert_eq!(m, "nodevss has overlapping sender vss.")
             }
             _ => assert!(false, "it should error"),
         }
@@ -236,7 +236,7 @@ mod tests {
         federation.nodevss[0].receiver_public_key = TEST_KEYS.pubkeys()[0];
         match federation.validate() {
             Err(Error::InvalidFederation(m)) => {
-                assert_eq!(m, "The nodevss has wrong receiver value. All VSS's receiver_public_key should be equal with publich key of the signer who runs the node.".to_string())
+                assert_eq!(m, "The nodevss has wrong receiver value. All VSS's receiver_public_key should be equal with publich key of the signer who runs the node.")
             }
             _ => assert!(false, "it should error"),
         }
@@ -250,7 +250,7 @@ mod tests {
         match federation.validate() {
             Err(Error::InvalidFederation(m)) => assert_eq!(
                 m,
-                "The nodevss has wrong vss which has wrong number of commitments.".to_string()
+                "The nodevss has wrong vss which has wrong number of commitments."
             ),
             _ => assert!(false, "it should error"),
         }
@@ -260,7 +260,7 @@ mod tests {
         federation.nodevss[0].positive_secret = ECScalar::new_random();
         match federation.validate() {
             Err(Error::InvalidFederation(m)) => {
-                assert_eq!(m, "The nodevss includes invalid share.".to_string())
+                assert_eq!(m, "The nodevss includes invalid share.")
             }
             _ => assert!(false, "it should error"),
         }
