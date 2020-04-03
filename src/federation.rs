@@ -8,6 +8,7 @@ use bitcoin::PublicKey;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::{
     ShamirSecretSharing, VerifiableSS,
 };
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct Federations {
@@ -138,9 +139,8 @@ impl Federation {
     pub fn validate(&self) -> Result<(), Error> {
         // Check all sender is different.
         let signers = self.signers();
-        let is_overlap = signers
-            .iter()
-            .any(|i| signers.iter().filter(|j| i == *j).count() > 1);
+        let unique_set: HashSet<&SignerID> = signers.iter().collect();
+        let is_overlap = unique_set.len() < signers.len();
         if is_overlap {
             return Err(Error::InvalidFederation(
                 "nodevss has overlapping sender vss.",
