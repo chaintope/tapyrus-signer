@@ -28,6 +28,8 @@ pub enum Error {
     RedisError(RedisError),
     /// Errors for using incomplete block(like no proof block) as usual block.
     IncompleteBlock,
+    /// Errors when the federation is invalid. This error has the block height of the federation gets started and message string.
+    InvalidFederation(Option<u64>, &'static str),
 }
 
 impl std::fmt::Display for Error {

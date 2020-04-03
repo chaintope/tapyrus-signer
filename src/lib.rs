@@ -23,6 +23,7 @@ pub mod cli;
 pub mod command_args;
 pub mod crypto;
 pub mod errors;
+pub mod federation;
 pub mod key;
 pub mod net;
 pub mod rpc;
