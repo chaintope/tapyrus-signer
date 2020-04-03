@@ -12,28 +12,30 @@ use curv::cryptographic_primitives::secret_sharing::feldman_vss::{
 #[derive(Debug)]
 pub struct Federations {
     /// The vector of federations. This vector should be sorted by block height.
-    vec: Vec<Federation>,
+    federations: Vec<Federation>,
 }
 
 impl Federations {
     pub fn new(federations: Vec<Federation>) -> Self {
         let mut federations = federations;
         federations.sort_by_key(|f| f.block_height());
-        Federations { vec: federations }
+        Federations {
+            federations: federations,
+        }
     }
 
     pub fn len(&self) -> usize {
-        self.vec.len()
+        self.federations.len()
     }
 
     pub fn validate(&self) -> Result<(), Error> {
-        if self.vec.len() == 0 {
+        if self.federations.len() == 0 {
             return Err(Error::InvalidFederation(
                 "At least the node must have one federation",
             ));
         }
 
-        for federation in &self.vec {
+        for federation in &self.federations {
             federation.validate()?;
         }
 
