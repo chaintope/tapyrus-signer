@@ -72,7 +72,10 @@ impl Federation {
         self.signers()
             .iter()
             .position(|i| *i == self.signer_id)
-            .unwrap()
+            .expect(&format!(
+                "The federation doesn't include the own node({}).",
+                self.signer_id
+            ))
     }
 
     pub fn signers(&self) -> Vec<SignerID> {
