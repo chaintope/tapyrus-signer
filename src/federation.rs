@@ -155,7 +155,7 @@ impl Federation {
             .iter()
             .any(|i| i.receiver_public_key != self.signer_id.pubkey)
         {
-            return Err(Error::InvalidFederation(Some(self.block_height), "The nodevss has wrong receiver value. All VSS's receiver_public_key should be equal with publich key of the signer who runs the node."));
+            return Err(Error::InvalidFederation(Some(self.block_height), "The nodevss has wrong receiver value. All VSS's receiver_public_key should be equal with publish key of the signer who runs the node."));
         }
 
         // Check all commitment length is correct.
@@ -245,7 +245,7 @@ mod tests {
         federation.nodevss[0].receiver_public_key = TEST_KEYS.pubkeys()[0];
         match federation.validate() {
             Err(Error::InvalidFederation(_, m)) => {
-                assert_eq!(m, "The nodevss has wrong receiver value. All VSS's receiver_public_key should be equal with publich key of the signer who runs the node.")
+                assert_eq!(m, "The nodevss has wrong receiver value. All VSS's receiver_public_key should be equal with publish key of the signer who runs the node.")
             }
             _ => assert!(false, "it should error"),
         }
