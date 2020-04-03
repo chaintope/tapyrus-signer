@@ -191,7 +191,9 @@ mod tests {
     use crate::net::SignerID;
     use crate::tests::helper::keys::TEST_KEYS;
     use crate::tests::helper::node_vss::node_vss;
+    use curv::arithmetic::traits::Converter;
     use curv::elliptic::curves::traits::ECScalar;
+    use curv::BigInt;
 
     #[test]
     fn test_signers() {
@@ -266,7 +268,10 @@ mod tests {
 
         // the federation has invalid secret share
         let mut federation = valid_federation();
-        federation.nodevss[0].positive_secret = ECScalar::new_random();
+
+        federation.nodevss[0].positive_secret = ECScalar::from(&BigInt::from_hex(
+            "9b77b12bf0ec14c6094be7657a3a3d473077bc3c8b694ead6c1b6d8c5b4e816c",
+        ));
         match federation.validate() {
             Err(Error::InvalidFederation(_, m)) => {
                 assert_eq!(m, "The nodevss includes invalid share.")
