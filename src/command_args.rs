@@ -4,21 +4,19 @@
 
 use std::str::FromStr;
 
-use crate::crypto::vss::Vss;
 use crate::signer_node::ROUND_INTERVAL_DEFAULT_SECS;
 use bitcoin::{Address, PublicKey};
 use clap::{App, Arg};
 use log;
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub const OPTION_NAME_CONFIG: &str = "config";
 
 /// # Signer Config
 pub const OPTION_NAME_TO_ADDRESS: &str = "coinbase_pay_to_address";
-pub const OPTION_NAME_THRESHOLD: &str = "threshold";
 pub const OPTION_NAME_PUBLIC_KEY: &str = "publickey";
-pub const OPTION_NAME_NODE_VSS: &str = "nodevss";
+pub const OPTION_NAME_FEDERATIONS_FILE: &str = "federations-file";
 
 /// # RPC Config
 pub const OPTION_NAME_RPC_ENDPOINT_HOST: &str = "rpc_endpoint_host";
@@ -73,9 +71,8 @@ struct SignerToml {
     to_address: Option<String>,
     publickeys: Option<Vec<String>>,
     privatekey: Option<String>,
-    threshold: Option<u8>,
     publickey: Option<String>,
-    nodevss: Option<Vec<String>>,
+    federations_file: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -118,9 +115,8 @@ pub struct CommandArgs<'a> {
 
 pub struct SignerCommandArgs<'a> {
     to_address: Option<&'a str>,
-    threshold: Option<u8>,
     public_key: Option<&'a str>,
-    node_vss: Option<Vec<&'a str>>,
+    federations_file: Option<&'a str>,
 }
 
 pub struct SignerConfig<'a> {
@@ -144,14 +140,6 @@ impl<'a> SignerConfig<'a> {
             .expect("Must be specified to_address.")
     }
 
-    pub fn threshold(&self) -> u8 {
-        // TODO: should be retrn Result<u8, Error>?
-        self.command_args
-            .threshold
-            .or(self.toml_config.and_then(|config| config.threshold))
-            .expect("Must be specified threshold.")
-    }
-
     pub fn public_key(&self) -> PublicKey {
         let value_within_config: Option<&str> = self
             .toml_config
@@ -167,37 +155,16 @@ impl<'a> SignerConfig<'a> {
             .expect("Must be specified publickey.")
     }
 
-    pub fn node_vss(&self) -> Vec<Vss> {
-        let vec_string: Option<&Vec<String>> =
-            self.toml_config.and_then(|config| config.nodevss.as_ref());
-        let node_vss_within_config: Option<Vec<&str>> =
-            vec_string.map(|v| v.iter().map(|s| &s as &str).collect());
-        // TODO: maybe panic is not suitable? should be return result<vec, error> ?
-        let specified = self
-            .command_args
-            .node_vss
-            .as_ref()
-            .or(node_vss_within_config.as_ref())
-            .expect("Must be specified nodevss.");
-        let parse_results: Vec<Result<Vss, String>> = specified
-            .iter()
-            .map(|s| {
-                Vss::from_str(s).or_else(|_e| Err(format!("'{}' is invalid VSS format.\n", s)))
-            })
-            .collect();
-
-        // separate invalid pubkey while doing convert.
-        let mut iter = parse_results.iter();
-        let errors: Vec<&String> = iter
-            .by_ref()
-            .filter(|r| r.is_err())
-            .map(|r| r.as_ref().err().unwrap())
-            .collect();
-        if !errors.is_empty() {
-            panic!("{:?}", errors.into_iter().fold(String::new(), |s, e| s + e));
-        }
-        // all VSSs are valid
-        parse_results.into_iter().map(|r| r.unwrap()).collect()
+    pub fn federations_file(&self) -> &Path {
+        let value_within_config: Option<&str> = self
+            .toml_config
+            .and_then(|config| config.federations_file.as_ref())
+            .map(|p| p as &str);
+        self.command_args
+            .federations_file
+            .or(value_within_config)
+            .and_then(|s| Some(Path::new(s)))
+            .expect("Must be specified federations-file.")
     }
 }
 
@@ -390,17 +357,11 @@ impl<'a> CommandArgs<'a> {
     }
 
     pub fn signer_config(&self) -> SignerConfig {
-        let threshold_args = self.matches.value_of(OPTION_NAME_THRESHOLD);
-        let num: Option<u8> = threshold_args.and_then(|s| s.parse().ok());
         SignerConfig {
             command_args: SignerCommandArgs {
                 to_address: self.matches.value_of(OPTION_NAME_TO_ADDRESS),
-                threshold: num,
                 public_key: self.matches.value_of(OPTION_NAME_PUBLIC_KEY),
-                node_vss: self
-                    .matches
-                    .values_of(OPTION_NAME_NODE_VSS)
-                    .map(|vs| vs.collect()),
+                federations_file: self.matches.value_of(OPTION_NAME_FEDERATIONS_FILE),
             },
             toml_config: self.config.as_ref().and_then(|c| c.signer.as_ref()),
         }
@@ -462,21 +423,15 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
             .long("to_address")
             .value_name("TO_ADDRESS")
             .help("Coinbase pay to address."))
-        .arg(Arg::with_name(OPTION_NAME_THRESHOLD)
-            .short("t")
-            .long("threshold")
-            .value_name("NUM")
-            .help("The threshold of enough signer. it must be less than specified public keys."))
         .arg(Arg::with_name(OPTION_NAME_PUBLIC_KEY)
             .short("p")
             .long("publickey")
             .value_name("PUBLIC_KEY")
             .help("Public key of the signer who host this tapyrus-sigenrd. example: 03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc"))
-        .arg(Arg::with_name(OPTION_NAME_NODE_VSS)
-            .long("nodevss")
-            .value_name("NODE_VSS")
-            .multiple(true)
-            .help("Node VSS. Verifiable Secret Share for key generation protocol in distributed schnorr signature method."))
+        .arg(Arg::with_name(OPTION_NAME_FEDERATIONS_FILE)
+            .long("federations-file")
+            .value_name("FILE")
+            .help("The path to TOML file of the federations of the chain."))
         .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_HOST)
             .long("rpchost")
             .value_name("HOST_NAME or IP")
@@ -567,27 +522,14 @@ fn test_load_from_file() {
         .get_matches_from(vec!["node", "-c=tests/resources/signer_config_sample.toml"]);
     let args = CommandArgs::load(matches).unwrap();
 
-    let threshold = args.signer_config().threshold();
-    assert_eq!(threshold, 2);
-
     let public_key = args.signer_config().public_key();
     assert_eq!(
         public_key.to_string(),
         "033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8"
     );
-    let node_vss = args.signer_config().node_vss();
-    assert_eq!(node_vss.len(), 3);
     assert_eq!(
-        node_vss[0].to_string(),
-        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000001"
-    );
-    assert_eq!(
-        node_vss[1].to_string(),
-        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000002"
-    );
-    assert_eq!(
-        node_vss[2].to_string(),
-        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000003"
+        args.signer_config().federations_file(),
+        Path::new("/tmp/federations.toml")
     );
 
     // rpc parameters are loaded from toml data.
@@ -617,11 +559,8 @@ fn test_priority_commandline() {
     let matches = get_options().get_matches_from(vec![
         "node",
         "-c=tests/resources/signer_config.toml",
-        "--threshold=1",
         "-p=033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8",
-        "--nodevss=03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000001",
-        "--nodevss=03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000002",
-        "--nodevss=03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000003",
+        "--federations-file=/tmp/federations.toml",
         "--rpchost=tapyrus.dev.chaintope.com",
         "--rpcport=12345",
         "--rpcuser=test",
@@ -634,27 +573,14 @@ fn test_priority_commandline() {
     ]);
     let args = CommandArgs::load(matches).unwrap();
 
-    let threshold = args.signer_config().threshold();
-    assert_eq!(threshold, 1);
-
     let public_key = args.signer_config().public_key();
     assert_eq!(
         public_key.to_string(),
         "033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8"
     );
-    let node_vss = args.signer_config().node_vss();
-    assert_eq!(node_vss.len(), 3);
     assert_eq!(
-        node_vss[0].to_string(),
-        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000001"
-    );
-    assert_eq!(
-        node_vss[1].to_string(),
-        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000002"
-    );
-    assert_eq!(
-        node_vss[2].to_string(),
-        "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca203e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee100014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163967359e69f3af7b7e1b3e3a294ab81a2c5b02658b8deee2008aa39eff6bf55742900000000000000000000000000000000000000000000000000000000000000014f8f2711cfcf76a4d3cb350b5cd59906685dc7fbb320541e7e1f7885b37163968ca61960c508481e4c1c5d6b547e5d3a4fd9a7472111dff755c6100840aa88060000000000000000000000000000000000000000000000000000000000000003"
+        args.signer_config().federations_file(),
+        Path::new("/tmp/federations.toml")
     );
 
     // rpc parameters are loaded from toml data.
@@ -676,17 +602,6 @@ fn test_priority_commandline() {
 }
 
 #[test]
-#[should_panic(expected = "Must be specified threshold.")]
-fn test_no_thrshold() {
-    let matches = get_options().get_matches_from(vec!["node"]);
-    let args = CommandArgs {
-        matches,
-        config: Some(ConfigToml::default()),
-    };
-    let _threshold = args.signer_config().threshold();
-}
-
-#[test]
 #[should_panic(expected = "'aabbccdd' is invalid public key. error msg:")]
 fn test_invalid_public_key() {
     let matches = get_options().get_matches_from(vec!["node"]);
@@ -696,10 +611,9 @@ fn test_invalid_public_key() {
             signer: Some(SignerToml {
                 to_address: None,
                 publickeys: None,
-                threshold: Some(0),
                 privatekey: None,
                 publickey: Some("aabbccdd".to_string()),
-                nodevss: None,
+                federations_file: None,
             }),
             ..ConfigToml::default()
         }),
@@ -719,32 +633,6 @@ fn test_no_public_key() {
 }
 
 #[test]
-#[should_panic(
-    expected = "\\'aaaa\\' is invalid VSS format.\\n\\'bbbb\\' is invalid VSS format.\\n"
-)]
-fn test_invalid_nod_vss() {
-    let matches = get_options().get_matches_from(vec![
-        "node",
-        "-c=tests/resources/signer_config.toml",
-        "--nodevss=aaaa",
-        "--nodevss=bbbb",
-    ]);
-    let args = CommandArgs::load(matches).unwrap();
-    let _node_vss = args.signer_config().node_vss();
-}
-
-#[test]
-#[should_panic(expected = "Must be specified nodevss.")]
-fn test_no_node_vss() {
-    let matches = get_options().get_matches_from(vec!["node"]);
-    let args = CommandArgs {
-        matches,
-        config: Some(ConfigToml::default()),
-    };
-    let _node_vss = args.signer_config().node_vss();
-}
-
-#[test]
 #[should_panic(expected = "'aabbccdd' is invalid address. error msg:")]
 fn test_invalid_to_address() {
     let matches = get_options().get_matches_from(vec!["node"]);
@@ -754,10 +642,9 @@ fn test_invalid_to_address() {
             signer: Some(SignerToml {
                 to_address: Some("aabbccdd".to_string()),
                 publickeys: None,
-                threshold: Some(0),
                 privatekey: None,
                 publickey: None,
-                nodevss: None,
+                federations_file: None,
             }),
             ..ConfigToml::default()
         }),

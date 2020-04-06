@@ -25,6 +25,12 @@ impl Federations {
         }
     }
 
+    pub fn last(&self) -> &Federation {
+        self.federations
+            .last()
+            .expect("Federations should not be empty.")
+    }
+
     pub fn len(&self) -> usize {
         self.federations.len()
     }
