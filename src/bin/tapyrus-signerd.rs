@@ -64,18 +64,18 @@ fn main() {
         .map(|vss| vss.sender_public_key.clone())
         .collect();
 
-    // TODO: set federations to NodeParameters
-    let _federations = load_federations(
+    let federations = load_federations(
         &signer_config.public_key(),
         signer_config.federations_file(),
     );
+    let federation = federations.last();
 
     let params = NodeParameters::new(
         signer_config.to_address(),
-        public_keys,
-        signer_config.threshold(),
+        federation.signers().iter().map(|i| i.pubkey).collect(),
+        federation.threshold(),
         signer_config.public_key(),
-        node_vss,
+        federation.nodevss().clone(),
         rpc,
         round_duration,
         general_config.skip_waiting_ibd(),
