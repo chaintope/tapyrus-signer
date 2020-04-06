@@ -14,10 +14,12 @@ use bitcoin::PublicKey;
 
 use daemonize::Daemonize;
 use std::fs::OpenOptions;
+use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tapyrus_signer::command_args::{CommandArgs, RedisConfig, RpcConfig};
 use tapyrus_signer::crypto::vss::Vss;
+use tapyrus_signer::federation::Federations;
 use tapyrus_signer::net::{ConnectionManager, RedisManager};
 use tapyrus_signer::rpc::Rpc;
 use tapyrus_signer::signer_node::{NodeParameters, SignerNode};
@@ -61,6 +63,12 @@ fn main() {
         .iter()
         .map(|vss| vss.sender_public_key.clone())
         .collect();
+
+    // TODO: set federations to NodeParameters
+    let _federations = load_federations(
+        &signer_config.public_key(),
+        signer_config.federations_file(),
+    );
 
     let params = NodeParameters::new(
         signer_config.to_address(),
@@ -204,10 +212,36 @@ fn start_unix_signal_handling() {
     });
 }
 
+fn load_federations(pubkey: &PublicKey, path: &Path) -> Federations {
+    let federations_toml = std::fs::read_to_string(path).expect(&format!(
+        "Can't open federations_file. path: {:?} Error",
+        path
+    ));
+    match Federations::from_pubkey_and_toml(pubkey, &federations_toml) {
+        Ok(r) => r,
+        Err(tapyrus_signer::errors::Error::InvalidTomlFormat(e)) => {
+            panic!("federations_file: Invalid TOML format. {}", e);
+        }
+        Err(tapyrus_signer::errors::Error::InvalidFederation(Some(height), m)) => {
+            panic!(
+                "federations_file: Invalid Federation at {} height. message: {}",
+                height, m
+            );
+        }
+        Err(tapyrus_signer::errors::Error::InvalidFederation(None, m)) => {
+            panic!("federations_file: Invalid. message: {}", m);
+        }
+        Err(e) => {
+            panic!("federations_file: {}", e);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{connect_rpc, connect_signer_network, validate_options};
+    use crate::{connect_rpc, connect_signer_network, load_federations, validate_options};
     use bitcoin::PublicKey;
+    use std::path::Path;
     use std::str::FromStr;
     use tapyrus_signer::command_args::{RedisConfig, RpcConfig};
     use tapyrus_signer::crypto::vss::Vss;
@@ -313,5 +347,58 @@ mod tests {
         };
 
         connect_signer_network(config);
+    }
+
+    #[test]
+    fn test_load_federations() {
+        let pubkey = PublicKey::from_str(
+            "02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506",
+        )
+        .unwrap();
+
+        let path = Path::new("tests/resources/federations.toml");
+        let federations = load_federations(&pubkey, path);
+
+        assert_eq!(federations.len(), 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "Can't open federations_file. path: \"/foo/bar/no_exist_file.toml\"")]
+    fn test_load_federations_invalid_file_path() {
+        let pubkey = PublicKey::from_str(
+            "02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506",
+        )
+        .unwrap();
+
+        let path = Path::new("/foo/bar/no_exist_file.toml");
+        load_federations(&pubkey, path);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "federations_file: Invalid Federation at 0 height. message: The nodevss has wrong vss which has wrong number of commitments."
+    )]
+    fn test_load_federations_has_invalid_federation() {
+        let pubkey = PublicKey::from_str(
+            "02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506",
+        )
+        .unwrap();
+
+        let path = Path::new("tests/resources/federations_has_invalid_federation.toml");
+        load_federations(&pubkey, path);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "federations_file: Invalid TOML format. missing field `threshold` for key `federation` at line 12 column 1"
+    )]
+    fn test_load_federations_invalid_toml_format() {
+        let pubkey = PublicKey::from_str(
+            "02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506",
+        )
+        .unwrap();
+
+        let path = Path::new("tests/resources/federations_invalid_toml_format.toml");
+        load_federations(&pubkey, path);
     }
 }
