@@ -39,15 +39,15 @@ mod tests {
     #[test]
     fn test_process_completedblock() {
         let block = get_block(0);
-        let mut rpc = MockRpc::new();
-        // It should call testproposedblock RPC once.
-        rpc.should_call_testproposedblock(Ok(true));
+        let rpc = MockRpc::new();
         let params = NodeParametersBuilder::new().rpc(rpc).build();
 
         // check 1, next_master_index should be incremented after process completeblock message.
         let prev_state = Member::for_test().master_index(0).build();
         let sender_id = SignerID::new(TEST_KEYS.pubkeys()[4]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
+
+        params.rpc.assert();
 
         match &state {
             NodeState::RoundComplete {
@@ -57,9 +57,13 @@ mod tests {
         }
 
         // check 2, next master index should be back to 0 if the previous master index is the last number.
+        let rpc = MockRpc::new();
+        let params = NodeParametersBuilder::new().rpc(rpc).build();
         let prev_state = Member::for_test().master_index(4).build();
         let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
+
+        params.rpc.assert();
 
         match &state {
             NodeState::RoundComplete {
@@ -72,14 +76,14 @@ mod tests {
     #[test]
     fn test_process_completedblock_ignore_different_master() {
         let block = get_block(0);
-        let mut rpc = MockRpc::new();
-        // It should call testproposedblock RPC once.
-        rpc.should_call_testproposedblock(Ok(true));
+        let rpc = MockRpc::new();
         let params = NodeParametersBuilder::new().rpc(rpc).build();
 
         let prev_state = Member::for_test().master_index(0).build();
         let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
+
+        params.rpc.assert();
 
         // It should not incremented if not recorded master.
         assert_eq!(master_index(&state, &params).unwrap(), 0);
