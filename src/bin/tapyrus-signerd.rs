@@ -68,11 +68,6 @@ fn main() {
         general_config.skip_waiting_ibd(),
     );
 
-    // Verify share
-    params
-        .verify_nodevss()
-        .expect("The nodevss has invalid vss");
-
     let node = &mut SignerNode::new(con, params);
     node.start();
 }
@@ -175,7 +170,6 @@ mod tests {
     use std::path::Path;
     use std::str::FromStr;
     use tapyrus_signer::command_args::{RedisConfig, RpcConfig};
-    use tapyrus_signer::crypto::vss::Vss;
 
     #[test]
     #[should_panic(
