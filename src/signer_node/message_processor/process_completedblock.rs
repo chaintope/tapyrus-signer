@@ -5,7 +5,7 @@ use crate::signer_node::{is_master, master_index, next_master_index, NodeParamet
 
 pub fn process_completedblock<T>(
     sender_id: &SignerID,
-    _block: &Block,
+    block: &Block,
     prev_state: &NodeState,
     params: &NodeParameters<T>,
 ) -> NodeState
@@ -15,6 +15,16 @@ where
     if !is_master(sender_id, prev_state, params) {
         log::warn!("Peer {} may be malicious node. It might impersonate as master or your node might be behind from others.", sender_id);
         return prev_state.clone(); // Ignore message
+    }
+
+    if let Err(e) = params.rpc.submitblock(block) {
+        log::warn!(
+            "The node gets invalid completed block from peer: {}, block: {:?}, rpc error: {:?}",
+            sender_id,
+            block,
+            e
+        );
+        return prev_state.clone();
     }
 
     NodeState::RoundComplete {
@@ -39,7 +49,8 @@ mod tests {
     #[test]
     fn test_process_completedblock() {
         let block = get_block(0);
-        let rpc = MockRpc::new();
+        let mut rpc = MockRpc::new();
+        rpc.should_call_submitblock(Ok(()));
         let params = NodeParametersBuilder::new().rpc(rpc).build();
 
         // check 1, next_master_index should be incremented after process completeblock message.
@@ -57,7 +68,8 @@ mod tests {
         }
 
         // check 2, next master index should be back to 0 if the previous master index is the last number.
-        let rpc = MockRpc::new();
+        let mut rpc = MockRpc::new();
+        rpc.should_call_submitblock(Ok(()));
         let params = NodeParametersBuilder::new().rpc(rpc).build();
         let prev_state = Member::for_test().master_index(4).build();
         let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
