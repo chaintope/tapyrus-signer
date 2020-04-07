@@ -41,8 +41,7 @@ where
             })
             .public_keys(params.pubkey_list.clone())
             .public_key(params.signer_id.pubkey)
-            .prev_state(prev_state.clone())
-            .node_vss(params.node_vss.clone());
+            .prev_state(prev_state.clone());
         builder
     };
     // extract values from state object.
@@ -260,7 +259,6 @@ mod tests {
             .rpc(MockRpc::new())
             .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
-            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -291,7 +289,6 @@ mod tests {
             .rpc(MockRpc::new())
             .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
-            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -324,7 +321,6 @@ mod tests {
             .rpc(MockRpc::new())
             .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
-            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -378,7 +374,6 @@ mod tests {
             .rpc(MockRpc::new())
             .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
-            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -420,7 +415,6 @@ mod tests {
             .rpc(MockRpc::new())
             .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
-            .node_vss(dump.node_vss.clone())
             .federations(federations)
             .build();
 
@@ -465,7 +459,6 @@ mod tests {
             .rpc(MockRpc::new())
             .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
-            .node_vss(dump.node_vss.clone())
             .federations(federations)
             .build();
 
@@ -512,7 +505,6 @@ mod tests {
             .rpc(rpc)
             .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
-            .node_vss(dump.node_vss.clone())
             .federations(federations)
             .build();
 

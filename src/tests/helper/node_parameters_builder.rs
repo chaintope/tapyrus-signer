@@ -1,4 +1,3 @@
-use crate::crypto::vss::Vss;
 use crate::federation::{Federation, Federations};
 use crate::signer_node::NodeParameters;
 use crate::tests::helper::address;
@@ -14,7 +13,6 @@ pub struct NodeParametersBuilder {
     round_duration: u64,
     skip_waiting_ibd: bool,
     public_key: PublicKey,
-    node_vss: Vec<Vss>,
     federations: Federations,
 }
 
@@ -28,7 +26,6 @@ impl NodeParametersBuilder {
             round_duration: 0,
             skip_waiting_ibd: true,
             public_key: TEST_KEYS.pubkeys()[2],
-            node_vss: node_vss(0),
             federations: Federations::new(vec![Federation::new(
                 TEST_KEYS.pubkeys()[0],
                 0,
@@ -43,7 +40,6 @@ impl NodeParametersBuilder {
             self.address.clone(),
             self.pubkey_list.clone(),
             self.public_key,
-            self.node_vss.clone(),
             self.rpc.take().unwrap_or(MockRpc::new()),
             self.round_duration,
             self.skip_waiting_ibd,
@@ -58,11 +54,6 @@ impl NodeParametersBuilder {
 
     pub fn public_key(&mut self, public_key: PublicKey) -> &mut Self {
         self.public_key = public_key;
-        self
-    }
-
-    pub fn node_vss(&mut self, node_vss: Vec<Vss>) -> &mut Self {
-        self.node_vss = node_vss;
         self
     }
 

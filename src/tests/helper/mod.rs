@@ -167,7 +167,6 @@ pub mod test_vectors {
             .rpc(rpc)
             .pubkey_list(public_keys.clone())
             .public_key(public_key)
-            .node_vss(node_vss)
             .federations(federations)
             .build()
     }

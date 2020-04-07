@@ -61,7 +61,6 @@ fn main() {
         signer_config.to_address(),
         federation.signers().iter().map(|i| i.pubkey).collect(),
         signer_config.public_key(),
-        federation.nodevss().clone(),
         rpc,
         round_duration,
         general_config.skip_waiting_ibd(),

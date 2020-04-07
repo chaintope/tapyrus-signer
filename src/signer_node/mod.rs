@@ -567,7 +567,6 @@ mod tests {
             to_address,
             pubkey_list,
             public_key,
-            node_vss(0),
             rpc,
             0,
             true,

@@ -1,6 +1,5 @@
 use super::utils::sender_index;
 use crate::crypto::multi_party_schnorr::Parameters;
-use crate::crypto::vss::Vss;
 use crate::federation::{Federation, Federations};
 use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
@@ -17,7 +16,6 @@ pub struct NodeParameters<T: TapyrusApi> {
     pub self_node_index: usize,
     pub round_duration: u64,
     pub skip_waiting_ibd: bool,
-    pub node_vss: Vec<Vss>,
     federations: Federations,
 }
 
@@ -26,7 +24,6 @@ impl<T: TapyrusApi> NodeParameters<T> {
         to_address: Address,
         pubkey_list: Vec<PublicKey>,
         public_key: PublicKey,
-        node_vss: Vec<Vss>,
         rpc: T,
         round_duration: u64,
         skip_waiting_ibd: bool,
@@ -46,7 +43,6 @@ impl<T: TapyrusApi> NodeParameters<T> {
             self_node_index,
             round_duration,
             skip_waiting_ibd,
-            node_vss,
             federations,
         }
     }
