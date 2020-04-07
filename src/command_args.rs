@@ -68,33 +68,47 @@ pub const DEFAULT_CONFIG_FILENAME: &str = "signer_config.toml";
 
 #[derive(Debug, Deserialize, Default)]
 struct SignerToml {
+    #[serde(rename = "to-address")]
     to_address: Option<String>,
+    #[serde(rename = "public-key")]
     publickey: Option<String>,
+    #[serde(rename = "federations-file")]
     federations_file: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct RpcToml {
+    #[serde(rename = "rpc-endpoint-host")]
     rpc_endpoint_host: Option<String>,
+    #[serde(rename = "rpc-endpoint-port")]
     rpc_endpoint_port: Option<u32>,
+    #[serde(rename = "rpc-endpoint-user")]
     rpc_endpoint_user: Option<String>,
+    #[serde(rename = "rpc-endpoint-pass")]
     rpc_endpoint_pass: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct RedisToml {
+    #[serde(rename = "redis-host")]
     redis_host: Option<String>,
+    #[serde(rename = "redis-port")]
     redis_port: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct GeneralToml {
+    #[serde(rename = "round-duration")]
     round_duration: Option<u64>,
+    #[serde(rename = "log-level")]
     log_level: Option<String>,
+    #[serde(rename = "log-quiet")]
     log_quiet: Option<bool>,
+    #[serde(rename = "skip-waiting-ibd")]
     skip_waiting_ibd: Option<bool>,
     daemon: Option<bool>,
     pid: Option<String>,
+    #[serde(rename = "log-file")]
     log_file: Option<String>,
 }
 
