@@ -80,7 +80,7 @@ where
         sharing_params.share_count,
     );
 
-    for i in 0..params.pubkey_list.len() {
+    for i in 0..params.pubkey_list(block_height).len() {
         // Skip broadcasting if it is vss for myself. Just return this.
         if i == self_node_index {
             continue;
@@ -96,7 +96,7 @@ where
             ),
             sender_id: params.signer_id,
             receiver_id: Some(SignerID {
-                pubkey: params.pubkey_list[i],
+                pubkey: params.pubkey_list(block_height)[i],
             }),
         });
     }

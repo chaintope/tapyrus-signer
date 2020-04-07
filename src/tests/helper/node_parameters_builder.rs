@@ -7,7 +7,6 @@ use crate::tests::helper::rpc::MockRpc;
 use bitcoin::{Address, PublicKey};
 
 pub struct NodeParametersBuilder {
-    pubkey_list: Vec<PublicKey>,
     rpc: Option<MockRpc>,
     address: Address,
     round_duration: u64,
@@ -20,7 +19,6 @@ impl NodeParametersBuilder {
     /// Returns instance with default value for test.(it not same with production default)
     pub fn new() -> Self {
         Self {
-            pubkey_list: TEST_KEYS.pubkeys(),
             rpc: None,
             address: address(&TEST_KEYS.key[0]),
             round_duration: 0,
@@ -38,18 +36,12 @@ impl NodeParametersBuilder {
     pub fn build(&mut self) -> NodeParameters<MockRpc> {
         NodeParameters::new(
             self.address.clone(),
-            self.pubkey_list.clone(),
             self.public_key,
             self.rpc.take().unwrap_or(MockRpc::new()),
             self.round_duration,
             self.skip_waiting_ibd,
             self.federations.clone(),
         )
-    }
-
-    pub fn pubkey_list(&mut self, pubkey_list: Vec<PublicKey>) -> &mut Self {
-        self.pubkey_list = pubkey_list;
-        self
     }
 
     pub fn public_key(&mut self, public_key: PublicKey) -> &mut Self {

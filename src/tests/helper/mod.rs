@@ -150,10 +150,6 @@ pub mod test_vectors {
             .iter()
             .map(|i| Vss::from_str(i.as_str().unwrap()).unwrap())
             .collect();
-        let public_keys: Vec<PublicKey> = node_vss
-            .iter()
-            .map(|i| i.sender_public_key.clone())
-            .collect();
         let threshold = value["threshold"].as_u64().unwrap();
         let public_key = to_public_key(&value["public_key"]);
         let federations = vec![Federation::new(
@@ -165,7 +161,6 @@ pub mod test_vectors {
         let federations = Federations::new(federations);
         NodeParametersBuilder::new()
             .rpc(rpc)
-            .pubkey_list(public_keys.clone())
             .public_key(public_key)
             .federations(federations)
             .build()

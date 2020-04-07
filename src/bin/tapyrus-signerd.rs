@@ -55,11 +55,9 @@ fn main() {
         &signer_config.public_key(),
         signer_config.federations_file(),
     );
-    let federation = federations.last();
 
     let params = NodeParameters::new(
         signer_config.to_address(),
-        federation.signers().iter().map(|i| i.pubkey).collect(),
         signer_config.public_key(),
         rpc,
         round_duration,

@@ -29,6 +29,8 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
+    let block_height = prev_state.block_height();
+
     #[cfg(feature = "dump")]
     let mut dump_builder = {
         let mut builder = DumpBuilder::default();
@@ -39,7 +41,7 @@ where
                 gamma_i,
                 e,
             })
-            .public_keys(params.pubkey_list.clone())
+            .public_keys(params.pubkey_list(block_height).clone())
             .public_key(params.signer_id.pubkey)
             .prev_state(prev_state.clone());
         builder
@@ -85,8 +87,6 @@ where
     let new_signatures = store_received_local_sig(sender_id, signatures, gamma_i, e);
     state_builder.signatures(new_signatures.clone());
 
-    let block_height = prev_state.block_height();
-
     log::trace!(
         "number of signatures: {:?} (threshold: {:?})",
         new_signatures.len(),
@@ -126,7 +126,7 @@ where
     let signature = match Vss::aggregate_and_verify_signature(
         candidate_block,
         new_signatures,
-        &params.pubkey_list,
+        &params.pubkey_list(block_height),
         &federation.node_shared_secrets(),
         &block_shared_keys,
         &shared_block_secrets_by_participants,
@@ -257,7 +257,6 @@ mod tests {
         let conman = TestConnectionManager::new();
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
-            .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
             .build();
 
@@ -287,7 +286,6 @@ mod tests {
         let conman = TestConnectionManager::new();
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
-            .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
             .build();
 
@@ -319,7 +317,6 @@ mod tests {
         let conman = TestConnectionManager::new();
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
-            .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
             .build();
 
@@ -372,7 +369,6 @@ mod tests {
         let conman = TestConnectionManager::new();
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
-            .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
             .build();
 
@@ -413,7 +409,6 @@ mod tests {
         let federations = Federations::new(federations);
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
-            .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
             .federations(federations)
             .build();
@@ -457,7 +452,6 @@ mod tests {
         let federations = Federations::new(federations);
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
-            .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
             .federations(federations)
             .build();
@@ -503,7 +497,6 @@ mod tests {
         let federations = Federations::new(federations);
         let params = NodeParametersBuilder::new()
             .rpc(rpc)
-            .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
             .federations(federations)
             .build();

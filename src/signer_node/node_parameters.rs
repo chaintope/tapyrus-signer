@@ -7,7 +7,6 @@ use std::convert::TryInto;
 use std::sync::Arc;
 
 pub struct NodeParameters<T: TapyrusApi> {
-    pub pubkey_list: Vec<PublicKey>,
     pub rpc: std::sync::Arc<T>,
     pub address: Address,
     /// Own Signer ID. Actually it is signer own public key.
@@ -20,7 +19,6 @@ pub struct NodeParameters<T: TapyrusApi> {
 impl<T: TapyrusApi> NodeParameters<T> {
     pub fn new(
         to_address: Address,
-        pubkey_list: Vec<PublicKey>,
         public_key: PublicKey,
         rpc: T,
         round_duration: u64,
@@ -29,11 +27,7 @@ impl<T: TapyrusApi> NodeParameters<T> {
     ) -> NodeParameters<T> {
         let signer_id = SignerID { pubkey: public_key };
 
-        let mut pubkey_list = pubkey_list;
-        NodeParameters::<T>::sort_publickey(&mut pubkey_list);
-
         NodeParameters {
-            pubkey_list,
             rpc: Arc::new(rpc),
             address: to_address,
             signer_id,
@@ -47,15 +41,17 @@ impl<T: TapyrusApi> NodeParameters<T> {
         self.federations.get_by_block_height(block_height)
     }
 
-    pub fn get_signer_id_by_index(&self, index: usize) -> SignerID {
+    pub fn get_signer_id_by_index(&self, block_height: u64, index: usize) -> SignerID {
         SignerID {
-            pubkey: self.pubkey_list[index].clone(),
+            pubkey: self.pubkey_list(block_height)[index].clone(),
         }
     }
 
     pub fn sharing_params(&self, block_height: u64) -> Parameters {
         let t = (self.threshold(block_height) - 1 as u8).try_into().unwrap();
-        let n: usize = (self.pubkey_list.len() as u8).try_into().unwrap();
+        let n: usize = (self.pubkey_list(block_height).len() as u8)
+            .try_into()
+            .unwrap();
         Parameters {
             threshold: t,
             share_count: n.clone(),
@@ -78,6 +74,10 @@ impl<T: TapyrusApi> NodeParameters<T> {
     pub fn self_node_index(&self, block_height: u64) -> usize {
         let federation = self.get_federation_by_block_height(block_height);
         federation.node_index()
+    }
+    pub fn pubkey_list(&self, block_height: u64) -> Vec<PublicKey> {
+        let federation = self.get_federation_by_block_height(block_height);
+        federation.signers().iter().map(|s| s.pubkey).collect()
     }
 }
 

@@ -434,7 +434,8 @@ where
         } => *next_master_index,
     };
 
-    next % params.pubkey_list.len()
+    let block_height = state.block_height();
+    next % params.pubkey_list(block_height + 1).len()
 }
 
 pub fn is_master<T>(sender_id: &SignerID, state: &NodeState, params: &NodeParameters<T>) -> bool
@@ -443,8 +444,12 @@ where
 {
     match state {
         NodeState::Master { .. } => params.signer_id == *sender_id,
-        NodeState::Member { master_index, .. } => {
-            let master_id = params.pubkey_list[*master_index];
+        NodeState::Member {
+            master_index,
+            block_height,
+            ..
+        } => {
+            let master_id = params.pubkey_list(*block_height)[*master_index];
             master_id == sender_id.pubkey
         }
         _ => false,
@@ -563,15 +568,7 @@ mod tests {
         let federations =
             Federations::new(vec![Federation::new(public_key, 0, threshold, node_vss(0))]);
 
-        let mut params = NodeParameters::new(
-            to_address,
-            pubkey_list,
-            public_key,
-            rpc,
-            0,
-            true,
-            federations,
-        );
+        let mut params = NodeParameters::new(to_address, public_key, rpc, 0, true, federations);
         params.round_duration = 0;
         let con = TestConnectionManager::new(publish_count, spy);
         let broadcaster = con.sender.clone();
