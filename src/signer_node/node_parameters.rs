@@ -1,7 +1,7 @@
 use super::utils::sender_index;
 use crate::crypto::multi_party_schnorr::{Parameters, SharedKeys};
 use crate::crypto::vss::Vss;
-use crate::federation::Federations;
+use crate::federation::{Federation, Federations};
 use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
 use crate::sign::Sign;
@@ -57,6 +57,10 @@ impl<T: TapyrusApi> NodeParameters<T> {
             node_vss,
             federations,
         }
+    }
+
+    fn get_federation_by_block_height(&self, block_height: u64) -> &Federation {
+        self.federations.get_by_block_height(block_height)
     }
 
     pub fn get_signer_id_by_index(&self, index: usize) -> SignerID {
