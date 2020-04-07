@@ -69,8 +69,6 @@ pub const DEFAULT_CONFIG_FILENAME: &str = "signer_config.toml";
 #[derive(Debug, Deserialize, Default)]
 struct SignerToml {
     to_address: Option<String>,
-    publickeys: Option<Vec<String>>,
-    privatekey: Option<String>,
     publickey: Option<String>,
     federations_file: Option<String>,
 }
@@ -610,8 +608,6 @@ fn test_invalid_public_key() {
         config: Some(ConfigToml {
             signer: Some(SignerToml {
                 to_address: None,
-                publickeys: None,
-                privatekey: None,
                 publickey: Some("aabbccdd".to_string()),
                 federations_file: None,
             }),
@@ -641,8 +637,6 @@ fn test_invalid_to_address() {
         config: Some(ConfigToml {
             signer: Some(SignerToml {
                 to_address: Some("aabbccdd".to_string()),
-                publickeys: None,
-                privatekey: None,
                 publickey: None,
                 federations_file: None,
             }),
