@@ -125,8 +125,11 @@ where
         shared_block_secrets.len()
     );
     let block = get_valid_block(prev_state, blockhash)?;
+    let block_height = prev_state.block_height();
+    let federation = params.get_federation_by_block_height(block_height);
+
     Vss::create_local_sig_from_shares(
-        &params.node_secret_share(),
+        &federation.node_secret_share(),
         params.self_node_index + 1,
         shared_block_secrets,
         &block,

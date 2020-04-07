@@ -87,6 +87,8 @@ where
     let new_signatures = store_received_local_sig(sender_id, signatures, gamma_i, e);
     state_builder.signatures(new_signatures.clone());
 
+    let block_height = prev_state.block_height();
+
     log::trace!(
         "number of signatures: {:?} (threshold: {:?})",
         new_signatures.len(),
@@ -122,14 +124,15 @@ where
         .filter(|(i, ..)| participants.contains(i))
         .collect();
 
+    let federation = params.get_federation_by_block_height(block_height);
     let signature = match Vss::aggregate_and_verify_signature(
         candidate_block,
         new_signatures,
         &params.pubkey_list,
-        &params.node_shared_secrets(),
+        &federation.node_shared_secrets(),
         &block_shared_keys,
         &shared_block_secrets_by_participants,
-        &params.node_secret_share(),
+        &federation.node_secret_share(),
     ) {
         Ok(sig) => sig,
         Err(e) => {
