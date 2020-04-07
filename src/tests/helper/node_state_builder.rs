@@ -17,6 +17,7 @@ impl BuilderForTest for Master {
             BTreeMap::new(),
             HashSet::new(),
             false,
+            0,
         )
     }
 }
@@ -29,6 +30,7 @@ impl BuilderForTest for Member {
             None,
             None,
             HashSet::new(),
+            0,
             0,
         )
     }

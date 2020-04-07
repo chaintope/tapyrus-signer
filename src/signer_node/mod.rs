@@ -277,7 +277,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
-    pub fn start_new_round(&mut self) -> NodeState {
+    pub fn start_new_round(&mut self, block_height: u64) -> NodeState {
         std::thread::sleep(Duration::from_secs(self.params.round_duration));
 
         let block = match self.params.rpc.getnewblock(&self.params.address) {
@@ -310,6 +310,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 shared_secret_for_positive,
                 shared_secret_for_negative,
             )
+            .block_height(block_height)
             .build()
     }
 
@@ -372,6 +373,17 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     fn start_next_round(&mut self, next_master_index: usize) {
         self.round_timer.restart().unwrap();
 
+        let block_height = match self.params.rpc.getblockchaininfo() {
+            Ok(GetBlockchainInfoResult {
+                blocks: block_height,
+                ..
+            }) => block_height,
+            _ => match self.current_state {
+                NodeState::Member { block_height, .. } => block_height + 1,
+                NodeState::Master { block_height, .. } => block_height + 1,
+                _ => panic!("current_state is invalid"),
+            },
+        };
         log::info!(
             "Start next round: self_index={}, master_index={}",
             self.params.self_node_index,
@@ -379,9 +391,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         );
 
         if self.params.self_node_index == next_master_index {
-            self.current_state = self.start_new_round();
+            self.current_state = self.start_new_round(block_height);
         } else {
-            self.current_state = Member::default().master_index(next_master_index).build();
+            self.current_state = Member::default()
+                .master_index(next_master_index)
+                .block_height(block_height)
+                .build();
         }
     }
 
@@ -601,6 +616,7 @@ mod tests {
                 candidate_block: None,
                 participants: HashSet::new(),
                 master_index: 0,
+                block_height: 0,
             },
             rpc,
         );
@@ -674,6 +690,7 @@ mod tests {
                     candidate_block: None,
                     participants: HashSet::new(),
                     master_index: 0,
+                    block_height: 0,
                 },
                 rpc,
             );
