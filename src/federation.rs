@@ -10,7 +10,7 @@ use curv::cryptographic_primitives::secret_sharing::feldman_vss::{
 };
 use std::collections::HashSet;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Federations {
     /// The vector of federations. This vector should be sorted by block height.
     federations: Vec<Federation>,

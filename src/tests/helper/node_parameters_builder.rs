@@ -1,4 +1,5 @@
 use crate::crypto::vss::Vss;
+use crate::federation::Federations;
 use crate::signer_node::NodeParameters;
 use crate::tests::helper::address;
 use crate::tests::helper::keys::TEST_KEYS;
@@ -15,6 +16,7 @@ pub struct NodeParametersBuilder {
     skip_waiting_ibd: bool,
     public_key: PublicKey,
     node_vss: Vec<Vss>,
+    federations: Federations,
 }
 
 impl NodeParametersBuilder {
@@ -29,6 +31,7 @@ impl NodeParametersBuilder {
             skip_waiting_ibd: true,
             public_key: TEST_KEYS.pubkeys()[2],
             node_vss: node_vss(0),
+            federations: Federations::new(vec![]),
         }
     }
 
@@ -42,6 +45,7 @@ impl NodeParametersBuilder {
             self.rpc.take().unwrap_or(MockRpc::new()),
             self.round_duration,
             self.skip_waiting_ibd,
+            self.federations.clone(),
         )
     }
 

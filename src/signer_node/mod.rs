@@ -434,6 +434,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::federation::Federations;
     use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
     use crate::rpc::tests::{safety, MockRpc};
     use crate::rpc::TapyrusApi;
@@ -540,6 +541,7 @@ mod tests {
         let private_key = TEST_KEYS.key[0];
         let to_address = address(&private_key);
         let public_key = pubkey_list[0].clone();
+        let federations = Federations::new(vec![]);
 
         let mut params = NodeParameters::new(
             to_address,
@@ -550,6 +552,7 @@ mod tests {
             rpc,
             0,
             true,
+            federations,
         );
         params.round_duration = 0;
         let con = TestConnectionManager::new(publish_count, spy);

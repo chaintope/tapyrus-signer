@@ -66,6 +66,7 @@ fn main() {
         rpc,
         round_duration,
         general_config.skip_waiting_ibd(),
+        federations,
     );
 
     let node = &mut SignerNode::new(con, params);
