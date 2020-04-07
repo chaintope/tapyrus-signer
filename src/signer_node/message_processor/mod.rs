@@ -58,12 +58,13 @@ pub fn create_block_vss<T, C>(
     block: Block,
     params: &NodeParameters<T>,
     conman: &C,
+    block_height: u64,
 ) -> (Keys, SharedSecret, SharedSecret)
 where
     T: TapyrusApi,
     C: ConnectionManager,
 {
-    let sharing_params = params.sharing_params();
+    let sharing_params = params.sharing_params(block_height);
 
     let (
         key,

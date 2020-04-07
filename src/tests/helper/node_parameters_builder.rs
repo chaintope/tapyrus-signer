@@ -1,5 +1,5 @@
 use crate::crypto::vss::Vss;
-use crate::federation::Federations;
+use crate::federation::{Federation, Federations};
 use crate::signer_node::NodeParameters;
 use crate::tests::helper::address;
 use crate::tests::helper::keys::TEST_KEYS;
@@ -9,7 +9,6 @@ use bitcoin::{Address, PublicKey};
 
 pub struct NodeParametersBuilder {
     pubkey_list: Vec<PublicKey>,
-    threshold: u8,
     rpc: Option<MockRpc>,
     address: Address,
     round_duration: u64,
@@ -24,14 +23,18 @@ impl NodeParametersBuilder {
     pub fn new() -> Self {
         Self {
             pubkey_list: TEST_KEYS.pubkeys(),
-            threshold: 3,
             rpc: None,
             address: address(&TEST_KEYS.key[0]),
             round_duration: 0,
             skip_waiting_ibd: true,
             public_key: TEST_KEYS.pubkeys()[2],
             node_vss: node_vss(0),
-            federations: Federations::new(vec![]),
+            federations: Federations::new(vec![Federation::new(
+                TEST_KEYS.pubkeys()[0],
+                0,
+                2,
+                node_vss(0),
+            )]),
         }
     }
 
@@ -39,7 +42,6 @@ impl NodeParametersBuilder {
         NodeParameters::new(
             self.address.clone(),
             self.pubkey_list.clone(),
-            self.threshold,
             self.public_key,
             self.node_vss.clone(),
             self.rpc.take().unwrap_or(MockRpc::new()),
@@ -51,11 +53,6 @@ impl NodeParametersBuilder {
 
     pub fn pubkey_list(&mut self, pubkey_list: Vec<PublicKey>) -> &mut Self {
         self.pubkey_list = pubkey_list;
-        self
-    }
-
-    pub fn threshold(&mut self, threshold: u8) -> &mut Self {
-        self.threshold = threshold;
         self
     }
 
@@ -86,6 +83,11 @@ impl NodeParametersBuilder {
 
     pub fn skip_waiting_ibd(&mut self, skip_waiting_ibd: bool) -> &mut Self {
         self.skip_waiting_ibd = skip_waiting_ibd;
+        self
+    }
+
+    pub fn federations(&mut self, federations: Federations) -> &mut Self {
+        self.federations = federations;
         self
     }
 }

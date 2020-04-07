@@ -60,7 +60,6 @@ fn main() {
     let params = NodeParameters::new(
         signer_config.to_address(),
         federation.signers().iter().map(|i| i.pubkey).collect(),
-        federation.threshold(),
         signer_config.public_key(),
         federation.nodevss().clone(),
         rpc,

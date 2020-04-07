@@ -10,7 +10,6 @@ use std::sync::Arc;
 
 pub struct NodeParameters<T: TapyrusApi> {
     pub pubkey_list: Vec<PublicKey>,
-    pub threshold: u8,
     pub rpc: std::sync::Arc<T>,
     pub address: Address,
     /// Own Signer ID. Actually it is signer own public key.
@@ -26,7 +25,6 @@ impl<T: TapyrusApi> NodeParameters<T> {
     pub fn new(
         to_address: Address,
         pubkey_list: Vec<PublicKey>,
-        threshold: u8,
         public_key: PublicKey,
         node_vss: Vec<Vss>,
         rpc: T,
@@ -42,7 +40,6 @@ impl<T: TapyrusApi> NodeParameters<T> {
         let self_node_index = sender_index(&signer_id, &pubkey_list);
         NodeParameters {
             pubkey_list,
-            threshold,
             rpc: Arc::new(rpc),
             address: to_address,
             signer_id,
@@ -64,8 +61,8 @@ impl<T: TapyrusApi> NodeParameters<T> {
         }
     }
 
-    pub fn sharing_params(&self) -> Parameters {
-        let t = (self.threshold - 1 as u8).try_into().unwrap();
+    pub fn sharing_params(&self, block_height: u64) -> Parameters {
+        let t = (self.threshold(block_height) - 1 as u8).try_into().unwrap();
         let n: usize = (self.pubkey_list.len() as u8).try_into().unwrap();
         Parameters {
             threshold: t,
@@ -79,6 +76,11 @@ impl<T: TapyrusApi> NodeParameters<T> {
             let b = b.key.serialize();
             Ord::cmp(&a[..], &b[..])
         });
+    }
+
+    pub fn threshold(&self, block_height: u64) -> u8 {
+        let federation = self.get_federation_by_block_height(block_height);
+        federation.threshold()
     }
 }
 

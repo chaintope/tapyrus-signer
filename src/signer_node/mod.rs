@@ -299,8 +299,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             receiver_id: None,
         });
 
-        let (keys, shared_secret_for_positive, shared_secret_for_negative) =
-            create_block_vss(block.clone(), &self.params, &self.connection_manager);
+        let (keys, shared_secret_for_positive, shared_secret_for_negative) = create_block_vss(
+            block.clone(),
+            &self.params,
+            &self.connection_manager,
+            block_height,
+        );
 
         Master::default()
             .candidate_block(Some(block))
@@ -449,7 +453,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::federation::Federations;
+    use crate::federation::{Federation, Federations};
     use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
     use crate::rpc::tests::{safety, MockRpc};
     use crate::rpc::TapyrusApi;
@@ -556,12 +560,12 @@ mod tests {
         let private_key = TEST_KEYS.key[0];
         let to_address = address(&private_key);
         let public_key = pubkey_list[0].clone();
-        let federations = Federations::new(vec![]);
+        let federations =
+            Federations::new(vec![Federation::new(public_key, 0, threshold, node_vss(0))]);
 
         let mut params = NodeParameters::new(
             to_address,
             pubkey_list,
-            threshold,
             public_key,
             node_vss(0),
             rpc,
