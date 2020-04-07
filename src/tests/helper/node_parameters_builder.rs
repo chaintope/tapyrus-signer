@@ -20,12 +20,12 @@ impl NodeParametersBuilder {
     pub fn new() -> Self {
         Self {
             rpc: None,
-            address: address(&TEST_KEYS.key[0]),
+            address: address(&TEST_KEYS.key[4]),
             round_duration: 0,
             skip_waiting_ibd: true,
-            public_key: TEST_KEYS.pubkeys()[2],
+            public_key: TEST_KEYS.pubkeys()[4],
             federations: Federations::new(vec![Federation::new(
-                TEST_KEYS.pubkeys()[0],
+                TEST_KEYS.pubkeys()[1],
                 0,
                 Some(2),
                 node_vss(0),

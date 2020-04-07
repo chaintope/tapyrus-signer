@@ -56,7 +56,7 @@ mod tests {
 
         // check 1, next_master_index should be incremented after process completeblock message.
         let prev_state = Member::for_test().master_index(0).build();
-        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[4]);
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
 
         params.rpc.assert();
@@ -73,7 +73,7 @@ mod tests {
         rpc.should_call_submitblock(Ok(()));
         let params = NodeParametersBuilder::new().rpc(rpc).build();
         let prev_state = Member::for_test().master_index(4).build();
-        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[4]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
 
         params.rpc.assert();
@@ -100,7 +100,7 @@ mod tests {
         let params = NodeParametersBuilder::new().rpc(rpc).build();
 
         let prev_state = Member::for_test().master_index(0).build();
-        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[4]);
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
 
         params.rpc.assert();
@@ -120,7 +120,7 @@ mod tests {
         let params = NodeParametersBuilder::new().rpc(rpc).build();
 
         let prev_state = Member::for_test().master_index(0).build();
-        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[4]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
 
         params.rpc.assert();

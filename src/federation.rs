@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn test_signers() {
         let federation = Federation::new(
-            TEST_KEYS.pubkeys()[4],
+            TEST_KEYS.pubkeys()[0],
             0,
             Some(3),
             node_vss(0),
@@ -344,7 +344,7 @@ mod tests {
 
     fn valid_federation() -> Federation {
         Federation::new(
-            TEST_KEYS.pubkeys()[4],
+            TEST_KEYS.pubkeys()[0],
             0,
             Some(3),
             node_vss(0),
@@ -392,7 +392,7 @@ mod tests {
 
         // federation has invalid vss whose receiver is not equal with the node itself.
         let mut federation = valid_federation();
-        federation.nodevss[0].receiver_public_key = TEST_KEYS.pubkeys()[0];
+        federation.nodevss[0].receiver_public_key = TEST_KEYS.pubkeys()[4];
         match federation.validate() {
             Err(Error::InvalidFederation(_, m)) => {
                 assert_eq!(m, "The nodevss has wrong receiver value. All VSS's receiver_public_key should be equal with publish key of the signer who runs the node.")
