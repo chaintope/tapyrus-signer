@@ -1,4 +1,3 @@
-use super::utils::sender_index;
 use crate::crypto::multi_party_schnorr::Parameters;
 use crate::federation::{Federation, Federations};
 use crate::net::SignerID;
@@ -13,7 +12,6 @@ pub struct NodeParameters<T: TapyrusApi> {
     pub address: Address,
     /// Own Signer ID. Actually it is signer own public key.
     pub signer_id: SignerID,
-    pub self_node_index: usize,
     pub round_duration: u64,
     pub skip_waiting_ibd: bool,
     federations: Federations,
@@ -34,13 +32,11 @@ impl<T: TapyrusApi> NodeParameters<T> {
         let mut pubkey_list = pubkey_list;
         NodeParameters::<T>::sort_publickey(&mut pubkey_list);
 
-        let self_node_index = sender_index(&signer_id, &pubkey_list);
         NodeParameters {
             pubkey_list,
             rpc: Arc::new(rpc),
             address: to_address,
             signer_id,
-            self_node_index,
             round_duration,
             skip_waiting_ibd,
             federations,
@@ -77,6 +73,11 @@ impl<T: TapyrusApi> NodeParameters<T> {
     pub fn threshold(&self, block_height: u64) -> u8 {
         let federation = self.get_federation_by_block_height(block_height);
         federation.threshold()
+    }
+
+    pub fn self_node_index(&self, block_height: u64) -> usize {
+        let federation = self.get_federation_by_block_height(block_height);
+        federation.node_index()
     }
 }
 

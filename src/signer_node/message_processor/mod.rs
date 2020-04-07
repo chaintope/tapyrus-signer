@@ -66,6 +66,8 @@ where
 {
     let sharing_params = params.sharing_params(block_height);
 
+    let self_node_index = params.self_node_index(block_height);
+
     let (
         key,
         vss_scheme_for_positive,
@@ -73,14 +75,14 @@ where
         vss_scheme_for_negative,
         secret_shares_for_negative,
     ) = Vss::create_block_shares(
-        params.self_node_index + 1,
+        self_node_index + 1,
         sharing_params.threshold + 1,
         sharing_params.share_count,
     );
 
     for i in 0..params.pubkey_list.len() {
         // Skip broadcasting if it is vss for myself. Just return this.
-        if i == params.self_node_index {
+        if i == self_node_index {
             continue;
         }
 
@@ -103,11 +105,11 @@ where
         key,
         SharedSecret {
             vss: vss_scheme_for_positive.clone(),
-            secret_share: secret_shares_for_positive[params.self_node_index],
+            secret_share: secret_shares_for_positive[self_node_index],
         },
         SharedSecret {
             vss: vss_scheme_for_negative.clone(),
-            secret_share: secret_shares_for_negative[params.self_node_index],
+            secret_share: secret_shares_for_negative[self_node_index],
         },
     )
 }
@@ -131,7 +133,7 @@ where
 
     Vss::create_local_sig_from_shares(
         &federation.node_secret_share(),
-        params.self_node_index + 1,
+        params.self_node_index(block_height) + 1,
         shared_block_secrets,
         &block,
     )

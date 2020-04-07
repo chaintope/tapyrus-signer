@@ -390,11 +390,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         };
         log::info!(
             "Start next round: self_index={}, master_index={}",
-            self.params.self_node_index,
+            self.params.self_node_index(block_height),
             next_master_index,
         );
 
-        if self.params.self_node_index == next_master_index {
+        if self.params.self_node_index(block_height) == next_master_index {
             self.current_state = self.start_new_round(block_height);
         } else {
             self.current_state = Member::default()
@@ -414,7 +414,7 @@ where
     T: TapyrusApi,
 {
     match state {
-        NodeState::Master { .. } => Some(params.self_node_index),
+        NodeState::Master { .. } => Some(params.self_node_index(state.block_height())),
         NodeState::Member { master_index, .. } => Some(*master_index),
         NodeState::RoundComplete { master_index, .. } => Some(*master_index),
         _ => None,
@@ -427,7 +427,7 @@ where
 {
     let next = match state {
         NodeState::Joining => 0,
-        NodeState::Master { .. } => params.self_node_index + 1,
+        NodeState::Master { .. } => params.self_node_index(state.block_height()) + 1,
         NodeState::Member { master_index, .. } => master_index + 1,
         NodeState::RoundComplete {
             next_master_index, ..
