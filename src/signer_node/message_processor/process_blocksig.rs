@@ -34,6 +34,8 @@ where
     #[cfg(feature = "dump")]
     let mut dump_builder = {
         let mut builder = DumpBuilder::default();
+        let federation = params.get_federation_by_block_height(block_height);
+        let node_vss = federation.nodevss();
         builder
             .received(Received {
                 sender: sender_id.clone(),
@@ -42,8 +44,10 @@ where
                 e,
             })
             .public_keys(params.pubkey_list(block_height).clone())
+            .threshold(params.threshold(block_height) as usize)
             .public_key(params.signer_id.pubkey)
-            .prev_state(prev_state.clone());
+            .prev_state(prev_state.clone())
+            .node_vss(node_vss.clone());
         builder
     };
     // extract values from state object.
