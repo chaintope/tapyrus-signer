@@ -77,9 +77,15 @@ impl<T: TapyrusApi> NodeParameters<T> {
         let federation = self.get_federation_by_block_height(block_height);
         federation.node_index()
     }
+
     pub fn pubkey_list(&self, block_height: u64) -> Vec<PublicKey> {
         let federation = self.get_federation_by_block_height(block_height);
         federation.signers().iter().map(|s| s.pubkey).collect()
+    }
+
+    pub fn aggregated_public_key(&self, block_height: u64) -> PublicKey {
+        let federation = self.get_federation_by_block_height(block_height);
+        federation.aggregated_public_key()
     }
 }
 

@@ -296,6 +296,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             }
         };
 
+        let block = self.add_aggregated_public_key_if_needed(block_height, block);
         log::info!(
             "Broadcast candidate block. block hash for signing: {:?}",
             block.sighash()
@@ -329,6 +330,19 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         let block_height = self.current_state.block_height();
         let federation = self.params.get_federation_by_block_height(block_height);
         federation.signers().contains(sender_id)
+    }
+
+    fn add_aggregated_public_key_if_needed(&self, block_height: u64, block: Block) -> Block {
+        let next_block_height = block_height + 1;
+        let federation = self
+            .params
+            .get_federation_by_block_height(next_block_height);
+        if federation.block_height() == next_block_height {
+            let aggregated_public_key = self.params.aggregated_public_key(next_block_height);
+            block.add_aggregated_public_key(aggregated_public_key)
+        } else {
+            block
+        }
     }
 
     pub fn process_round_message(
