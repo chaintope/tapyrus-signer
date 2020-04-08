@@ -19,6 +19,7 @@ use crate::signer_node::message_processor::process_blockvss;
 use crate::signer_node::message_processor::process_candidateblock;
 use crate::signer_node::message_processor::process_completedblock;
 use crate::signer_node::node_state::builder::{Builder, Master, Member};
+
 use crate::timer::RoundTimeOutObserver;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::FE;
@@ -318,11 +319,20 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             .build()
     }
 
+    fn is_federation_member(&self, sender_id: &SignerID) -> bool {
+        let block_height = self.current_state.block_height();
+        let federation = self.params.get_federation_by_block_height(block_height);
+        federation.signers().contains(sender_id)
+    }
+
     pub fn process_round_message(
         &mut self,
         sender_id: &SignerID,
         message: MessageType,
     ) -> NodeState {
+        if !self.is_federation_member(sender_id) {
+            return self.current_state.clone();
+        }
         match message {
             MessageType::Candidateblock(block) => process_candidateblock(
                 &sender_id,
@@ -471,8 +481,10 @@ mod tests {
     use crate::tests::helper::keys::TEST_KEYS;
     use crate::tests::helper::node_vss::node_vss;
     use crate::tests::helper::{address, enable_log};
+    use bitcoin::PublicKey;
     use redis::ControlFlow;
     use std::collections::HashSet;
+    use std::str::FromStr;
     use std::sync::mpsc::{channel, Receiver, Sender};
     use std::sync::Arc;
     use std::thread;
@@ -576,6 +588,37 @@ mod tests {
         let mut node = SignerNode::new(con, params);
         node.current_state = current_state;
         (node, broadcaster)
+    }
+
+    #[test]
+    fn test_is_federation_member() {
+        let public_key = TEST_KEYS.pubkeys()[0];
+        let arc_block = safety(get_block(0));
+        let rpc = MockRpc {
+            return_block: arc_block.clone(),
+        };
+        let node = create_node(
+            NodeState::Member {
+                block_key: None,
+                block_shared_keys: None,
+                shared_block_secrets: BidirectionalSharedSecretMap::new(),
+                candidate_block: None,
+                participants: HashSet::new(),
+                master_index: 0,
+                block_height: 0,
+            },
+            rpc,
+        );
+        let result = node.is_federation_member(&SignerID::new(public_key));
+        assert!(result);
+
+        // This signer is not member of the federation.
+        let public_key = PublicKey::from_str(
+            "023cb7d6326e33332d04d026be1a04cdaf084703d8dc75322182d8fb314a03a877",
+        )
+        .unwrap();
+        let result = node.is_federation_member(&SignerID::new(public_key));
+        assert!(!result);
     }
 
     #[test]
