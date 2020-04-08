@@ -580,12 +580,18 @@ mod tests {
         publish_count: u32,
     ) -> (SignerNode<T, TestConnectionManager>, Sender<Message>) {
         let pubkey_list = TEST_KEYS.pubkeys();
-        let threshold = 3;
+        let threshold = Some(3);
         let private_key = TEST_KEYS.key[0];
         let to_address = address(&private_key);
         let public_key = pubkey_list[0].clone();
-        let federations =
-            Federations::new(vec![Federation::new(public_key, 0, threshold, node_vss(0))]);
+        let aggregated_public_key = TEST_KEYS.aggregated();
+        let federations = Federations::new(vec![Federation::new(
+            public_key,
+            0,
+            threshold,
+            node_vss(0),
+            aggregated_public_key,
+        )]);
 
         let mut params = NodeParameters::new(to_address, public_key, rpc, 0, true, federations);
         params.round_duration = 0;

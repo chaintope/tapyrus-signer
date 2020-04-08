@@ -68,7 +68,9 @@ impl<T: TapyrusApi> NodeParameters<T> {
 
     pub fn threshold(&self, block_height: u64) -> u8 {
         let federation = self.get_federation_by_block_height(block_height);
-        federation.threshold()
+        federation
+            .threshold()
+            .expect("threshold should not be None")
     }
 
     pub fn self_node_index(&self, block_height: u64) -> usize {

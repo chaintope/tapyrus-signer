@@ -59,6 +59,12 @@ impl TestKeys {
             .unwrap(),
         ]
     }
+
+    pub fn aggregated(&self) -> PublicKey {
+        PublicKey::from_str("030d856ac9f5871c3785a2d76e3a5d9eca6fcce70f4de63339671dfb9d1f33edb0")
+            .unwrap()
+    }
+
     pub fn signer_id(&self) -> SignerID {
         SignerID::new(self.pubkeys()[0])
     }
