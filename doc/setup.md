@@ -96,6 +96,9 @@ But from a security point of view, Signer[i] should send the value to others usi
 
 For more information about encrypting and encoding `node_vss[i, j]`, see Appendix A.
 
+:heavy_exclamation_mark:Caution: 
+> The VSS encryption is not implemented at 0.4.0 release. It is going to be implemented in future release.
+
 [^4]: [Provably Secure Distributed Schnorr Signatures and a (t,n) Threshold Scheme for Implicit Cerfiticates](https://t.co/jMhQnovLcb)
 [^5]: [ChaCha20 and Poly1305 for IETF Protocols](https://tools.ietf.org/html/rfc8439)
 
@@ -168,6 +171,9 @@ Signer[i] does not have to specify a nonce used in the encryption. Nonce is opti
 
 `block_vss[i, j]` is encrypted in the same way as `node_vss`.
 
+:heavy_exclamation_mark:Caution: 
+> The VSS encryption is not implemented at 0.4.0 release. It is going to be implemented in future release.
+
 Signer[i] sends the generated values `block_vss[i, j]` to other signers.
 
 [^6]: In schnorr signature schema used in Tapyrus Core, we use the random value "r" and the ephemeral point "R" on the elliptic curve, where R = rG (G is the generator of the curve). In Tapyrus signature schema we should choose R so that jacobi(y(R)) = 1 (if not, use (n - r) instead of r and generate R so that R = (n - r)G, where n is the order of the curve). So in this step, we should generate both "positive" secret and commitments that corresponds to r, and "negative" ones that corrensponds to (n - r). For more information, see [Tapyrus Schnorr Signature Specification](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/schnorr_signature.md)
@@ -236,6 +242,9 @@ In above list, `private_key` and `node_secret_share` must be treated as secret.
 
 ## Appendix A: Encoding and Encrypting the VSS
 
+:heavy_exclamation_mark:Caution: 
+> The VSS encryption is not implemented at 0.4.0 release. It is going to be implemented in future release.
+
 In this section, we describe the protocol to encode/encrypt the VSS.
 `node_vss[i, j]` and `block_vss[i, j]` have same structure.
 
@@ -289,6 +298,9 @@ it is the same as the encryption of `node_vss` except nonce used by chacha20_pol
 // TODO: Write usage of tapyrus-vss.
 
 ## Appendix C: Security Consideration
+
+:heavy_exclamation_mark:Caution: 
+> The VSS encryption is not implemented at 0.4.0 release. It is going to be implemented in future release.
 
 ### Nonce used by Encrypting with ChaCha20-Poly1305
 
