@@ -8,8 +8,15 @@ Before every minor and major release:
 
 * Update version in `Cargo.toml`. See also [vertioning rule](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/versioning_rule.md).
 * Write release notes (see below)
+* Create a release draft on Github repository.
 * Update Testnet environment. 
      * We should create bland new testnet if the release doesn't have compatibility and keep old testnet for a while.
+
+When release:
+
+* Upload binary archives to the release draft on Github.
+* Create release tag with annotate like `git tag -a vx.x.x` and push.
+* Publish the release on Github.
 
 ### Tapyrus maintainers/release engineers, suggestion for writing release notes
 
