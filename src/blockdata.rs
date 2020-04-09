@@ -142,6 +142,12 @@ impl Block {
         Block(new_payload)
     }
 
+    pub fn get_aggregated_public_key(&self) -> Option<PublicKey> {
+        let len = self.get_aggregated_public_key_length();
+        let bytes = &self.payload()[Self::AGG_PUBKEY_POSITION..Self::AGG_PUBKEY_POSITION + len];
+        PublicKey::from_slice(bytes).ok()
+    }
+
     /// the length of aggregated public key.
     /// return 0 if key is not set in block.
     /// return 33 if otherwise.
@@ -251,6 +257,16 @@ mod tests {
         .unwrap();
         let block = test_block_without_pubkey().add_aggregated_public_key(public_key);
         assert_eq!(block, test_block_with_pubkey());
+    }
+
+    #[test]
+    fn test_get_aggregated_public_key() {
+        let public_key = PublicKey::from_str(
+            "025700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
+        )
+        .unwrap();
+        let block = test_block_with_pubkey();
+        assert_eq!(block.get_aggregated_public_key().unwrap(), public_key);
     }
 
     #[test]

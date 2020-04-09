@@ -1,4 +1,5 @@
 use crate::blockdata::Block;
+use crate::errors::Error;
 use crate::net::{ConnectionManager, SignerID};
 use crate::rpc::TapyrusApi;
 use crate::signer_node::message_processor::create_block_vss;
@@ -29,6 +30,15 @@ where
 
     match &prev_state {
         NodeState::Member { block_height, .. } => {
+            if let Err(_) = verify_aggregated_public_key(block, *block_height, params) {
+                log::error!(
+                    "Aggregated public key is invalid. sender: {}, block: {:?}",
+                    sender_id,
+                    block,
+                );
+                return prev_state.clone();
+            }
+
             if let Err(e) = params.rpc.testproposedblock(&block) {
                 log::warn!(
                     "Received Invalid candidate block sender: {}, {:?}",
@@ -53,6 +63,29 @@ where
                 .build()
         }
         _ => prev_state.clone(),
+    }
+}
+
+fn verify_aggregated_public_key<T>(
+    block: &Block,
+    block_height: u64,
+    params: &NodeParameters<T>,
+) -> Result<(), Error>
+where
+    T: TapyrusApi,
+{
+    if let Some(public_key) = block.get_aggregated_public_key() {
+        let next_block_height = block_height + 1;
+        let federation = params.get_federation_by_block_height(next_block_height);
+        if public_key == federation.aggregated_public_key()
+            && next_block_height == federation.block_height()
+        {
+            Ok(())
+        } else {
+            Err(Error::InvalidAggregatedPublicKey)
+        }
+    } else {
+        Ok(())
     }
 }
 
