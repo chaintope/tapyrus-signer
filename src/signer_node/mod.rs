@@ -11,10 +11,8 @@ pub use crate::signer_node::node_parameters::NodeParameters;
 pub use crate::signer_node::node_state::NodeState;
 
 use crate::blockdata::Block;
-use crate::errors::Error;
 use crate::net::{ConnectionManager, Message, MessageType, SignerID};
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
-use crate::sign::Sign;
 use crate::signer_node::message_processor::create_block_vss;
 use crate::signer_node::message_processor::process_blockparticipants;
 use crate::signer_node::message_processor::process_blocksig;
@@ -25,9 +23,7 @@ use crate::signer_node::node_state::builder::{Builder, Master, Member};
 
 use crate::timer::RoundTimeOutObserver;
 
-use bitcoin::PublicKey;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-use curv::elliptic::curves::traits::ECPoint;
 use curv::FE;
 use redis::ControlFlow;
 use serde::{Deserialize, Serialize};

@@ -74,9 +74,9 @@ fn verify_aggregated_public_key<T>(
 where
     T: TapyrusApi,
 {
+    let next_block_height = block_height + 1;
+    let federation = params.get_federation_by_block_height(next_block_height);
     if let Some(public_key) = block.get_aggregated_public_key() {
-        let next_block_height = block_height + 1;
-        let federation = params.get_federation_by_block_height(next_block_height);
         if public_key == federation.aggregated_public_key()
             && next_block_height == federation.block_height()
         {
@@ -85,14 +85,19 @@ where
             Err(Error::InvalidAggregatedPublicKey)
         }
     } else {
-        Ok(())
+        if next_block_height == federation.block_height() {
+            Err(Error::InvalidAggregatedPublicKey)
+        } else {
+            Ok(())
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::process_candidateblock;
+    use super::*;
     use crate::blockdata::Block;
+    use crate::federation::{Federation, Federations};
     use crate::net::{Message, MessageType, SignerID};
     use crate::signer_node::node_state::builder::{Builder, Master, Member};
     use crate::signer_node::{master_index, NodeState};
@@ -101,7 +106,10 @@ mod tests {
     use crate::tests::helper::net::TestConnectionManager;
     use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
     use crate::tests::helper::node_state_builder::BuilderForTest;
+    use crate::tests::helper::node_vss::node_vss;
     use crate::tests::helper::rpc::MockRpc;
+    use bitcoin::PublicKey;
+    use std::str::FromStr;
 
     fn sender_id() -> SignerID {
         TEST_KEYS.signer_ids()[1]
@@ -257,5 +265,71 @@ mod tests {
         assert_eq!(master_index(&state, &params).unwrap(), 4);
 
         params.rpc.assert();
+    }
+
+    const TEST_BLOCK_WITH_PUBKEY: &str = "010000000000000000000000000000000000000000000000000000000000000000000000e7c526d0125538b13a50b06465fb8b72120be13fb1142e93aba2aabb2a4f369826c18219f76e4d0ebddbaa9b744837c2ac65b347673695a23c3cc1a2be4141e1427d735e21030d856ac9f5871c3785a2d76e3a5d9eca6fcce70f4de63339671dfb9d1f33edb0000101000000010000000000000000000000000000000000000000000000000000000000000000000000002221025700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3ffffffff0100f2052a010000001976a914834e0737cdb9008db614cd95ec98824e952e3dc588ac00000000";
+    const TEST_BLOCK_WITHOUT_PUBKEY: &str = "010000000000000000000000000000000000000000000000000000000000000000000000e7c526d0125538b13a50b06465fb8b72120be13fb1142e93aba2aabb2a4f369826c18219f76e4d0ebddbaa9b744837c2ac65b347673695a23c3cc1a2be4141e1427d735e00000101000000010000000000000000000000000000000000000000000000000000000000000000000000002221025700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3ffffffff0100f2052a010000001976a914834e0737cdb9008db614cd95ec98824e952e3dc588ac00000000";
+
+    fn test_block_with_public_key() -> Block {
+        let raw_block = hex::decode(TEST_BLOCK_WITH_PUBKEY).unwrap();
+        Block::new(raw_block)
+    }
+
+    fn test_block_without_public_key() -> Block {
+        let raw_block = hex::decode(TEST_BLOCK_WITHOUT_PUBKEY).unwrap();
+        Block::new(raw_block)
+    }
+    #[test]
+    fn test_verify_aggregated_public_key() {
+        let federation0 = Federation::new(
+            TEST_KEYS.pubkeys()[4],
+            0,
+            Some(3),
+            node_vss(0),
+            TEST_KEYS.aggregated(),
+        );
+        let federation100 = Federation::new(
+            TEST_KEYS.pubkeys()[4],
+            100,
+            Some(3),
+            node_vss(1),
+            TEST_KEYS.aggregated(),
+        );
+        let another_key = PublicKey::from_str(
+            "030acd6af981c498ebf2ffd9a341d2a96bde5832c150e7d300fa3583eee0f964fe",
+        )
+        .unwrap();
+        let federation200 = Federation::new(
+            TEST_KEYS.pubkeys()[4],
+            200,
+            Some(4),
+            node_vss(2),
+            another_key,
+        );
+        let federations = Federations::new(vec![
+            federation0.clone(),
+            federation100.clone(),
+            federation200.clone(),
+        ]);
+        let params = NodeParametersBuilder::new()
+            .public_key(TEST_KEYS.pubkeys()[2])
+            .rpc(MockRpc::new())
+            .federations(federations)
+            .build();
+
+        let block = test_block_with_public_key();
+        assert!(verify_aggregated_public_key(&block, 99, &params).is_ok());
+
+        let block = test_block_with_public_key();
+        assert!(verify_aggregated_public_key(&block, 100, &params).is_err());
+
+        let block = test_block_with_public_key();
+        assert!(verify_aggregated_public_key(&block, 199, &params).is_err());
+
+        let block = test_block_without_public_key();
+        assert!(verify_aggregated_public_key(&block, 99, &params).is_err());
+
+        let block = test_block_without_public_key();
+        assert!(verify_aggregated_public_key(&block, 100, &params).is_ok());
     }
 }
