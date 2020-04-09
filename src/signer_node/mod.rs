@@ -385,6 +385,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             _ => match self.current_state {
                 NodeState::Member { block_height, .. } => block_height + 1,
                 NodeState::Master { block_height, .. } => block_height + 1,
+                NodeState::RoundComplete { block_height, .. } => block_height + 1,
                 _ => panic!("current_state is invalid"),
             },
         };
