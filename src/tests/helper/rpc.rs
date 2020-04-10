@@ -37,7 +37,7 @@ pub struct MockRpc {
     getnewblock_results: RefCell<VecDeque<Block>>,
     getblockchaininfo_results: RefCell<VecDeque<GetBlockchainInfoResult>>,
     testproposedblock_results: RefCell<VecDeque<Result<bool, Error>>>,
-    submitblock_results: RefCell<VecDeque<()>>,
+    submitblock_results: RefCell<VecDeque<Result<(), Error>>>,
 }
 
 impl MockRpc {
@@ -95,10 +95,7 @@ impl MockRpc {
 
     pub fn should_call_submitblock(&mut self, result: Result<(), Error>) {
         let mut list = self.submitblock_results.borrow_mut();
-        match result {
-            Ok(r) => list.push_front(r),
-            Err(_) => unimplemented!("MockRpc not support testing Error result yet."),
-        }
+        list.push_front(result);
     }
 
     pub fn should_call_testproposedblock_and_returns_invalid_block_error(&mut self) {
@@ -131,11 +128,10 @@ impl TapyrusApi for MockRpc {
 
     fn submitblock(&self, block: &Block) -> Result<(), Error> {
         let mut list = self.submitblock_results.borrow_mut();
-        let result = list.pop_back().expect(&format!(
+        list.pop_back().expect(&format!(
             "Unexpected RPC call method=submitblock, args(block={:?}",
             block
-        ));
-        Ok(result)
+        ))
     }
 
     fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error> {
