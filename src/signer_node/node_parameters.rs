@@ -100,9 +100,12 @@ mod tests {
 
     #[test]
     fn test_sort_publickey() {
+        // Get shuffled public key list.
         let mut pubkeys: Vec<PublicKey> = TEST_KEYS.pubkeys();
-        pubkeys.shuffle(&mut thread_rng());
-        assert_ne!(pubkeys, TEST_KEYS.pubkeys());
+        while pubkeys == TEST_KEYS.pubkeys() {
+            pubkeys.shuffle(&mut thread_rng());
+        }
+
         NodeParameters::<MockRpc>::sort_publickey(&mut pubkeys);
         assert_eq!(pubkeys, TEST_KEYS.pubkeys());
     }
