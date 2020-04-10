@@ -26,9 +26,9 @@ For all settings including optional ones, see [sample file](https://github.com/c
 
 `[signer]` section is a set of settings for consensus algorithm used in Tapyrus Signer/Core Network.
 
-- `public_key`: The public key of this node.
+- `public-key`: The public key of this node.
 - `threshold`: The number of signers required to sign block. It should be less than the number of all signers.
-- `node_vss`: Array of Verifiable Secret Sharing generated in setting up.
+- `node-vss`: Array of Verifiable Secret Sharing generated in setting up.
 
 ### [rpc] section
 
@@ -40,7 +40,7 @@ For all settings including optional ones, see [sample file](https://github.com/c
 
 `[redis]` section is a set of settings for redis.
 
-- `redis_host`: Redis Server host name or IP Address.
+- `redis-host`: Redis Server host name or IP Address.
 
 ## Start Signer Node
 
