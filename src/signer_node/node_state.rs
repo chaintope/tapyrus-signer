@@ -31,6 +31,7 @@ pub enum NodeState {
         participants: HashSet<SignerID>,
         /// Set true when the round is done.
         round_is_done: bool,
+        block_height: u64,
     },
     Member {
         /// *block_key* is random value for using int the Signature Issuing Protocol.
@@ -52,11 +53,24 @@ pub enum NodeState {
         /// are declared by Master node of the round.
         participants: HashSet<SignerID>,
         master_index: usize,
+        block_height: u64,
     },
     RoundComplete {
         master_index: usize,
         next_master_index: usize,
+        block_height: u64,
     },
+}
+
+impl NodeState {
+    pub fn block_height(&self) -> u64 {
+        match &self {
+            NodeState::Joining => 0,
+            NodeState::Master { block_height, .. } => *block_height,
+            NodeState::Member { block_height, .. } => *block_height,
+            NodeState::RoundComplete { block_height, .. } => *block_height,
+        }
+    }
 }
 
 pub mod builder {
@@ -83,6 +97,7 @@ pub mod builder {
         signatures: BTreeMap<SignerID, (FE, FE)>,
         participants: HashSet<SignerID>,
         round_is_done: bool,
+        block_height: u64,
     }
 
     impl Builder for Master {
@@ -95,6 +110,7 @@ pub mod builder {
                 signatures: self.signatures.clone(),
                 participants: self.participants.clone(),
                 round_is_done: self.round_is_done,
+                block_height: 0,
             }
         }
 
@@ -107,6 +123,7 @@ pub mod builder {
                 signatures,
                 participants,
                 round_is_done,
+                block_height,
             } = state
             {
                 Self {
@@ -117,6 +134,7 @@ pub mod builder {
                     signatures,
                     participants,
                     round_is_done,
+                    block_height,
                 }
             } else {
                 unreachable!(
@@ -136,6 +154,7 @@ pub mod builder {
                 signatures: BTreeMap::new(),
                 participants: HashSet::new(),
                 round_is_done: false,
+                block_height: 0,
             }
         }
     }
@@ -149,6 +168,7 @@ pub mod builder {
             signatures: BTreeMap<SignerID, (FE, FE)>,
             participants: HashSet<SignerID>,
             round_is_done: bool,
+            block_height: u64,
         ) -> Self {
             Self {
                 block_key,
@@ -158,6 +178,7 @@ pub mod builder {
                 signatures,
                 participants,
                 round_is_done,
+                block_height,
             }
         }
 
@@ -224,6 +245,11 @@ pub mod builder {
             self.round_is_done = round_is_done;
             self
         }
+
+        pub fn block_height(&mut self, block_height: u64) -> &mut Self {
+            self.block_height = block_height;
+            self
+        }
     }
 
     pub struct Member {
@@ -233,6 +259,7 @@ pub mod builder {
         candidate_block: Option<Block>,
         participants: HashSet<SignerID>,
         master_index: usize,
+        block_height: u64,
     }
 
     impl Default for Member {
@@ -244,6 +271,7 @@ pub mod builder {
                 candidate_block: None,
                 participants: HashSet::new(),
                 master_index: INITIAL_MASTER_INDEX,
+                block_height: 0,
             }
         }
     }
@@ -257,6 +285,7 @@ pub mod builder {
                 candidate_block: self.candidate_block.clone(),
                 participants: self.participants.clone(),
                 master_index: self.master_index,
+                block_height: self.block_height,
             }
         }
 
@@ -268,6 +297,7 @@ pub mod builder {
                 candidate_block,
                 participants,
                 master_index,
+                block_height,
             } = state
             {
                 Self {
@@ -277,6 +307,7 @@ pub mod builder {
                     candidate_block,
                     participants,
                     master_index,
+                    block_height,
                 }
             } else {
                 unreachable!(
@@ -294,6 +325,7 @@ pub mod builder {
             candidate_block: Option<Block>,
             participants: HashSet<SignerID>,
             master_index: usize,
+            block_height: u64,
         ) -> Self {
             Self {
                 block_key,
@@ -302,6 +334,7 @@ pub mod builder {
                 candidate_block,
                 participants,
                 master_index,
+                block_height,
             }
         }
 
@@ -351,6 +384,11 @@ pub mod builder {
 
         pub fn master_index(&mut self, master_index: usize) -> &mut Self {
             self.master_index = master_index;
+            self
+        }
+
+        pub fn block_height(&mut self, block_height: u64) -> &mut Self {
+            self.block_height = block_height;
             self
         }
     }

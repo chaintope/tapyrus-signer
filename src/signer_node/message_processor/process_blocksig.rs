@@ -29,9 +29,13 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
+    let block_height = prev_state.block_height();
+
     #[cfg(feature = "dump")]
     let mut dump_builder = {
         let mut builder = DumpBuilder::default();
+        let federation = params.get_federation_by_block_height(block_height);
+        let node_vss = federation.nodevss();
         builder
             .received(Received {
                 sender: sender_id.clone(),
@@ -39,11 +43,11 @@ where
                 gamma_i,
                 e,
             })
-            .public_keys(params.pubkey_list.clone())
-            .threshold(params.threshold as usize)
+            .public_keys(params.pubkey_list(block_height).clone())
+            .threshold(params.threshold(block_height) as usize)
             .public_key(params.signer_id.pubkey)
             .prev_state(prev_state.clone())
-            .node_vss(params.node_vss.clone());
+            .node_vss(node_vss.clone());
         builder
     };
     // extract values from state object.
@@ -90,7 +94,7 @@ where
     log::trace!(
         "number of signatures: {:?} (threshold: {:?})",
         new_signatures.len(),
-        params.threshold
+        params.threshold(block_height)
     );
 
     let candidate_block = match get_valid_block(prev_state, blockhash) {
@@ -103,7 +107,7 @@ where
     };
 
     // Check whether the number of signatures met the threshold
-    if new_signatures.len() < params.threshold as usize {
+    if new_signatures.len() < params.threshold(block_height) as usize {
         #[cfg(feature = "dump")]
         dump_builder.build().unwrap().log();
         return state_builder.build();
@@ -122,14 +126,15 @@ where
         .filter(|(i, ..)| participants.contains(i))
         .collect();
 
+    let federation = params.get_federation_by_block_height(block_height);
     let signature = match Vss::aggregate_and_verify_signature(
         candidate_block,
         new_signatures,
-        &params.pubkey_list,
-        &params.node_shared_secrets(),
+        &params.pubkey_list(block_height),
+        &federation.node_shared_secrets(),
         &block_shared_keys,
         &shared_block_secrets_by_participants,
-        &params.node_secret_share(),
+        &federation.node_secret_share(),
     ) {
         Ok(sig) => sig,
         Err(e) => {
@@ -237,6 +242,7 @@ pub struct Received {
 #[cfg(test)]
 mod tests {
     use super::process_blocksig;
+    use crate::federation::{Federation, Federations};
     use crate::net::Message;
     use crate::signer_node::message_processor::process_blocksig::Dump;
     use crate::signer_node::*;
@@ -255,10 +261,7 @@ mod tests {
         let conman = TestConnectionManager::new();
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
-            .threshold(dump.threshold as u8)
-            .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
-            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -287,10 +290,7 @@ mod tests {
         let conman = TestConnectionManager::new();
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
-            .threshold(dump.threshold as u8)
-            .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
-            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -321,10 +321,7 @@ mod tests {
         let conman = TestConnectionManager::new();
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
-            .threshold(dump.threshold as u8)
-            .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
-            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -376,10 +373,7 @@ mod tests {
         let conman = TestConnectionManager::new();
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
-            .threshold(dump.threshold as u8)
-            .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
-            .node_vss(dump.node_vss.clone())
             .build();
 
         let next = process_blocksig(
@@ -410,12 +404,17 @@ mod tests {
         )
         .unwrap();
         let conman = TestConnectionManager::new();
+        let federations = vec![Federation::new(
+            dump.public_key,
+            0,
+            dump.threshold as u8,
+            dump.node_vss.clone(),
+        )];
+        let federations = Federations::new(federations);
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
-            .threshold(dump.threshold as u8)
-            .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
-            .node_vss(dump.node_vss.clone())
+            .federations(federations)
             .build();
 
         let next = process_blocksig(
@@ -448,12 +447,17 @@ mod tests {
         )
         .unwrap();
         let conman = TestConnectionManager::new();
+        let federations = vec![Federation::new(
+            dump.public_key,
+            0,
+            dump.threshold as u8,
+            dump.node_vss.clone(),
+        )];
+        let federations = Federations::new(federations);
         let params = NodeParametersBuilder::new()
             .rpc(MockRpc::new())
-            .threshold(dump.threshold as u8)
-            .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
-            .node_vss(dump.node_vss.clone())
+            .federations(federations)
             .build();
 
         let next = process_blocksig(
@@ -488,12 +492,17 @@ mod tests {
                 .unwrap();
         let mut rpc = MockRpc::new();
         rpc.should_call_submitblock(Ok(()));
+        let federations = vec![Federation::new(
+            dump.public_key,
+            0,
+            dump.threshold as u8,
+            dump.node_vss.clone(),
+        )];
+        let federations = Federations::new(federations);
         let params = NodeParametersBuilder::new()
             .rpc(rpc)
-            .threshold(dump.threshold as u8)
-            .pubkey_list(dump.public_keys.clone())
             .public_key(dump.public_key)
-            .node_vss(dump.node_vss.clone())
+            .federations(federations)
             .build();
 
         let mut conman = TestConnectionManager::new();

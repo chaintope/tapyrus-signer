@@ -277,7 +277,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
-    pub fn start_new_round(&mut self) -> NodeState {
+    pub fn start_new_round(&mut self, block_height: u64) -> NodeState {
         std::thread::sleep(Duration::from_secs(self.params.round_duration));
 
         let block = match self.params.rpc.getnewblock(&self.params.address) {
@@ -299,8 +299,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             receiver_id: None,
         });
 
-        let (keys, shared_secret_for_positive, shared_secret_for_negative) =
-            create_block_vss(block.clone(), &self.params, &self.connection_manager);
+        let (keys, shared_secret_for_positive, shared_secret_for_negative) = create_block_vss(
+            block.clone(),
+            &self.params,
+            &self.connection_manager,
+            block_height,
+        );
 
         Master::default()
             .candidate_block(Some(block))
@@ -310,6 +314,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 shared_secret_for_positive,
                 shared_secret_for_negative,
             )
+            .block_height(block_height)
             .build()
     }
 
@@ -372,16 +377,31 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     fn start_next_round(&mut self, next_master_index: usize) {
         self.round_timer.restart().unwrap();
 
+        let block_height = match self.params.rpc.getblockchaininfo() {
+            Ok(GetBlockchainInfoResult {
+                blocks: block_height,
+                ..
+            }) => block_height,
+            _ => match self.current_state {
+                NodeState::Member { block_height, .. } => block_height + 1,
+                NodeState::Master { block_height, .. } => block_height + 1,
+                NodeState::RoundComplete { block_height, .. } => block_height + 1,
+                _ => panic!("current_state is invalid"),
+            },
+        };
         log::info!(
             "Start next round: self_index={}, master_index={}",
-            self.params.self_node_index,
+            self.params.self_node_index(block_height),
             next_master_index,
         );
 
-        if self.params.self_node_index == next_master_index {
-            self.current_state = self.start_new_round();
+        if self.params.self_node_index(block_height) == next_master_index {
+            self.current_state = self.start_new_round(block_height);
         } else {
-            self.current_state = Member::default().master_index(next_master_index).build();
+            self.current_state = Member::default()
+                .master_index(next_master_index)
+                .block_height(block_height)
+                .build();
         }
     }
 
@@ -395,7 +415,7 @@ where
     T: TapyrusApi,
 {
     match state {
-        NodeState::Master { .. } => Some(params.self_node_index),
+        NodeState::Master { .. } => Some(params.self_node_index(state.block_height())),
         NodeState::Member { master_index, .. } => Some(*master_index),
         NodeState::RoundComplete { master_index, .. } => Some(*master_index),
         _ => None,
@@ -408,14 +428,15 @@ where
 {
     let next = match state {
         NodeState::Joining => 0,
-        NodeState::Master { .. } => params.self_node_index + 1,
+        NodeState::Master { .. } => params.self_node_index(state.block_height()) + 1,
         NodeState::Member { master_index, .. } => master_index + 1,
         NodeState::RoundComplete {
             next_master_index, ..
         } => *next_master_index,
     };
 
-    next % params.pubkey_list.len()
+    let block_height = state.block_height();
+    next % params.pubkey_list(block_height + 1).len()
 }
 
 pub fn is_master<T>(sender_id: &SignerID, state: &NodeState, params: &NodeParameters<T>) -> bool
@@ -424,8 +445,12 @@ where
 {
     match state {
         NodeState::Master { .. } => params.signer_id == *sender_id,
-        NodeState::Member { master_index, .. } => {
-            let master_id = params.pubkey_list[*master_index];
+        NodeState::Member {
+            master_index,
+            block_height,
+            ..
+        } => {
+            let master_id = params.pubkey_list(*block_height)[*master_index];
             master_id == sender_id.pubkey
         }
         _ => false,
@@ -434,6 +459,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::federation::{Federation, Federations};
     use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
     use crate::rpc::tests::{safety, MockRpc};
     use crate::rpc::TapyrusApi;
@@ -540,17 +566,10 @@ mod tests {
         let private_key = TEST_KEYS.key[0];
         let to_address = address(&private_key);
         let public_key = pubkey_list[0].clone();
+        let federations =
+            Federations::new(vec![Federation::new(public_key, 0, threshold, node_vss(0))]);
 
-        let mut params = NodeParameters::new(
-            to_address,
-            pubkey_list,
-            threshold,
-            public_key,
-            node_vss(0),
-            rpc,
-            0,
-            true,
-        );
+        let mut params = NodeParameters::new(to_address, public_key, rpc, 0, true, federations);
         params.round_duration = 0;
         let con = TestConnectionManager::new(publish_count, spy);
         let broadcaster = con.sender.clone();
@@ -598,6 +617,7 @@ mod tests {
                 candidate_block: None,
                 participants: HashSet::new(),
                 master_index: 0,
+                block_height: 0,
             },
             rpc,
         );
@@ -671,6 +691,7 @@ mod tests {
                     candidate_block: None,
                     participants: HashSet::new(),
                     master_index: 0,
+                    block_height: 0,
                 },
                 rpc,
             );

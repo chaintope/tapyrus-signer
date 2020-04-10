@@ -57,18 +57,19 @@ where
     };
 
     match prev_state {
-        NodeState::Master { participants, .. } => {
+        NodeState::Master {
+            participants,
+            block_height,
+            ..
+        } => {
             let mut state_builder = Master::from_node_state(prev_state.clone());
 
             // Broadcast blockparticipants message when the master haven't broadcast yet and met
             // the threshold.
-            if participants.len() == 0
-                && new_shared_block_secrets.len() >= params.threshold as usize
-            {
-                let participants = select_participants_for_signing(
-                    &new_shared_block_secrets,
-                    params.threshold as usize,
-                );
+            let threshold = params.threshold(*block_height);
+            if participants.len() == 0 && new_shared_block_secrets.len() >= threshold as usize {
+                let participants =
+                    select_participants_for_signing(&new_shared_block_secrets, threshold as usize);
 
                 let shared_block_secrets_by_participants = new_shared_block_secrets
                     .clone()

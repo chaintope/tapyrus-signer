@@ -28,7 +28,7 @@ where
     );
 
     match &prev_state {
-        NodeState::Member { .. } => {
+        NodeState::Member { block_height, .. } => {
             if let Err(e) = params.rpc.testproposedblock(&block) {
                 log::warn!(
                     "Received Invalid candidate block sender: {}, {:?}",
@@ -39,12 +39,12 @@ where
             }
 
             let (key, shared_secret_for_positive, shared_secret_for_negative) =
-                create_block_vss(block.clone(), params, conman);
+                create_block_vss(block.clone(), params, conman, *block_height);
 
             Member::from_node_state(prev_state.clone())
                 .block_key(Some(key.u_i))
                 .candidate_block(Some(block.clone()))
-                .master_index(sender_index(sender_id, &params.pubkey_list))
+                .master_index(sender_index(sender_id, &params.pubkey_list(*block_height)))
                 .insert_shared_block_secrets(
                     params.signer_id.clone(),
                     shared_secret_for_positive,

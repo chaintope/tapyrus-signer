@@ -21,6 +21,7 @@
       },
       "prev_state": {
         "Member": {
+          "block_height": 100,
           "block_key": "f9b7cd6af4cb156de044cec7f1ab53fcdf701ba840c46970c5b513170082a8d3",
           "shared_block_secrets": {
             "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e": [
@@ -182,6 +183,7 @@
       },
       "prev_state": {
         "Master": {
+          "block_height": 100,
           "block_key": "f9b7cd6af4cb156de044cec7f1ab53fcdf701ba840c46970c5b513170082a8d3",
           "shared_block_secrets": {
             "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e": [
@@ -349,6 +351,7 @@
       },
       "prev_state": {
         "Master": {
+          "block_height": 100,
           "block_key": "f9b7cd6af4cb156de044cec7f1ab53fcdf701ba840c46970c5b513170082a8d3",
           "shared_block_secrets": {
             "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e": [
@@ -511,6 +514,7 @@
       },
       "prev_state": {
         "Master": {
+          "block_height": 100,
           "block_key": "f9b7cd6af4cb156de044cec7f1ab53fcdf701ba840c46970c5b513170082a8d3",
           "shared_block_secrets": {
             "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e": [
@@ -678,6 +682,7 @@
       },
       "prev_state": {
         "Master": {
+          "block_height": 100,
           "block_key": "f9b7cd6af4cb156de044cec7f1ab53fcdf701ba840c46970c5b513170082a8d3",
           "shared_block_secrets": {
             "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e": [
@@ -845,6 +850,7 @@
       },
       "prev_state": {
         "Master": {
+          "block_height": 100,
           "block_key": "f9b7cd6af4cb156de044cec7f1ab53fcdf701ba840c46970c5b513170082a8d3",
           "shared_block_secrets": {
             "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e": [
@@ -1012,6 +1018,7 @@
       },
       "prev_state": {
         "Master": {
+          "block_height": 100,
           "block_key": "f9b7cd6af4cb156de044cec7f1ab53fcdf701ba840c46970c5b513170082a8d3",
           "shared_block_secrets": {
             "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e": [

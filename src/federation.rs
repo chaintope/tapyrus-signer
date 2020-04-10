@@ -10,7 +10,7 @@ use curv::cryptographic_primitives::secret_sharing::feldman_vss::{
 };
 use std::collections::HashSet;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Federations {
     /// The vector of federations. This vector should be sorted by block height.
     federations: Vec<Federation>,
@@ -23,6 +23,14 @@ impl Federations {
         Federations {
             federations: federations,
         }
+    }
+
+    pub fn get_by_block_height(&self, block_height: u64) -> &Federation {
+        self.federations
+            .iter()
+            .filter(|f| f.block_height <= block_height)
+            .last()
+            .expect("Federations should not be empty.")
     }
 
     pub fn last(&self) -> &Federation {
@@ -254,6 +262,21 @@ mod tests {
     use curv::elliptic::curves::traits::ECScalar;
     use curv::BigInt;
     use std::str::FromStr;
+
+    #[test]
+    fn test_get_by_block_height() {
+        let federation0 = Federation::new(TEST_KEYS.pubkeys()[4], 0, 3, node_vss(0));
+        let federation100 = Federation::new(TEST_KEYS.pubkeys()[4], 100, 3, node_vss(1));
+        let federation200 = Federation::new(TEST_KEYS.pubkeys()[4], 200, 4, node_vss(2));
+        let federations = Federations::new(vec![
+            federation0.clone(),
+            federation100.clone(),
+            federation200.clone(),
+        ]);
+        assert_eq!(federations.get_by_block_height(99).clone(), federation0);
+        assert_eq!(federations.get_by_block_height(100).clone(), federation100);
+        assert_eq!(federations.get_by_block_height(101).clone(), federation100);
+    }
 
     #[test]
     fn test_signers() {

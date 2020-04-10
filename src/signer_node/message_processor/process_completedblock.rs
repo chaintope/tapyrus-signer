@@ -21,6 +21,7 @@ where
         master_index: master_index(prev_state, params)
             .expect("Previous state getting round complete should have round master"),
         next_master_index: next_master_index(prev_state, params),
+        block_height: prev_state.block_height(),
     }
 }
 

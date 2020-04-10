@@ -39,11 +39,13 @@ pub mod test_vectors {
     use crate::blockdata::Block;
     use crate::crypto::multi_party_schnorr::LocalSig;
     use crate::crypto::vss::Vss;
+    use crate::federation::{Federation, Federations};
     use crate::net::SignerID;
     use crate::signer_node::NodeParameters;
     use crate::signer_node::SharedSecret;
     use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
     use crate::tests::helper::rpc::MockRpc;
+
     use bitcoin::{PrivateKey, PublicKey};
     use curv::{FE, GE};
     use serde_json::Value;
@@ -148,19 +150,19 @@ pub mod test_vectors {
             .iter()
             .map(|i| Vss::from_str(i.as_str().unwrap()).unwrap())
             .collect();
-        let public_keys: Vec<PublicKey> = node_vss
-            .iter()
-            .map(|i| i.sender_public_key.clone())
-            .collect();
         let threshold = value["threshold"].as_u64().unwrap();
         let public_key = to_public_key(&value["public_key"]);
-
+        let federations = vec![Federation::new(
+            public_key,
+            0,
+            threshold as u8,
+            node_vss.clone(),
+        )];
+        let federations = Federations::new(federations);
         NodeParametersBuilder::new()
             .rpc(rpc)
-            .threshold(threshold as u8)
-            .pubkey_list(public_keys.clone())
             .public_key(public_key)
-            .node_vss(node_vss)
+            .federations(federations)
             .build()
     }
 }

@@ -35,8 +35,12 @@ where
         NodeState::Member {
             shared_block_secrets: s,
             master_index,
+            block_height,
             ..
-        } => (s, params.get_signer_id_by_index(master_index.clone())),
+        } => (
+            s,
+            params.get_signer_id_by_index(*block_height, master_index.clone()),
+        ),
         _ => return prev_state.clone(),
     };
 

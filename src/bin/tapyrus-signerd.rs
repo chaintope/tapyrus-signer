@@ -55,17 +55,14 @@ fn main() {
         &signer_config.public_key(),
         signer_config.federations_file(),
     );
-    let federation = federations.last();
 
     let params = NodeParameters::new(
         signer_config.to_address(),
-        federation.signers().iter().map(|i| i.pubkey).collect(),
-        federation.threshold(),
         signer_config.public_key(),
-        federation.nodevss().clone(),
         rpc,
         round_duration,
         general_config.skip_waiting_ibd(),
+        federations,
     );
 
     let node = &mut SignerNode::new(con, params);
