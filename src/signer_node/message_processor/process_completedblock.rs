@@ -5,7 +5,7 @@ use crate::signer_node::{is_master, master_index, next_master_index, NodeParamet
 
 pub fn process_completedblock<T>(
     sender_id: &SignerID,
-    _block: &Block,
+    block: &Block,
     prev_state: &NodeState,
     params: &NodeParameters<T>,
 ) -> NodeState
@@ -15,6 +15,15 @@ where
     if !is_master(sender_id, prev_state, params) {
         log::warn!("Peer {} may be malicious node. It might impersonate as master or your node might be behind from others.", sender_id);
         return prev_state.clone(); // Ignore message
+    }
+
+    if let Err(e) = params.rpc.submitblock(block) {
+        log::warn!(
+            "The node got invalid completed block or it was already relayed via Tapyrus network. from-peer: {}, block: {:?}, rpc error: {:?}",
+            sender_id,
+            block,
+            e
+        );
     }
 
     NodeState::RoundComplete {
@@ -28,6 +37,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::process_completedblock;
+    use crate::errors::Error;
     use crate::net::SignerID;
     use crate::signer_node::node_state::builder::{Builder, Member};
     use crate::signer_node::{master_index, NodeState};
@@ -41,14 +51,15 @@ mod tests {
     fn test_process_completedblock() {
         let block = get_block(0);
         let mut rpc = MockRpc::new();
-        // It should call testproposedblock RPC once.
-        rpc.should_call_testproposedblock(Ok(true));
+        rpc.should_call_submitblock(Ok(()));
         let params = NodeParametersBuilder::new().rpc(rpc).build();
 
         // check 1, next_master_index should be incremented after process completeblock message.
         let prev_state = Member::for_test().master_index(0).build();
         let sender_id = SignerID::new(TEST_KEYS.pubkeys()[4]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
+
+        params.rpc.assert();
 
         match &state {
             NodeState::RoundComplete {
@@ -58,9 +69,14 @@ mod tests {
         }
 
         // check 2, next master index should be back to 0 if the previous master index is the last number.
+        let mut rpc = MockRpc::new();
+        rpc.should_call_submitblock(Ok(()));
+        let params = NodeParametersBuilder::new().rpc(rpc).build();
         let prev_state = Member::for_test().master_index(4).build();
         let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
+
+        params.rpc.assert();
 
         match &state {
             NodeState::RoundComplete {
@@ -71,16 +87,43 @@ mod tests {
     }
 
     #[test]
-    fn test_process_completedblock_ignore_different_master() {
+    fn test_process_completedblock_with_submit_block_failure() {
         let block = get_block(0);
         let mut rpc = MockRpc::new();
-        // It should call testproposedblock RPC once.
-        rpc.should_call_testproposedblock(Ok(true));
+        rpc.should_call_submitblock(Err(Error::JsonRpc(jsonrpc::error::Error::Rpc(
+            jsonrpc::error::RpcError {
+                code: -25,
+                message: "proposal was not based on our best chain".to_string(),
+                data: None,
+            },
+        ))));
+        let params = NodeParametersBuilder::new().rpc(rpc).build();
+
+        let prev_state = Member::for_test().master_index(0).build();
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[4]);
+        let state = process_completedblock(&sender_id, &block, &prev_state, &params);
+
+        params.rpc.assert();
+
+        match &state {
+            NodeState::RoundComplete {
+                next_master_index, ..
+            } => assert_eq!(*next_master_index, 1),
+            n => assert!(false, "Should be RoundComplete, but the state is {:?}", n),
+        }
+    }
+
+    #[test]
+    fn test_process_completedblock_ignore_different_master() {
+        let block = get_block(0);
+        let rpc = MockRpc::new();
         let params = NodeParametersBuilder::new().rpc(rpc).build();
 
         let prev_state = Member::for_test().master_index(0).build();
         let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
+
+        params.rpc.assert();
 
         // It should not incremented if not recorded master.
         assert_eq!(master_index(&state, &params).unwrap(), 0);
