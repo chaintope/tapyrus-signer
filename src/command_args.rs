@@ -68,33 +68,47 @@ pub const DEFAULT_CONFIG_FILENAME: &str = "signer_config.toml";
 
 #[derive(Debug, Deserialize, Default)]
 struct SignerToml {
+    #[serde(rename = "to-address")]
     to_address: Option<String>,
+    #[serde(rename = "public-key")]
     publickey: Option<String>,
+    #[serde(rename = "federations-file")]
     federations_file: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct RpcToml {
+    #[serde(rename = "rpc-endpoint-host")]
     rpc_endpoint_host: Option<String>,
+    #[serde(rename = "rpc-endpoint-port")]
     rpc_endpoint_port: Option<u32>,
+    #[serde(rename = "rpc-endpoint-user")]
     rpc_endpoint_user: Option<String>,
+    #[serde(rename = "rpc-endpoint-pass")]
     rpc_endpoint_pass: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct RedisToml {
+    #[serde(rename = "redis-host")]
     redis_host: Option<String>,
+    #[serde(rename = "redis-port")]
     redis_port: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct GeneralToml {
+    #[serde(rename = "round-duration")]
     round_duration: Option<u64>,
+    #[serde(rename = "log-level")]
     log_level: Option<String>,
+    #[serde(rename = "log-quiet")]
     log_quiet: Option<bool>,
+    #[serde(rename = "skip-waiting-ibd")]
     skip_waiting_ibd: Option<bool>,
     daemon: Option<bool>,
     pid: Option<String>,
+    #[serde(rename = "log-file")]
     log_file: Option<String>,
 }
 
@@ -418,12 +432,12 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
             .default_value(DEFAULT_CONFIG_FILENAME)
             .help("Load settings from this file. when defined both in file and command line args, then command line args take precedence."))
         .arg(Arg::with_name(OPTION_NAME_TO_ADDRESS)
-            .long("to_address")
+            .long("to-address")
             .value_name("TO_ADDRESS")
             .help("Coinbase pay to address."))
         .arg(Arg::with_name(OPTION_NAME_PUBLIC_KEY)
             .short("p")
-            .long("publickey")
+            .long("public-key")
             .value_name("PUBLIC_KEY")
             .help("Public key of the signer who host this tapyrus-sigenrd. example: 03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc"))
         .arg(Arg::with_name(OPTION_NAME_FEDERATIONS_FILE)
@@ -431,27 +445,27 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
             .value_name("FILE")
             .help("The path to TOML file of the federations of the chain."))
         .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_HOST)
-            .long("rpchost")
+            .long("rpc-host")
             .value_name("HOST_NAME or IP")
             .help("TapyrusCore RPC endpoint host."))
         .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_PORT)
-            .long("rpcport")
+            .long("rpc-port")
             .value_name("PORT")
             .help("TapyrusCore RPC endpoint port number. These are TapyrusCore default port, mainnet: 2377, testnet: 12377, regtest: 12381."))
         .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_USER)
-            .long("rpcuser")
+            .long("rpc-user")
             .value_name("USER")
             .help("TapyrusCore RPC user name."))
         .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_PASS)
-            .long("rpcpass")
+            .long("rpc-pass")
             .value_name("PASS")
             .help("TapyrusCore RPC user password."))
         .arg(Arg::with_name(OPTION_NAME_REDIS_HOST)
-            .long("redishost")
+            .long("redis-host")
             .value_name("HOST_NAME or IP")
             .help("Redis host."))
         .arg(Arg::with_name(OPTION_NAME_REDIS_PORT)
-            .long("redisport")
+            .long("redis-port")
             .value_name("PORT")
             .help("Redis port."))
         .arg(Arg::with_name(OPTION_NAME_LOG_QUIET)
@@ -483,7 +497,7 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
             .value_name("file")
             .help("Specify pid file path. This option is enable when the node got '--daemon' flag."))
         .arg(Arg::with_name(OPTION_NAME_LOG_FILE)
-            .long("logfile")
+            .long("log-file")
             .takes_value(true)
             .value_name("file")
             .help("Specify where log file export to. This option is enable when the node fot '--daemon' flag. If not, logs are put on stdout and stderr."))
@@ -559,15 +573,15 @@ fn test_priority_commandline() {
         "-c=tests/resources/signer_config.toml",
         "-p=033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8",
         "--federations-file=/tmp/federations.toml",
-        "--rpchost=tapyrus.dev.chaintope.com",
-        "--rpcport=12345",
-        "--rpcuser=test",
-        "--rpcpass=test",
-        "--redishost=redis.endpoint.dev.chaintope.com",
-        "--redisport=88888",
+        "--rpc-host=tapyrus.dev.chaintope.com",
+        "--rpc-port=12345",
+        "--rpc-user=test",
+        "--rpc-pass=test",
+        "--redis-host=redis.endpoint.dev.chaintope.com",
+        "--redis-port=88888",
         "--daemon",
         "--pid=/tmp/test.pid",
-        "--logfile=/tmp/tapyrus-signer.log",
+        "--log-file=/tmp/tapyrus-signer.log",
     ]);
     let args = CommandArgs::load(matches).unwrap();
 

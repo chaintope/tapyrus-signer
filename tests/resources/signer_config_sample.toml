@@ -1,50 +1,50 @@
 [signer]
-# `publickey` is specify the signer own public key who hosted the node.
+# `public-key` is specify the signer own public key who hosted the node.
 # This is require and public key format is compressed hex string.
-publickey = "033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8"
+public-key = "033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8"
 
 # The path to TOML file of the federations of the chain.
-federations_file = "/tmp/federations.toml"
+federations-file = "/tmp/federations.toml"
 
 [rpc]
 # TapyrusCore RPC endpoint host name.
-rpc_endpoint_host = "localhost"
+rpc-endpoint-host = "localhost"
 
-# The `rpc_endpoint_port` is TapyrusCore RPC endpoint port number.
+# The `rpc-endpoint-port` is TapyrusCore RPC endpoint port number.
 # These are TapyrusCore default port,
 # mainnet: 2377, testnet: 12377, regtest: 12381.
 # this is optional, default is 2377(mainnet).
-rpc_endpoint_port = 12381
+rpc-endpoint-port = 12381
 
-# `rpc_endpoint_user` is TapyrusCore RPC user name for authentication.
+# `rpc-endpoint-user` is TapyrusCore RPC user name for authentication.
 # require if you set username to your TapyrusCore RPC Server.
-rpc_endpoint_user = "user"
+rpc-endpoint-user = "user"
 
-# `rpc_endpoint_pass" is TapyrusCore RPC password for authentication.
+# `rpc-endpoint-pass" is TapyrusCore RPC password for authentication.
 # require if you set password to your TapyrusCore RPC Server.
-rpc_endpoint_pass = "pass"
+rpc-endpoint-pass = "pass"
 
 [redis]
-# `redis_host` is Redis Server host name or IP Address.
-redis_host = "192.168.0.63"
+# `redis-host` is Redis Server host name or IP Address.
+redis-host = "192.168.0.63"
 
-# `redis_port` is Redis Server port number. default is 6379.
-redis_port =  16379
+# `redis-port` is Redis Server port number. default is 6379.
+redis-port =  16379
 
 [general]
-# `round_duration` is round robin duration time(sec).
+# `round-duration` is round robin duration time(sec).
 # this is optional, default duration is 60 sec.
 # if you want more slowly or quickly block creation, then set more big/small duration time.
-round_duration = 5 # uint64
+round-duration = 5 # uint64
 
-# `log_quiet` is setted `true` to silent of log report.
+# `log-quiet` is setted `true` to silent of log report.
 # this is optional, default false
-log_quiet = true
+log-quiet = true
 
-# `log_level` is Log Level.
+# `log-level` is Log Level.
 # selectable values are `trace`, `debug`, `info`, `warn` or `error`.
 # this is optional, default vlue `info`.
-log_level = "debug"
+log-level = "debug"
 
 # `daemon` is flag for to run node as daemon process. Set true then the node run as daemon.
 daemon = true
@@ -53,7 +53,7 @@ daemon = true
 # Specify pid file path. This option is enable when the node got '--daemon' flag.
 pid = "/tmp/tapyrus-signer.pid"
 
-# `log_file`
+# `log-file`
 # Specify where log file export to. This option is enable when the node fot '--daemon' flag.
 # If not, logs are put on stdout and stderr.
-log_file = "/var/log/tapyrus-signer.log"
+log-file = "/var/log/tapyrus-signer.log"

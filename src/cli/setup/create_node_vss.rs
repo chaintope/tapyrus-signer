@@ -38,13 +38,13 @@ pub struct CreateNodeVssCommand {}
 impl<'a> CreateNodeVssCommand {
     pub fn execute(matches: &ArgMatches) -> Result<Box<dyn Response>, Error> {
         let private_key: PrivateKey = matches
-            .value_of("private_key")
+            .value_of("private-key")
             .and_then(|key| PrivateKey::from_wif(key).ok())
-            .ok_or(Error::InvalidArgs("private_key".to_string()))?;
+            .ok_or(Error::InvalidArgs("private-key".to_string()))?;
 
         let mut public_keys: Vec<PublicKey> = matches
-            .values_of("public_key")
-            .ok_or(Error::InvalidArgs("public_key".to_string()))?
+            .values_of("public-key")
+            .ok_or(Error::InvalidArgs("public-key".to_string()))?
             .map(|key| PublicKey::from_str(key).map_err(|_| Error::InvalidKey))
             .collect::<Result<Vec<PublicKey>, _>>()?;
         NodeParameters::<Rpc>::sort_publickey(&mut public_keys);
@@ -83,14 +83,14 @@ impl<'a> CreateNodeVssCommand {
 
     pub fn args<'b>() -> App<'a, 'b> {
         SubCommand::with_name("createnodevss").args(&[
-            Arg::with_name("public_key")
-                .long("public_key")
+            Arg::with_name("public-key")
+                .long("public-key")
                 .required(true)
                 .multiple(true)
                 .takes_value(true)
                 .help("compressed public key of the each signer with a hex format string"),
-            Arg::with_name("private_key")
-                .long("private_key")
+            Arg::with_name("private-key")
+                .long("private-key")
                 .required(true)
                 .takes_value(true)
                 .help("private key of this signer with an extend WIF format"),
@@ -113,13 +113,13 @@ mod tests {
             "createnodevss",
             "--threshold",
             "2",
-            "--public_key",
+            "--public-key",
             "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
-            "--public_key",
+            "--public-key",
             "03e568e3a5641ac21930b51f92fb6dd201fb46faae560b108cf3a96380da08dee1",
-            "--public_key",
+            "--public-key",
             "02a1c8965ed06987fa6d7e0f552db707065352283ab3c1471510b12a76a5905287",
-            "--private_key",
+            "--private-key",
             "cQYYBMFS9dRR3Mt16gW4jixCqSiMhCwuDMHUBs6WeHMTxMnsq8Gh",
         ]);
         let response = CreateNodeVssCommand::execute(&matches);
@@ -132,9 +132,9 @@ mod tests {
             "createnodevss",
             "--threshold",
             "2",
-            "--public_key",
+            "--public-key",
             "x",
-            "--private_key",
+            "--private-key",
             "cQYYBMFS9dRR3Mt16gW4jixCqSiMhCwuDMHUBs6WeHMTxMnsq8Gh",
         ]);
         let response = CreateNodeVssCommand::execute(&matches);
@@ -147,15 +147,15 @@ mod tests {
             "createnodevss",
             "--threshold",
             "2",
-            "--public_key",
+            "--public-key",
             "03842d51608d08bee79587fb3b54ea68f5279e13fac7d72515a7205e6672858ca2",
-            "--private_key",
+            "--private-key",
             "x",
         ]);
         let response = CreateNodeVssCommand::execute(&matches);
         assert_eq!(
             format!("{}", response.err().unwrap()),
-            "InvalidArgs(\"private_key\")"
+            "InvalidArgs(\"private-key\")"
         );
     }
 }
