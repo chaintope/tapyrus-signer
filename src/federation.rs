@@ -332,13 +332,11 @@ mod tests {
             TEST_KEYS.aggregated(),
         );
 
-        let mut pubkeys = TEST_KEYS.pubkeys();
-        pubkeys.sort_by(|a, b| {
-            let a = a.key.serialize();
-            let b = b.key.serialize();
-            Ord::cmp(&a[..], &b[..])
-        });
-        let expected: Vec<SignerID> = pubkeys.into_iter().map(|i| SignerID::new(i)).collect();
+        let expected: Vec<SignerID> = TEST_KEYS
+            .pubkeys()
+            .into_iter()
+            .map(|i| SignerID::new(i))
+            .collect();
         assert_eq!(expected, federation.signers());
     }
 
