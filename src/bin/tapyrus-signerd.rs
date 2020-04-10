@@ -244,7 +244,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "federations_file: Invalid TOML format. missing field `threshold` for key `federation` at line 12 column 1"
+        expected = "federations_file: Invalid TOML format. missing field `aggregated_public_key` for key `federation` at line 12 column 1"
     )]
     fn test_load_federations_invalid_toml_format() {
         let pubkey = PublicKey::from_str(

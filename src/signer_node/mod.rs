@@ -10,6 +10,7 @@ pub mod utils;
 pub use crate::signer_node::node_parameters::NodeParameters;
 pub use crate::signer_node::node_state::NodeState;
 
+use crate::blockdata::Block;
 use crate::net::{ConnectionManager, Message, MessageType, SignerID};
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use crate::signer_node::message_processor::create_block_vss;
@@ -21,6 +22,7 @@ use crate::signer_node::message_processor::process_completedblock;
 use crate::signer_node::node_state::builder::{Builder, Master, Member};
 
 use crate::timer::RoundTimeOutObserver;
+
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::FE;
 use redis::ControlFlow;
@@ -290,6 +292,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             }
         };
 
+        let block = self.add_aggregated_public_key_if_needed(block_height, block);
         log::info!(
             "Broadcast candidate block. block hash for signing: {:?}",
             block.sighash()
@@ -323,6 +326,19 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         let block_height = self.current_state.block_height();
         let federation = self.params.get_federation_by_block_height(block_height);
         federation.signers().contains(sender_id)
+    }
+
+    fn add_aggregated_public_key_if_needed(&self, block_height: u64, block: Block) -> Block {
+        let next_block_height = block_height + 1;
+        let federation = self
+            .params
+            .get_federation_by_block_height(next_block_height);
+        if federation.block_height() == next_block_height {
+            let aggregated_public_key = self.params.aggregated_public_key(next_block_height);
+            block.add_aggregated_public_key(aggregated_public_key)
+        } else {
+            block
+        }
     }
 
     pub fn process_round_message(
@@ -574,12 +590,18 @@ mod tests {
         publish_count: u32,
     ) -> (SignerNode<T, TestConnectionManager>, Sender<Message>) {
         let pubkey_list = TEST_KEYS.pubkeys();
-        let threshold = 3;
+        let threshold = Some(3);
         let private_key = TEST_KEYS.key[0];
         let to_address = address(&private_key);
         let public_key = pubkey_list[0].clone();
-        let federations =
-            Federations::new(vec![Federation::new(public_key, 0, threshold, node_vss(0))]);
+        let aggregated_public_key = TEST_KEYS.aggregated();
+        let federations = Federations::new(vec![Federation::new(
+            public_key,
+            0,
+            threshold,
+            node_vss(0),
+            aggregated_public_key,
+        )]);
 
         let mut params = NodeParameters::new(to_address, public_key, rpc, 0, true, federations);
         params.round_duration = 0;

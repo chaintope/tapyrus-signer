@@ -68,16 +68,24 @@ impl<T: TapyrusApi> NodeParameters<T> {
 
     pub fn threshold(&self, block_height: u64) -> u8 {
         let federation = self.get_federation_by_block_height(block_height);
-        federation.threshold()
+        federation
+            .threshold()
+            .expect("threshold should not be None")
     }
 
     pub fn self_node_index(&self, block_height: u64) -> usize {
         let federation = self.get_federation_by_block_height(block_height);
         federation.node_index()
     }
+
     pub fn pubkey_list(&self, block_height: u64) -> Vec<PublicKey> {
         let federation = self.get_federation_by_block_height(block_height);
         federation.signers().iter().map(|s| s.pubkey).collect()
+    }
+
+    pub fn aggregated_public_key(&self, block_height: u64) -> PublicKey {
+        let federation = self.get_federation_by_block_height(block_height);
+        federation.aggregated_public_key()
     }
 }
 

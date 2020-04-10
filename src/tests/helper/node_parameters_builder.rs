@@ -27,8 +27,9 @@ impl NodeParametersBuilder {
             federations: Federations::new(vec![Federation::new(
                 TEST_KEYS.pubkeys()[0],
                 0,
-                2,
+                Some(2),
                 node_vss(0),
+                TEST_KEYS.aggregated(),
             )]),
         }
     }

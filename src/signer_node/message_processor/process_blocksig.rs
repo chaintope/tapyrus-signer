@@ -36,6 +36,7 @@ where
         let mut builder = DumpBuilder::default();
         let federation = params.get_federation_by_block_height(block_height);
         let node_vss = federation.nodevss();
+        let aggregated_public_key = federation.aggregated_public_key();
         builder
             .received(Received {
                 sender: sender_id.clone(),
@@ -47,6 +48,7 @@ where
             .threshold(params.threshold(block_height) as usize)
             .public_key(params.signer_id.pubkey)
             .prev_state(prev_state.clone())
+            .aggregated_public_key(aggregated_public_key)
             .node_vss(node_vss.clone());
         builder
     };
@@ -220,6 +222,7 @@ pub struct Dump {
     node_vss: Vec<Vss>,
     received: Received,
     prev_state: NodeState,
+    aggregated_public_key: PublicKey,
     #[builder(setter(strip_option), default)]
     completed_block: Option<Block>,
 }
@@ -407,8 +410,9 @@ mod tests {
         let federations = vec![Federation::new(
             dump.public_key,
             0,
-            dump.threshold as u8,
+            Some(dump.threshold as u8),
             dump.node_vss.clone(),
+            dump.aggregated_public_key,
         )];
         let federations = Federations::new(federations);
         let params = NodeParametersBuilder::new()
@@ -450,8 +454,9 @@ mod tests {
         let federations = vec![Federation::new(
             dump.public_key,
             0,
-            dump.threshold as u8,
+            Some(dump.threshold as u8),
             dump.node_vss.clone(),
+            dump.aggregated_public_key,
         )];
         let federations = Federations::new(federations);
         let params = NodeParametersBuilder::new()
@@ -495,8 +500,9 @@ mod tests {
         let federations = vec![Federation::new(
             dump.public_key,
             0,
-            dump.threshold as u8,
+            Some(dump.threshold as u8),
             dump.node_vss.clone(),
+            dump.aggregated_public_key,
         )];
         let federations = Federations::new(federations);
         let params = NodeParametersBuilder::new()

@@ -151,12 +151,14 @@ pub mod test_vectors {
             .map(|i| Vss::from_str(i.as_str().unwrap()).unwrap())
             .collect();
         let threshold = value["threshold"].as_u64().unwrap();
+        let aggregated_public_key = to_public_key(&value["aggregated_public_key"]);
         let public_key = to_public_key(&value["public_key"]);
         let federations = vec![Federation::new(
             public_key,
             0,
-            threshold as u8,
+            Some(threshold as u8),
             node_vss.clone(),
+            aggregated_public_key,
         )];
         let federations = Federations::new(federations);
         NodeParametersBuilder::new()

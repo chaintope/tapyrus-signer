@@ -30,6 +30,8 @@ pub enum Error {
     IncompleteBlock,
     /// Errors when the federation is invalid. This error has the block height of the federation gets started and message string.
     InvalidFederation(Option<u64>, &'static str),
+    /// Error when the aggregated public key included the candidate block is invalid.
+    InvalidAggregatedPublicKey,
 }
 
 impl std::fmt::Display for Error {
