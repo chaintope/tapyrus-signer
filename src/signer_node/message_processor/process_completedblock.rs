@@ -19,12 +19,11 @@ where
 
     if let Err(e) = params.rpc.submitblock(block) {
         log::warn!(
-            "The node gets invalid completed block from peer: {}, block: {:?}, rpc error: {:?}",
+            "The node got invalid completed block or it was already relayed via Tapyrus network. from-peer: {}, block: {:?}, rpc error: {:?}",
             sender_id,
             block,
             e
         );
-        return prev_state.clone();
     }
 
     NodeState::RoundComplete {
@@ -37,6 +36,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::process_completedblock;
+    use crate::errors::Error;
     use crate::net::SignerID;
     use crate::signer_node::node_state::builder::{Builder, Member};
     use crate::signer_node::{master_index, NodeState};
@@ -81,6 +81,33 @@ mod tests {
             NodeState::RoundComplete {
                 next_master_index, ..
             } => assert_eq!(*next_master_index, 0),
+            n => assert!(false, "Should be RoundComplete, but the state is {:?}", n),
+        }
+    }
+
+    #[test]
+    fn test_process_completedblock_with_submit_block_failure() {
+        let block = get_block(0);
+        let mut rpc = MockRpc::new();
+        rpc.should_call_submitblock(Err(Error::JsonRpc(jsonrpc::error::Error::Rpc(
+            jsonrpc::error::RpcError {
+                code: -25,
+                message: "proposal was not based on our best chain".to_string(),
+                data: None,
+            },
+        ))));
+        let params = NodeParametersBuilder::new().rpc(rpc).build();
+
+        let prev_state = Member::for_test().master_index(0).build();
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[4]);
+        let state = process_completedblock(&sender_id, &block, &prev_state, &params);
+
+        params.rpc.assert();
+
+        match &state {
+            NodeState::RoundComplete {
+                next_master_index, ..
+            } => assert_eq!(*next_master_index, 1),
             n => assert!(false, "Should be RoundComplete, but the state is {:?}", n),
         }
     }
