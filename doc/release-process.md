@@ -6,7 +6,7 @@ time.
 
 Before every minor and major release:
 
-* Update version in `Cargo.toml`. See also [vertioning rule](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/versioning_rule.md).
+* Update version in `Cargo.toml`.
 * Write release notes (see below)
 * Create a release draft on Github repository.
 * Update Testnet environment. 
