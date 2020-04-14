@@ -111,19 +111,6 @@ impl Block {
             .expect("couldn't convert to blockdata::hash::Hash from sha256d::hash")
     }
 
-    /// Returns block hash
-    pub fn hash(&self) -> hash::SHA256Hash {
-        let header = if self.0[Self::XFIELD_POSITION] == 0 {
-            &self.0[..(Self::XFIELD_POSITION + 1)] // length byte
-        } else {
-            &self.0[..(Self::XFIELD_POSITION + 65)] // length byte + signature(64 bytes)
-        };
-
-        let hash = sha256d::Hash::hash(header).into_inner();
-        hash::SHA256Hash::from_slice(&hash)
-            .expect("couldn't convert to blockdata::hash::Hash from sha256d::hash")
-    }
-
     pub fn payload(&self) -> &[u8] {
         &self.0
     }
@@ -270,21 +257,6 @@ mod tests {
         .unwrap();
         let block = test_block_with_pubkey();
         assert_eq!(block.get_aggregated_public_key().unwrap(), public_key);
-    }
-
-    #[test]
-    fn test_hash() {
-        let block = test_block();
-        let hash = block.hash();
-
-        assert_eq!(
-            format!("{:?}", hash),
-            "Hash(86dbdec1ab22f4d43ef164ea5198bf6d4d96ea6ef97ca2dea97a40657af6d789)"
-        );
-
-        let json = serde_json::to_string(&hash).unwrap();
-        let deserialize_hash: hash::SHA256Hash = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialize_hash, hash);
     }
 
     #[test]

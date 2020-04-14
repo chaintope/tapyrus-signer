@@ -160,9 +160,8 @@ where
     };
 
     log::info!(
-        "Round Success. caindateblock(block hash for sign)={:?} completedblock={:?}",
+        "Round Success. candidateblock(block hash for sign)={:?}",
         candidate_block.sighash(),
-        completed_block.hash()
     );
 
     #[cfg(feature = "dump")]
@@ -205,7 +204,7 @@ fn broadcast_completedblock<C>(block: Block, own_id: &SignerID, conman: &C)
 where
     C: ConnectionManager,
 {
-    log::info!("Broadcast CompletedBlock message. {:?}", block.hash());
+    log::info!("Broadcast CompletedBlock message.");
     let message = Message {
         message_type: MessageType::Completedblock(block),
         sender_id: own_id.clone(),
