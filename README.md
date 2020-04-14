@@ -41,6 +41,11 @@ TSN produces schnorr signatures which is described in [Tapyrus Schnorr Singature
 
 > [^1]: Stinson, D. R., & Strobl, R. (2001). Provably secure distributed schnorr signatures and a (T, n) threshold scheme for implicit certificates. In Lecture Notes in Computer Science (including subseries Lecture Notes in Artificial Intelligence and Lecture Notes in Bioinformatics) (Vol. 2119, pp. 417–434). Springer Verlag. https://doi.org/10.1007/3-540-47719-5_33
 
+### Verifiable Secret Sharing
+
+The threshold signature scheme uses [Verifiable secret sharing(VSS)](https://en.wikipedia.org/wiki/Verifiable_secret_sharing) inside. And TSN uses [Feldman's scheme](https://en.wikipedia.org/wiki/Verifiable_secret_sharing#Feldman’s_scheme).
+The word of VSS appears in this repository means this scheme and sort of data format for VSS scheme.
+
 ## Overview of Tapyrus Signer Network(TSN) How it works
 
 After 5 seconds of idling, the block generation round will begin. Each round is divided into roles - one master and 
