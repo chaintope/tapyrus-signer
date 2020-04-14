@@ -35,10 +35,10 @@ Release tag is going to create when the github release note published.
 
 ## How to build release binary
 
-Tapyrus Signer support osx and linux environment. So we need to prepare binaries for both. Tapyrus Signer pre-built binaries are going to release following archive file on Github release feature like [this](https://github.com/chaintope/tapyrus-signer/releases/tag/v0.3.0) . 
+Tapyrus Signer support macOS and linux environment. So we need to prepare binaries for both. Tapyrus Signer pre-built binaries are going to release following archive file on Github release feature like [this](https://github.com/chaintope/tapyrus-signer/releases/tag/v0.3.0) . 
 
 ```
-tapyrus-signer-v0.3.0-osx64.tar.gz
+tapyrus-signer-v0.3.0-macOS.tar.gz
 tapyrus-signer-v0.3.0-x86_64-px-linux-gnu.tar.gz
 ```
 
@@ -77,7 +77,7 @@ $ cp target/release/tapyrus-signerd tapyrus-signer-${VERSION}-x86_64-px-linux-gn
 $ tar zcvf tapyrus-signer-${VERSION}-x86_64-px-linux-gnu.tar.gz tapyrus-signer-${VERSION}-x86_64-px-linux-gnu/
 ```
 
-### Build step for OSX
+### Build step for macOS
 
 #### Install Rust Compiler
 
@@ -99,8 +99,8 @@ $ cargo build --release
 #### Create archive
 
 ```
-$ mkdir -p tapyrus-signer-${VERSION}-osx64/bin
-$ cp target/release/tapyrus-signerd tapyrus-signer-${VERSION}-osx64/bin
-$ tar zcvf tapyrus-signer-${VERSION}-osx64.tar.gz  tapyrus-signer-${VERSION}-osx64/
+$ mkdir -p tapyrus-signer-${VERSION}-macOS/bin
+$ cp target/release/tapyrus-signerd tapyrus-signer-${VERSION}-macOS/bin
+$ tar zcvf tapyrus-signer-${VERSION}-macOS.tar.gz  tapyrus-signer-${VERSION}-macOS/
 ```
 
