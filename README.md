@@ -34,9 +34,10 @@ Signer Index.
 
 ## Verifiable Secret Sharing Scheme
 
-Tapyrus Signer Network(TSN)'s signing algorithm is using [KZen-networks/multi-party-schnorr](https://github.com/KZen-networks/multi-party-schnorr) and it is based on [Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold Scheme for Implicit Certificates](https://github.com/KZen-networks/multi-party-schnorr/blob/master/papers/provably_secure_distributed_schnorr_signatures_and_a_threshold_scheme.pdf).
+Tapyrus Signer Network(TSN)'s signing algorithm bases on "Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold Scheme for Implicit Certificates"[^1].
+If you want to understand what is going on in TSN, We recommend reading section 4 "A (t, n) Threshold Signature Scheme" in the paper before.
 
-If you want to understand what is going on in TSN, We recommend to read section 4 "A (t, n) Threshold Signature Scheme" in the paper before.
+[^1]: Stinson, D. R., & Strobl, R. (2001). Provably secure distributed schnorr signatures and a (T, n) threshold scheme for implicit certificates. In Lecture Notes in Computer Science (including subseries Lecture Notes in Artificial Intelligence and Lecture Notes in Bioinformatics) (Vol. 2119, pp. 417–434). Springer Verlag. https://doi.org/10.1007/3-540-47719-5_33
 
 ## Overview of Tapyrus Signer Network(TSN) How it works
 
