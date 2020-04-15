@@ -591,9 +591,9 @@ mod tests {
     ) -> (SignerNode<T, TestConnectionManager>, Sender<Message>) {
         let pubkey_list = TEST_KEYS.pubkeys();
         let threshold = Some(3);
-        let private_key = TEST_KEYS.key[0];
+        let private_key = TEST_KEYS.key[4];
         let to_address = address(&private_key);
-        let public_key = pubkey_list[0].clone();
+        let public_key = pubkey_list[4].clone();
         let aggregated_public_key = TEST_KEYS.aggregated();
         let federations = Federations::new(vec![Federation::new(
             public_key,
@@ -614,7 +614,7 @@ mod tests {
 
     #[test]
     fn test_is_federation_member() {
-        let public_key = TEST_KEYS.pubkeys()[0];
+        let public_key = TEST_KEYS.pubkeys()[4];
         let arc_block = safety(get_block(0));
         let rpc = MockRpc {
             return_block: arc_block.clone(),

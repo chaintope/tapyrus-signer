@@ -95,37 +95,11 @@ mod tests {
     use crate::tests::helper::keys::TEST_KEYS;
     use crate::tests::helper::rpc::MockRpc;
     use bitcoin::PublicKey;
-    use std::str::FromStr;
 
     #[test]
     fn test_sort_publickey() {
-        let mut pubkeys = TEST_KEYS.pubkeys();
+        let mut pubkeys: Vec<PublicKey> = TEST_KEYS.unsorted_pubkeys();
         NodeParameters::<MockRpc>::sort_publickey(&mut pubkeys);
-
-        assert_eq!(
-            pubkeys,
-            vec![
-                PublicKey::from_str(
-                    "02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506",
-                )
-                .unwrap(),
-                PublicKey::from_str(
-                    "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e",
-                )
-                .unwrap(),
-                PublicKey::from_str(
-                    "02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900",
-                )
-                .unwrap(),
-                PublicKey::from_str(
-                    "02d111519ba1f3013a7a613ecdcc17f4d53fbcb558b70404b5fb0c84ebb90a8d3c",
-                )
-                .unwrap(),
-                PublicKey::from_str(
-                    "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
-                )
-                .unwrap(),
-            ]
-        );
+        assert_eq!(pubkeys, TEST_KEYS.pubkeys());
     }
 }

@@ -356,7 +356,7 @@ mod test {
         // create un-usable connection
         let mut connection_manager = RedisManager::new("0.0.0.0".to_string(), "999".to_string());
         let sender_id = SignerID {
-            pubkey: TEST_KEYS.pubkeys()[0],
+            pubkey: TEST_KEYS.pubkeys()[4],
         };
 
         let message = Message {
@@ -384,7 +384,7 @@ mod test {
             "6379".to_string(),
         ));
         let sender_id = SignerID {
-            pubkey: TEST_KEYS.pubkeys()[0],
+            pubkey: TEST_KEYS.pubkeys()[4],
         };
 
         let message_processor = move |message: Message| {
@@ -406,7 +406,7 @@ mod test {
 
     #[test]
     fn signer_id_serialize_test() {
-        let pubkey = TEST_KEYS.pubkeys()[0];
+        let pubkey = TEST_KEYS.pubkeys()[4];
         let signer_id: SignerID = SignerID { pubkey };
         let serialized = serde_json::to_string(&signer_id).unwrap();
         assert_eq!(
@@ -420,7 +420,7 @@ mod test {
         let serialized = "\"03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc\"";
         let signer_id = serde_json::from_str::<SignerID>(serialized).unwrap();
 
-        let pubkey = TEST_KEYS.pubkeys()[0];
+        let pubkey = TEST_KEYS.pubkeys()[4];
         let expected: SignerID = SignerID { pubkey };
         assert_eq!(expected, signer_id);
     }

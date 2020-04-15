@@ -112,7 +112,7 @@ mod tests {
     use std::str::FromStr;
 
     fn sender_id() -> SignerID {
-        TEST_KEYS.signer_ids()[1]
+        TEST_KEYS.signer_ids()[2]
     }
 
     /// This network consists 5 signers and threshold 3.
@@ -233,9 +233,9 @@ mod tests {
     /// * The node's status is Member and its index is 4.
     /// * The round master's index is 0.
     ///
-    /// 1. Send candidateblock message from index 0 node(array index is 4).
+    /// 1. Send candidateblock message from index 0 node(array index is 0).
     ///    It must not change master_index assumption.
-    /// 2. Send candidateblock message from index 4 node(array index is 0).
+    /// 2. Send candidateblock message from index 4 node(array index is 4).
     ///    It must change master_index assumption to 4.
     #[test]
     fn test_modify_master_index() {
@@ -248,18 +248,18 @@ mod tests {
 
         let prev_state = Member::for_test().master_index(0).build();
         let params = NodeParametersBuilder::new()
-            .public_key(TEST_KEYS.pubkeys()[2])
+            .public_key(TEST_KEYS.pubkeys()[1])
             .rpc(rpc)
             .build();
 
         // Step 1.
-        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[4]);
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
         let state =
             process_candidateblock(&sender_id, &candidate_block, &prev_state, &conman, &params);
         assert_eq!(master_index(&state, &params).unwrap(), 0);
 
         // Step 2.
-        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[4]);
         let state =
             process_candidateblock(&sender_id, &candidate_block, &prev_state, &conman, &params);
         assert_eq!(master_index(&state, &params).unwrap(), 4);
