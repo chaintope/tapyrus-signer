@@ -4,8 +4,8 @@ This document describes the Federation Management of Tapyrus.
 
 ## Overview
 
-The Tapyrus Signer Network is a permissioned network consisting of identifiable signers who can control to sign blocks.
-These signers can not only sign blocks but also can control the identity of the participants on the network themselves.
+The Tapyrus Signer Network is a permitted network consisting of identifiable signers who can control to sign blocks.
+These signers cannot only sign blocks but also can control the identity of the participants on the network themselves.
 We introduce Federation, which is consisted of a set of identifiable signers and the features to maintain their access controls.
 
 A new signer joining the network needs to get approval from the signers who belongs to the Federation.
