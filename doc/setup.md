@@ -105,16 +105,8 @@ where:
 
 And then, Signer[i] send the generated `node_vss[i, j]` (j = 1, 2, ..., n; i != j) to the Signer[j].
 
-`node_vss[i, j]` contains the following information:
+The structure of `node_vss[i, j]` is mentioned later in [Structure of VSS](#structure-of-vss).
 
-- the public key `public_key[i]` which indicates the signer who sends this vss.
-- the public key `public_key[j]` which indicates the signer to be received the `node_vss[i, j]`
-- "positive" public commitments `commitments[k]` (k = 0, 1, ..., t - 1)
-- "positive" secret `secret[j]` to perform secret sharing scheme.
-- "negative" public commitments `commitments[k]` (k = 0, 1, ..., t - 1)
-- "negative" secret `secret[j]` to perform secret sharing scheme.
-
-`node_vss[i, j]` have 2 kinds of VSS, named "positive" and "negative". Only "positive" VSS is used to generate aggregated value. For more information, see [^6].
 `node_vss[i, j]` also is encrypted using symmetric key encryption scheme ChaCha20-Poly1305 [^4] and encoding with Base58.
 So in generally, one who doesn't know `private_key[i]` can not know the secret value `secret[j]` even if they get `node_vss[i, j]`.
 But from a security point of view, Signer[i] should send the value to others using a secure communication channel with PFS.
@@ -184,23 +176,14 @@ where:
 
 Signer[i] does not have to specify a nonce used in the encryption. Nonce is optional in this step.
 
-`block_vss[i, j]` contains the following information:
+The structure of `block_vss[i, j]` is mentioned later in [Structure of VSS](#structure-of-vss).
 
-- the public key `public_key[i]` which indicates the signer who sends this VSS.
-- the public key `public_key[j]` which indicates the signer to be received the `block_vss[i, j]`
-- "positive"[^6] public commitments `commitments[k]` (k = 1, 2, ..., t)
-- "positive" secret `secret[j]` to perform secret sharing scheme.
-- "negative" public commitments `commitments[k]` (k = 1, 2, ..., t)
-- "negative" secret `secret[j]` to perform secret sharing scheme.
-
-`block_vss[i, j]` is encrypted in the same way as `node_vss`.
+`block_vss[i, j]` is encrypted in the same way as Node VSS.
 
 :heavy_exclamation_mark:Caution: 
 > The VSS encryption is not implemented at 0.4.0 release. It is going to be implemented in future release.
 
 Signer[i] sends the generated values `block_vss[i, j]` to other signers.
-
-[^6]: In schnorr signature schema used in Tapyrus Core, we use the random value "r" and the ephemeral point "R" on the elliptic curve, where R = rG (G is the generator of the curve). In Tapyrus signature schema we should choose R so that jacobi(y(R)) = 1 (if not, use (n - r) instead of r and generate R so that R = (n - r)G, where n is the order of the curve). So in this step, we should generate both "positive" secret and commitments that corresponds to r, and "negative" ones that corrensponds to (n - r). For more information, see [Tapyrus Schnorr Signature Specification](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/schnorr_signature.md)
 
 ### Step 2. Sign the genesis block locally.
 
@@ -276,7 +259,11 @@ Below in this section, notation `vss` means `node_vss[i, j]` or `block_vss[i, j]
 
 ### Structure of VSS
 
-`node_vss` and `block_vss` have 7 fields:
+VSS have 2 kinds of VSS, named "positive" and "negative". 
+Only "positive" VSS is used to generate aggregated value. 
+For more information, see [^5].
+
+Node VSS and Block VSS have 7 fields:
 
 | name                 | size      | explaination                                                                                      |
 | -------------------- | --------- | ------------------------------------------------------------------------------------------------- |
@@ -288,6 +275,8 @@ Below in this section, notation `vss` means `node_vss[i, j]` or `block_vss[i, j]
 | negative secret      | 32        | secret value for (n - r) to perform secret sharing scheme                                         |
 
 Each commitment consists of 32-bits x-coordinate and 32-bits y-coordinate.
+
+[^5]: In schnorr signature schema used in Tapyrus Core, we use the random value "r" and the ephemeral point "R" on the elliptic curve, where R = rG (G is the generator of the curve). In Tapyrus signature schema we should choose R so that jacobi(y(R)) = 1 (if not, use (n - r) instead of r and generate R so that R = (n - r)G, where n is the order of the curve). So in this step, we should generate both "positive" secret and commitments that corresponds to r, and "negative" ones that corrensponds to (n - r). For more information, see [Tapyrus Schnorr Signature Specification](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/schnorr_signature.md)
 
 ### Encryption of Node VSS
 
