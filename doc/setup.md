@@ -17,22 +17,47 @@ We suppose (or recommend) that all signers can communicate with each other using
 
 To support for setting up the Tapyrus Signer Network, we provide a command-line utility `tapyrus-setup`
 
+## Tapyrus signer network parameters
+In addition to [Tapyrus network parameters](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/getting_started.md#tapyrus-network-parameters), Tapyrus signer network uses following unique parameters to each tapyrus network.
+
+**Node VSS**  
+Node VSS is sort of Verifiable Secret Share(VSS) Which is produced at 4.1 Key Generation Protocol in [the paper](https://doi.org/10.1007/3-540-47719-5_33).
+[The structure](#structure-of-vss) is mentioned later.
+All signers must have Node VSSs from all signers which includes myself to start up own node in federations.toml config file.
+
+**Node secret share**
+Node secret share is a share which is produced at 4.1 Key Generation Protocol in [the paper](https://doi.org/10.1007/3-540-47719-5_33).
+Each signer must have own Node secret share. 
+This is calculated by collected Node VSSs.
+The value is 32bytes data of private key on secp256k1 curve.
+
+Tapyrus signer network uses following unique parameters to each block generation round.
+
+**Block VSS**
+Block VSS is sort of VSS which is produced at 4.2 Signature Issuing Protocol in [the paper](https://doi.org/10.1007/3-540-47719-5_33).
+[The structure](#structure-of-vss) is mentioned later.
+All signers must generate Block VSSs and exchange each other. 
+
+**Block secret share**
+Block secret share is a share which is produced at 4.2 Signature Issuing Protocol in [the paper](https://doi.org/10.1007/3-540-47719-5_33).
+The value is 32bytes data of private key on secp256k1 curve.
+
 ## Generate Aggregate public key and Node secret share for Tapyrus-signer network
 
 Here describes each signer how to get Aggregate public key of Tapyrus Signer Network(TSN) and Node secret share of each signer. 
-The TNS produces signatures for blocks of the Tapyrus blockchain. 
+TSN produces signatures for blocks of the Tapyrus blockchain. 
 The signatures are equal with that signed by a private key which is aggregated all signer's private key.
 So the signatures can be verified with private key which is aggregated all signer's public key. 
 However, actually the TNS dosen't use the aggregate private key to produce the signatures. 
 The TNS uses distributed schnorr singnature scheme from [Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold Scheme for Implicit Certificates](https://github.com/KZen-networks/multi-party-schnorr/blob/master/papers/provably_secure_distributed_schnorr_signatures_and_a_threshold_scheme.pdf).
-In this scheme, each signer has own secret share which is called Node Secret Share.
-The TNS can produce signatures using the Node Secret Shares whose count equals threshold.
+In this scheme, each signer has own secret share which is called Node secret share.
+The TNS can produce signatures using the Node secret shares whose count equals threshold.
 
 The following steps can be summarized like this: 
 * Generate your own key pair. 
 * Generate and distribute Node VSSs for all each signer.
 * By the distribution, you would collect Node VSSs for you from each other signer and yourself.
-* Generate Aggregate public key and Node Secret Share by the collected Node VSSs.
+* Generate Aggregate public key and Node secret share from the collected Node VSSs.
 
 ### Step 1. Generate key pair
 
@@ -58,7 +83,7 @@ In the following steps, Signers are supposed to be sorted by public keys and ind
 
 ### Step 2. Generate node verifiable secret shares.
 
-Signer[i] generates "node" VSS(verifiable secret share)[^4] with `tapyrus-setup createnodevss`.
+Signer[i] generates Node VSS with `tapyrus-setup createnodevss`.
 
 ```
 tapyrus-setup createnodevss --public-key=<public_key[1]> --public-key=<public_key[2]> ... --public-key=<public_key[n]> --private-key=<private_key[i]> --networkid=<networkid> --block-height=<block_height> --threshold=<t>
@@ -90,7 +115,7 @@ And then, Signer[i] send the generated `node_vss[i, j]` (j = 1, 2, ..., n; i != 
 - "negative" secret `secret[j]` to perform secret sharing scheme.
 
 `node_vss[i, j]` have 2 kinds of VSS, named "positive" and "negative". Only "positive" VSS is used to generate aggregated value. For more information, see [^6].
-`node_vss[i, j]` also is encrypted using symmetric key encryption scheme ChaCha20-Poly1305 [^5] and encoding with Base58.
+`node_vss[i, j]` also is encrypted using symmetric key encryption scheme ChaCha20-Poly1305 [^4] and encoding with Base58.
 So in generally, one who doesn't know `private_key[i]` can not know the secret value `secret[j]` even if they get `node_vss[i, j]`.
 But from a security point of view, Signer[i] should send the value to others using a secure communication channel with PFS.
 
@@ -99,8 +124,7 @@ For more information about encrypting and encoding `node_vss[i, j]`, see Appendi
 :heavy_exclamation_mark:Caution: 
 > The VSS encryption is not implemented at 0.4.0 release. It is going to be implemented in future release.
 
-[^4]: [Provably Secure Distributed Schnorr Signatures and a (t,n) Threshold Scheme for Implicit Cerfiticates](https://t.co/jMhQnovLcb)
-[^5]: [ChaCha20 and Poly1305 for IETF Protocols](https://tools.ietf.org/html/rfc8439)
+[^4]: [ChaCha20 and Poly1305 for IETF Protocols](https://tools.ietf.org/html/rfc8439)
 
 ### Step 3. Generate an aggregated public key
 
@@ -131,13 +155,13 @@ If you don't have yet, get it following [Create new genesis block using tapyrus-
 The following steps can be summarized like this: 
 * Generate and distribute Block VSSs for all each signer.
 * By the distribution, you would collect Block VSSs for you from each other signer and yourself.
-* Generate Local Signature by the collected Block VSSs and Node Secret Share.
+* Generate Local Signature by the collected Block VSSs and Node secret share.
 * Share the Local Signature with all other signers.
 * Compute final signature for the block from all collected Local Signatures.
 
 ### Step 1. Generate Block VSSs.
 
-As in Step 3, Signer[i] creates "block" VSS(verifiable secret share).
+As in Step 3, Signer[i] creates Block VSS.
 
 ```
 
@@ -162,7 +186,7 @@ Signer[i] does not have to specify a nonce used in the encryption. Nonce is opti
 
 `block_vss[i, j]` contains the following information:
 
-- the public key `public_key[i]` which indicates the signer who sends this vss.
+- the public key `public_key[i]` which indicates the signer who sends this VSS.
 - the public key `public_key[j]` which indicates the signer to be received the `block_vss[i, j]`
 - "positive"[^6] public commitments `commitments[k]` (k = 1, 2, ..., t)
 - "positive" secret `secret[j]` to perform secret sharing scheme.
@@ -188,7 +212,7 @@ tapyrus-setup sign --block-vss=<block_vss[1, i]> --block-vss=<block_vss[2, i]> .
 output: <local_sig[i]>
 ```
 
-- `block_vss[j, i]` (j = 1, 2, ..., n) are the block VSSs generated by Step 1.
+- `block_vss[j, i]` (j = 1, 2, ..., n) are Block VSSs generated by Step 1.
 - `private_key[i]` is the private key of Signer[i].
 - `aggregated_public_key` is an aggregated public key.
 - `node_secret_share[i]` is the secret key share of Signer[i].
@@ -216,8 +240,8 @@ output: <block_with_signature>
 - `local_sig[i]` is the local signatures broadcasted by signers.
 - `block` is the genesis block without block proof.
 - `private_key[i]` is the private key of Signer[i].
-- `block_vss[j, i]` (j = 1, 2, ..., n) are the block VSSs.
-- `node_vss[j, i]` (j = 1, 2, ..., n) are the node VSSs.
+- `block_vss[j, i]` (j = 1, 2, ..., n) are Block VSSs.
+- `node_vss[j, i]` (j = 1, 2, ..., n) are Node VSSs.
 - `block_with_signature` is the whole genesis block data with block proof as hex string format.
 
 To make block proof, t `local_sig`s are required.
@@ -250,7 +274,7 @@ In this section, we describe the protocol to encode/encrypt the VSS.
 
 Below in this section, notation `vss` means `node_vss[i, j]` or `block_vss[i, j]`.
 
-### Structure of vss
+### Structure of VSS
 
 `node_vss` and `block_vss` have 7 fields:
 
@@ -265,9 +289,9 @@ Below in this section, notation `vss` means `node_vss[i, j]` or `block_vss[i, j]
 
 Each commitment consists of 32-bits x-coordinate and 32-bits y-coordinate.
 
-### Encryption of `node_vss`
+### Encryption of Node VSS
 
-`node_vss` is processed in the rule listed below:
+Node VSS is processed in the rule listed below:
 
 1. Compute p = ECDH(`private_key`, `receiver_public_key`). where ECDH is a Elliptic-Curve Diffie-Hellman function. p represents a point on the secp256k1 and has 33-byte length.
 2. Compute k = h(p). where h is SHA256 hash function. k is used as 32-bytes symmetric key of ChaCha20-Poly1305.
@@ -279,10 +303,10 @@ Each commitment consists of 32-bits x-coordinate and 32-bits y-coordinate.
    enc_payload = chacha20_poly1305_encrypt(k, n, ad = '', payload)
 6. Encode `sender_public_key` || enc_payload using Base58.
 
-### Encryption of `block_vss`
+### Encryption of Block VSS
 
-`block_vss` is processed in the rule listed below.
-it is the same as the encryption of `node_vss` except nonce used by chacha20_poly1305_encrypt function.
+Block VSS is processed in the rule listed below.
+it is the same as the encryption of Node VSS except nonce used by chacha20_poly1305_encrypt function.
 
 1. Compute k = ECDH(`private_key`, `receiver_public_key`).
 2. Compute sk = h(k). where h is SHA256 hash function.
@@ -305,9 +329,9 @@ it is the same as the encryption of `node_vss` except nonce used by chacha20_pol
 ### Nonce used by Encrypting with ChaCha20-Poly1305
 
 As described in Appendix A, we use ChaCha20-Poly1305 encryption to generate vss.
-`networkid` is used as nonce in encrypting `node_vss`.
+`networkid` is used as nonce in encrypting Node VSS.
 Note that according to security requirement of ChaCha20, so we can not reuse same networkid with same node's keypair.
-In generating `block_vss`, fixed null-nonce can be used because keypair is ephemeral.
+In generating Block VSS, fixed null-nonce can be used because keypair is ephemeral.
 
 ### Communicating with a protocol with PFS
 
