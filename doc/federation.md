@@ -9,28 +9,28 @@ These signers cannot only sign blocks but also can control the identity of the p
 We introduce Federation, which is consisted of a set of identifiable signers and the features to maintain their access controls.
 
 A new signer joining the network needs to get approval from the signers who belongs to the Federation.
-Federation, including a new signer, needs to recreate a new aggregate public key and secret in the same protocol as [How to set up new Tapyrus Signer Network](./setup.md).
+Federation, including a new signer, needs to recreate a new Aggregate public key and secret in the same protocol as [How to set up new Tapyrus Signer Network](./setup.md).
 The created Aggregate public key is committed by the signer in the existing Federation and submitted to Tapyrus Core with the block.
-Block headers have a field for a new aggregated public key.
-When a new aggregated public key is set in a block header, Tapyrus Core discards the public key that has been used so far and performs proof verification using the new aggregate public key from the next block.
-When leaving from the Federation, it is necessary to update the aggregated public key in the same protocol.
+Block headers have a field for a new Aggregate public key.
+When a new Aggregate public key is set in a block header, Tapyrus Core discards the public key that has been used so far and performs proof verification using the new Aggregate public key from the next block.
+When leaving from the Federation, it is necessary to update the Aggregate public key in the same protocol.
 
 ## How To Update Federation
 
 The following describes how to change the Federation.
 
-### Re-create aggregated public key and secret.
+### Re-create Aggregate public key and secret.
 
-Federation members, including the new signer, regenerate the aggregated public key and the secret in the same procedure as [Generate Aggregate public key and Node secret share for Tapyrus-signer network](./setup.md#generate-aggregate-public-key-and-node-secret-share-for-tapyrus-signer-network).
+Federation members, including the new signer, regenerate the Aggregate public key and the secret in the same procedure as [Generate Aggregate public key and Node secret share for Tapyrus-signer network](./setup.md#generate-aggregate-public-key-and-node-secret-share-for-tapyrus-signer-network).
 Note that the same node public key can be used for the existing signer, so Step 1 is not required. However, for a new signer, a key pair needs to be created in Step 1.
 
-### Updating the aggregated public key for existing signers
+### Updating the Aggregate public key for existing signers
 
 :heavy_exclamation_mark:Caution: 
 > The RPC functionality is not implemented at 0.4.0 release. It is going to be implemented in a future release.
 > In 0.4.0 release, you can set federation information into `federations.toml` file directory. If you want to update federations settings, you can update the `federations.toml` and restart tapyrus-signerd.
 
-Update the aggregated public key held by the existing signer.
+Update the Aggregate public key held by the existing signer.
 For updating, use RPC `update_federation`.
 
 RPC `update_federation` takes the following parameters.
@@ -73,13 +73,13 @@ The new signer launches tapyrus-signer as described in [How To configure Tapyrus
 The signer MUST complete launching before entering the generation round of the specified block height.
 When the signer leaves, they MAY stop the process at any time after the round where the new Federation is applied.
 
-### Send the aggregated public key to Tapyrus Core.
+### Send the Aggregate public key to Tapyrus Core.
 
-The round master sent the new aggregated public key to Tapyrus Core one round before the new Federation is applied.
-When starting the previous round, the round master sets a new aggregated public key to the block and broadcast it to other members of the Federation.
-Each member of the round, upon receiving the candidateblock message, verifies that the aggregated public key is the same as the one expected, and then sign the block.
+The round master sent the new Aggregate public key to Tapyrus Core one round before the new Federation is applied.
+When starting the previous round, the round master sets a new Aggregate public key to the block and broadcast it to other members of the Federation.
+Each member of the round, upon receiving the candidateblock message, verifies that the Aggregate public key is the same as the one expected, and then sign the block.
 If the verification is failed, each member SHOULD ignored all messages during that round so that no blocks are generated in that round.
-As well as the consensus-building of blocks, the aggregated public key is valid only if the number of signatures exceeds the threshold t among the existing signers of the Federation.
+As well as the consensus-building of blocks, the Aggregate public key is valid only if the number of signatures exceeds the threshold t among the existing signers of the Federation.
 
 ## Modify or rollback federation plan
 
