@@ -4,7 +4,7 @@ use crate::tests::helper::address;
 use crate::tests::helper::keys::TEST_KEYS;
 use crate::tests::helper::node_vss::node_vss;
 use crate::tests::helper::rpc::MockRpc;
-use bitcoin::{Address, PublicKey};
+use tapyrus::{Address, PublicKey};
 
 pub struct NodeParametersBuilder {
     rpc: Option<MockRpc>,

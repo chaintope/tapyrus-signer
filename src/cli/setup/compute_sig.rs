@@ -12,7 +12,7 @@ use crate::rpc::Rpc;
 use crate::sign::Sign;
 use crate::signer_node::NodeParameters;
 
-use bitcoin::{PrivateKey, PublicKey};
+use tapyrus::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
 use curv::elliptic::curves::traits::{ECPoint, ECScalar};

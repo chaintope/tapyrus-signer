@@ -5,7 +5,7 @@
 use std::str::FromStr;
 
 use crate::signer_node::{ROUND_INTERVAL_DEFAULT_SECS, ROUND_LIMIT_DEFAULT_SECS};
-use bitcoin::{Address, PublicKey};
+use tapyrus::{Address, PublicKey};
 use clap::{App, Arg};
 use log;
 use serde::Deserialize;

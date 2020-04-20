@@ -1,5 +1,5 @@
 use crate::net::SignerID;
-use bitcoin::{PrivateKey, PublicKey};
+use tapyrus::{PrivateKey, PublicKey};
 use std::str::FromStr;
 
 pub struct TestKeys {
@@ -26,7 +26,7 @@ impl TestKeys {
 
     /// Returns public keys sorted by compressed public key order.
     pub fn pubkeys(&self) -> Vec<PublicKey> {
-        let secp = secp256k1::Secp256k1::new();
+        let secp = tapyrus::secp256k1::Secp256k1::new();
         self.key
             .iter()
             .map(|k| PublicKey::from_private_key(&secp, k))

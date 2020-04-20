@@ -6,7 +6,7 @@ use crate::errors::Error;
 use crate::rpc::Rpc;
 use crate::sign::Sign;
 use crate::signer_node::NodeParameters;
-use bitcoin::{PrivateKey, PublicKey};
+use tapyrus::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use curv::arithmetic::traits::Converter;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
@@ -70,10 +70,8 @@ impl<'a> AggregateCommand {
         let index = index_of(&private_key, &public_keys);
         let shared_keys = Sign::verify_vss_and_construct_key(&vss_map, &index)?;
 
-        let public_key = PublicKey {
-            compressed: true,
-            key: shared_keys.y.get_element(),
-        };
+        let slice = shared_keys.y.pk_to_key_slice();
+        let public_key = PublicKey::from_slice(&slice).map_err(|_| Error::InvalidKey)?;
 
         Ok(Box::new(AggregateResponse::new(
             public_key,
@@ -102,7 +100,7 @@ impl<'a> AggregateCommand {
 mod tests {
     use super::*;
 
-    use bitcoin::PublicKey;
+    use tapyrus::PublicKey;
     use curv::elliptic::curves::traits::ECScalar;
     use curv::BigInt;
     use std::str::FromStr;

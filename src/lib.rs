@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-extern crate bitcoin;
+extern crate tapyrus;
 extern crate secp256k1;
 #[macro_use]
 extern crate log;

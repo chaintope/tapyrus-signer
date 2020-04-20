@@ -10,7 +10,7 @@ pub enum Error {
     Json(serde_json::error::Error),
     InvalidLength(usize, usize),
     InvalidArgs(String),
-    BitcoinConsensusEncodeError(bitcoin::consensus::encode::Error),
+    BitcoinConsensusEncodeError(tapyrus::consensus::encode::Error),
     /// Errors cause sender side matter, like parameter was wrong.
     InvalidRequest(jsonrpc::error::RpcError),
     DuplicatedMessage,
@@ -73,8 +73,8 @@ impl From<RedisError> for Error {
     }
 }
 
-impl From<bitcoin::consensus::encode::Error> for Error {
-    fn from(e: bitcoin::consensus::encode::Error) -> Error {
+impl From<tapyrus::consensus::encode::Error> for Error {
+    fn from(e: tapyrus::consensus::encode::Error) -> Error {
         Error::BitcoinConsensusEncodeError(e)
     }
 }

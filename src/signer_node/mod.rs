@@ -541,7 +541,7 @@ mod tests {
     use crate::tests::helper::keys::TEST_KEYS;
     use crate::tests::helper::node_vss::node_vss;
     use crate::tests::helper::{address, enable_log};
-    use bitcoin::PublicKey;
+    use tapyrus::PublicKey;
     use redis::ControlFlow;
     use std::collections::HashSet;
     use std::str::FromStr;
@@ -784,7 +784,7 @@ mod tests {
         use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
         use crate::signer_node::tests::create_node;
         use crate::signer_node::{BidirectionalSharedSecretMap, NodeState};
-        use bitcoin::Address;
+        use tapyrus::Address;
         use std::cell::Cell;
         use std::collections::HashSet;
 

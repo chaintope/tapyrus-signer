@@ -127,7 +127,7 @@ mod tests {
     use crate::tests::helper::node_state_builder::BuilderForTest;
     use crate::tests::helper::node_vss::node_vss;
     use crate::tests::helper::rpc::MockRpc;
-    use bitcoin::PublicKey;
+    use tapyrus::PublicKey;
     use std::str::FromStr;
 
     fn sender_id() -> SignerID {

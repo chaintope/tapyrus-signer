@@ -1,7 +1,7 @@
 use crate::cli::setup::traits::Response;
 use crate::errors::Error;
 use crate::key::generate_key_pair;
-use bitcoin::{PrivateKey, PublicKey};
+use tapyrus::{PrivateKey, PublicKey};
 use clap::{App, ArgMatches, SubCommand};
 use std::fmt;
 
@@ -47,7 +47,7 @@ impl<'a> CreateKeyCommand {
 #[cfg(test)]
 mod test {
     use super::*;
-    use bitcoin::{PrivateKey, PublicKey};
+    use tapyrus::{PrivateKey, PublicKey};
     use std::str::FromStr;
 
     #[test]

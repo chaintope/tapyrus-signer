@@ -4,10 +4,10 @@
 
 use crate::errors::Error;
 use crate::serialize::HexStrVisitor;
-use bitcoin::consensus::encode::serialize;
-use bitcoin::consensus::encode::Decodable;
-use bitcoin::PublicKey;
-use bitcoin::VarInt;
+use tapyrus::consensus::encode::serialize;
+use tapyrus::consensus::encode::Decodable;
+use tapyrus::PublicKey;
+use tapyrus::VarInt;
 use bitcoin_hashes::{sha256d, Hash};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::Debug;

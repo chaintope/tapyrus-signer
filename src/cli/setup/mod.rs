@@ -3,7 +3,7 @@ use crate::net::SignerID;
 use crate::signer_node::BidirectionalSharedSecretMap;
 use crate::signer_node::SharedSecret;
 use crate::signer_node::SharedSecretMap;
-use bitcoin::{PrivateKey, PublicKey};
+use tapyrus::{PrivateKey, PublicKey};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::{
     ShamirSecretSharing, VerifiableSS,
 };
@@ -17,7 +17,7 @@ pub mod sign;
 pub mod traits;
 
 pub fn index_of(private_key: &PrivateKey, public_keys: &Vec<PublicKey>) -> usize {
-    let secp = secp256k1::Secp256k1::new();
+    let secp = tapyrus::secp256k1::Secp256k1::new();
     let public_key = PublicKey::from_private_key(&secp, private_key);
     let pos = public_keys
         .iter()
@@ -94,7 +94,7 @@ pub fn vss_to_bidirectional_shared_secret_map(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bitcoin::{PrivateKey, PublicKey};
+    use tapyrus::{PrivateKey, PublicKey};
     use std::str::FromStr;
 
     #[test]

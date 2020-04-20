@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use bitcoin::Address;
+use tapyrus::Address;
 use log::Level::Trace;
 use log::{log_enabled, trace};
 use serde::Deserialize;
@@ -117,7 +117,7 @@ impl TapyrusApi for Rpc {
 pub mod tests {
     use super::*;
     use crate::tests::helper::keys::TEST_KEYS;
-    use secp256k1::Secp256k1;
+    use tapyrus::secp256k1::Secp256k1;
 
     pub fn get_rpc_client() -> Rpc {
         Rpc::new(

@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-extern crate bitcoin;
+extern crate tapyrus;
 extern crate clap;
 extern crate daemonize;
 extern crate env_logger;
@@ -10,7 +10,7 @@ extern crate log;
 extern crate redis;
 extern crate tapyrus_signer;
 
-use bitcoin::PublicKey;
+use tapyrus::PublicKey;
 
 use daemonize::Daemonize;
 use std::fs::OpenOptions;
@@ -164,7 +164,7 @@ fn load_federations(pubkey: &PublicKey, path: &Path) -> Federations {
 #[cfg(test)]
 mod tests {
     use crate::{connect_rpc, connect_signer_network, load_federations};
-    use bitcoin::PublicKey;
+    use tapyrus::PublicKey;
     use std::path::Path;
     use std::str::FromStr;
     use tapyrus_signer::command_args::{RedisConfig, RpcConfig};

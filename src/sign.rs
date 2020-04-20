@@ -19,7 +19,7 @@ use secp256k1::rand::thread_rng;
 pub struct Sign;
 
 impl Sign {
-    pub fn private_key_to_big_int(key: secp256k1::SecretKey) -> Option<BigInt> {
+    pub fn private_key_to_big_int(key: tapyrus::secp256k1::SecretKey) -> Option<BigInt> {
         let value = format!("{}", key);
         let n = BigInt::from_hex(&value);
         Some(n)
@@ -29,7 +29,7 @@ impl Sign {
         let u: FE = match pk {
             Some(i) => ECScalar::from(&i),
             None => {
-                let seckey = secp256k1::SecretKey::new(&mut thread_rng());
+                let seckey = tapyrus::secp256k1::SecretKey::new(&mut thread_rng());
                 let bn = BigInt::from(&seckey[..]);
                 ECScalar::from(&bn)
             }
@@ -104,7 +104,7 @@ impl Sign {
 fn test_private_key_to_big_int() {
     use std::str::FromStr;
 
-    let key = secp256k1::SecretKey::from_str(
+    let key = tapyrus::secp256k1::SecretKey::from_str(
         "657440783dd10977c49f87c51dc68b63508e88c7ea9371dc19e6fcd0f5f8639e",
     )
     .unwrap();

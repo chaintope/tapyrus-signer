@@ -1,7 +1,7 @@
 use crate::blockdata::Block;
 use crate::errors::Error;
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
-use bitcoin::Address;
+use tapyrus::Address;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 

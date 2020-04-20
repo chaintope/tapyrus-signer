@@ -9,7 +9,7 @@ use crate::errors::Error;
 use crate::rpc::Rpc;
 use crate::signer_node::NodeParameters;
 
-use bitcoin::{PrivateKey, PublicKey};
+use tapyrus::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use curv::arithmetic::traits::Converter;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
@@ -110,7 +110,7 @@ impl<'a> SignCommand {
             &block,
         )?;
 
-        let secp = secp256k1::Secp256k1::new();
+        let secp = tapyrus::secp256k1::Secp256k1::new();
         let public_key = PublicKey::from_private_key(&secp, &private_key);
         Ok(Box::new(SignResponse::new(local_sig, public_key)))
     }

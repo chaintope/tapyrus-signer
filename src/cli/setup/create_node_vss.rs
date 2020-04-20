@@ -3,7 +3,7 @@ use crate::crypto::vss::{Commitment, Vss};
 use crate::errors::Error;
 use crate::rpc::Rpc;
 use crate::signer_node::node_parameters::NodeParameters;
-use bitcoin::{PrivateKey, PublicKey};
+use tapyrus::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::collections::BTreeMap;
 use std::fmt;
@@ -60,7 +60,7 @@ impl<'a> CreateNodeVssCommand {
             Vss::create_node_shares(&private_key, threshold as usize, public_keys.len());
 
         let mut vss_map = BTreeMap::new();
-        let secp = secp256k1::Secp256k1::new();
+        let secp = tapyrus::secp256k1::Secp256k1::new();
         let sender_public_key = PublicKey::from_private_key(&secp, &private_key);
         let commitments: Vec<Commitment> = vss_scheme
             .commitments

@@ -2,7 +2,7 @@ use crate::crypto::multi_party_schnorr::Parameters;
 use crate::federation::{Federation, Federations};
 use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
-use bitcoin::{Address, PublicKey};
+use tapyrus::{Address, PublicKey};
 use std::convert::TryInto;
 use std::sync::Arc;
 
@@ -97,7 +97,7 @@ mod tests {
     use crate::signer_node::NodeParameters;
     use crate::tests::helper::keys::TEST_KEYS;
     use crate::tests::helper::rpc::MockRpc;
-    use bitcoin::PublicKey;
+    use tapyrus::PublicKey;
 
     #[test]
     fn test_sort_publickey() {

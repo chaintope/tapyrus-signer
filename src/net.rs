@@ -6,7 +6,7 @@ use crate::blockdata::hash::SHA256Hash;
 use crate::blockdata::Block;
 use crate::errors;
 use crate::serialize::{ByteBufVisitor, HexStrVisitor};
-use bitcoin::PublicKey;
+use tapyrus::PublicKey;
 use redis::{Client, Commands, ControlFlow, PubSubCommands, RedisError};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cmp::Ordering;

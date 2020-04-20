@@ -10,7 +10,7 @@ use crate::signer_node::message_processor::get_valid_block;
 use crate::signer_node::node_state::builder::{Builder, Master};
 use crate::signer_node::NodeParameters;
 use crate::signer_node::NodeState;
-use bitcoin::PublicKey;
+use tapyrus::PublicKey;
 use curv::FE;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};

@@ -5,7 +5,7 @@ use crate::errors::Error;
 use crate::rpc::Rpc;
 use crate::signer_node::NodeParameters;
 
-use bitcoin::{PrivateKey, PublicKey};
+use tapyrus::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::collections::BTreeMap;
 use std::fmt;
@@ -67,7 +67,7 @@ impl<'a> CreateBlockVssCommand {
             secret_shares_for_negative,
         ) = Vss::create_block_shares(index, threshold as usize, public_keys.len());
         let mut vss_map = BTreeMap::new();
-        let secp = secp256k1::Secp256k1::new();
+        let secp = tapyrus::secp256k1::Secp256k1::new();
         let sender_public_key = PublicKey::from_private_key(&secp, &private_key);
 
         for j in 0..public_keys.len() {
