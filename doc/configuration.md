@@ -48,8 +48,9 @@ OPTIONS:
     -d, --duration <SECs>                 Round interval times(sec).
         --rpc-host <HOST_NAME or IP>      TapyrusCore RPC endpoint host.
         --rpc-pass <PASS>                 TapyrusCore RPC user password.
-        --rpc-port <PORT>                 TapyrusCore RPC endpoint port number. These are TapyrusCore default port,
-                                          mainnet: 2377, testnet: 12377, regtest: 12381.
+        --rpc-port <PORT>                 TapyrusCore RPC endpoint port number. The default is `2377`. Tapyrus-Core
+                                          default RPC ports are here. For production chain: `2377`. For development
+                                          chain: `12381`.
         --rpc-user <USER>                 TapyrusCore RPC user name.
 ```  
 

@@ -451,7 +451,7 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
         .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_PORT)
             .long("rpc-port")
             .value_name("PORT")
-            .help("TapyrusCore RPC endpoint port number. These are TapyrusCore default port, mainnet: 2377, testnet: 12377, regtest: 12381."))
+            .help("TapyrusCore RPC endpoint port number. The default is `2377`. Tapyrus-Core default RPC ports are here. For production chain: `2377`. For development chain: `12381`."))
         .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_USER)
             .long("rpc-user")
             .value_name("USER")
