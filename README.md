@@ -62,7 +62,6 @@ All messages has signer id field which is specify by signer public key.
 | blockparticipants | Vec &lt; PublicKey &gt; | Round master notify `signature issuing protocol` is going to be executed with the signers who are represented in payload keys |
 | blocksig          | LocalSig       | Broadcast local sig.                                         |
 | completedblock    | Block          | Round master broadcasts completed block.                     |
-| roundfailure      | N/A            | Round master notifies the round is failure.                  |
 
 
 Caution: Tapyrus-signer is using redis for to relay messages among each node. The word `send` and `broadcast` in the 

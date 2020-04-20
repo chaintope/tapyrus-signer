@@ -44,7 +44,6 @@ fn subscribe(state: &impl AppState) -> thread::JoinHandle<()> {
                 "candidate_block" => candidate_block( &payload),
                 "signature" => signature( &payload),
                 "completed_block" => completed_block( &payload),
-                "roundfailure" => roundfailure( &payload),
                 "end" => ControlFlow::Break(()),
                 a => {
                     println!("unknown message: {}", a);
@@ -69,12 +68,6 @@ fn signature(message: &str) -> ControlFlow<()> {
 
 fn completed_block(message: &str) -> ControlFlow<()> {
     println!("call completedBlock: {}", message);
-    publish("end");
-    ControlFlow::Continue
-}
-
-fn roundfailure(message: &str) -> ControlFlow<()> {
-    println!("call roundfailure: {}", message);
     publish("end");
     ControlFlow::Continue
 }
