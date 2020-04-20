@@ -1,5 +1,6 @@
 # You can find descriptions for each configration item in doc/configuration.md.
 [signer]
+to-address = "1Co1dFUNuYXY4izSNM9t71VpuUaYdMfq3S"
 public-key = "033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8"
 federations-file = "/tmp/federations.toml"
 

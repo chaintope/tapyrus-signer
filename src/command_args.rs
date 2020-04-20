@@ -543,6 +543,10 @@ fn test_load_from_file() {
         args.signer_config().federations_file(),
         Path::new("/tmp/federations.toml")
     );
+    assert_eq!(
+        args.signer_config().to_address(),
+        Address::from_str("1Co1dFUNuYXY4izSNM9t71VpuUaYdMfq3S").unwrap()
+    );
 
     // rpc parameters are loaded from toml data.
     assert_eq!(args.rpc_config().host(), "localhost");

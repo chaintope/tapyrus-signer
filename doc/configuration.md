@@ -61,6 +61,7 @@ This is an example file.
 
 ```toml
 [signer]
+to-address = "1Co1dFUN..."
 public-key = "033cfe7fa..."
 federations-file = "/path/to/federations.toml"
 
@@ -108,6 +109,9 @@ If not, logs are put on stdout and stderr.
 
 `[signer]` section is a set of settings for the consensus algorithm used in Tapyrus Signer/Core Network.
 
+* `to-address`
+This is required. 
+This address is used for coinbase transaction outputs in blocks which is proposed by the signer.
 * `public-key`
 This is required. This specifies the signer's public key, who hosted the node.
 The public key format is compressed hex string.
