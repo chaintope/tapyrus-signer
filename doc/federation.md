@@ -21,7 +21,7 @@ The following describes how to change the Federation.
 
 ### Re-create Aggregate public key and secret.
 
-Federation members, including the new signer, regenerate the Aggregate public key and the secret in the same procedure as [Generate Aggregate public key and Node secret share for Tapyrus-signer network](./setup.md#generate-aggregate-public-key-and-node-secret-share-for-tapyrus-signer-network).
+Federation members, including the new signer, regenerate the Aggregate public key and the secret in the same procedure as [Generate Aggregate public key and Node secret share for Tapyrus Signer network](./setup.md#generate-aggregate-public-key-and-node-secret-share-for-tapyrus-signer-network).
 Note that the same node public key can be used for the existing signer, so Step 1 is not required. However, for a new signer, a key pair needs to be created in Step 1.
 
 ### Updating the Aggregate public key for existing signers

@@ -46,7 +46,7 @@ The value is 32bytes data of private key on secp256k1 curve.
 Local Signature is a signature, which is produced in each signer node at 4.2 Signature Issuing Protocol in [the paper](https://doi.org/10.1007/3-540-47719-5_33).
 By collecting Local signatures can generate a final signature, which can be verified by Aggregate public key, with calculating Lagrange interpolation.
 
-## Generate Aggregate public key and Node secret share for Tapyrus-signer network
+## Generate Aggregate public key and Node secret share for Tapyrus Signer Network
 
 Here describes how each signer gets Aggregate public key of Tapyrus Signer Network(TSN) and Node secret share. 
 TSN produces signatures for blocks of the Tapyrus blockchain. 
