@@ -52,10 +52,10 @@ Here describes how each signer gets Aggregate public key of Tapyrus Signer Netwo
 TSN produces signatures for blocks of the Tapyrus blockchain. 
 The signatures are equal with that signed by a private key, which is aggregated all signer's private key.
 So the signatures can be verified with the public key, which is aggregated all signer's public key. 
-However, the TNS doesn't use the aggregate private key to produce the signatures. 
-The TNS uses the distributed schnorr signature scheme from [Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold Scheme for Implicit Certificates](https://github.com/KZen-networks/multi-party-schnorr/blob/master/papers/provably_secure_distributed_schnorr_signatures_and_a_threshold_scheme.pdf).
+However, the TSN doesn't use the aggregate private key to produce the signatures. 
+The TSN uses the distributed schnorr signature scheme from [Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold Scheme for Implicit Certificates](https://github.com/KZen-networks/multi-party-schnorr/blob/master/papers/provably_secure_distributed_schnorr_signatures_and_a_threshold_scheme.pdf).
 In this scheme, each signer has its secret share, which is called Node secret share.
-The TNS can produce signatures using the Node secret shares whose count equals threshold.
+The TSN can produce signatures using the Node secret shares whose count equals threshold.
 
 The following steps can be summarized like this: 
 * Generate your key pair. 
