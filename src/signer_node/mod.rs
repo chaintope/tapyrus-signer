@@ -10,7 +10,6 @@ pub mod utils;
 pub use crate::signer_node::node_parameters::NodeParameters;
 pub use crate::signer_node::node_state::NodeState;
 
-use crate::blockdata::Block;
 use crate::errors::Error;
 use crate::net::{ConnectionManager, Message, MessageType, SignerID};
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
@@ -30,6 +29,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::time::Duration;
+use tapyrus::blockdata::block::Block;
+use tapyrus::blockdata::block::XField;
 
 /// Round interval.
 pub static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
@@ -297,7 +298,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         let block = self.add_aggregated_public_key_if_needed(block_height, block);
         log::info!(
             "Broadcast candidate block. block hash for signing: {:?}",
-            block.sighash()
+            block.header.signature_hash()
         );
         self.connection_manager.broadcast_message(Message {
             message_type: MessageType::Candidateblock(block.clone()),
@@ -331,14 +332,16 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         federation.signers().contains(signer_id)
     }
 
-    fn add_aggregated_public_key_if_needed(&self, block_height: u64, block: Block) -> Block {
+    fn add_aggregated_public_key_if_needed(&self, block_height: u64, mut block: Block) -> Block {
         let next_block_height = block_height + 1;
         let federation = self
             .params
             .get_federation_by_block_height(next_block_height);
         if federation.block_height() == next_block_height {
             let aggregated_public_key = self.params.aggregated_public_key(next_block_height);
-            block.add_aggregated_public_key(aggregated_public_key)
+            // block.add_aggregated_public_key(aggregated_public_key)
+            block.header.xfield = XField::AggregatePublicKey(aggregated_public_key);
+            block
         } else {
             block
         }
@@ -462,8 +465,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     fn verify_block(&self, block: &Block) -> Result<(), Error> {
         // master node accepts the block that has None xfield type.
-        match block.get_xfield_type() {
-            0 => Ok(()),
+        match block.header.xfield {
+            XField::None => Ok(()),
             _ => Err(Error::UnsupportedXField),
         }
     }
@@ -529,7 +532,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::blockdata::Block;
     use crate::federation::{Federation, Federations};
     use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
     use crate::rpc::tests::{safety, MockRpc};
@@ -542,6 +544,8 @@ mod tests {
     use crate::tests::helper::node_vss::node_vss;
     use crate::tests::helper::{address, enable_log};
     use tapyrus::PublicKey;
+    use tapyrus::blockdata::block::Block;
+    use tapyrus::consensus::encode::deserialize;
     use redis::ControlFlow;
     use std::collections::HashSet;
     use std::str::FromStr;
@@ -662,7 +666,7 @@ mod tests {
     fn get_invalid_block() -> Block {
         const TEST_BLOCK_WITH_UNKNOWN_XFIELD: &str = "010000000000000000000000000000000000000000000000000000000000000000000000e7c526d0125538b13a50b06465fb8b72120be13fb1142e93aba2aabb2a4f369826c18219f76e4d0ebddbaa9b744837c2ac65b347673695a23c3cc1a2be4141e1427d735efffd2602ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000101000000010000000000000000000000000000000000000000000000000000000000000000000000002221025700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3ffffffff0100f2052a010000001976a914834e0737cdb9008db614cd95ec98824e952e3dc588ac00000000";
         let raw_block = hex::decode(TEST_BLOCK_WITH_UNKNOWN_XFIELD).unwrap();
-        Block::new(raw_block)
+        deserialize(&raw_block).unwrap()
     }
 
     #[test]
@@ -779,12 +783,12 @@ mod tests {
     }
 
     mod test_for_waiting_ibd_finish {
-        use crate::blockdata::Block;
         use crate::errors::Error;
         use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
         use crate::signer_node::tests::create_node;
         use crate::signer_node::{BidirectionalSharedSecretMap, NodeState};
         use tapyrus::Address;
+        use tapyrus::blockdata::block::Block;
         use std::cell::Cell;
         use std::collections::HashSet;
 

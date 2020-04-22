@@ -38,7 +38,6 @@ pub fn address(private_key: &PrivateKey) -> Address {
 }
 
 pub mod test_vectors {
-    use crate::blockdata::Block;
     use crate::crypto::multi_party_schnorr::LocalSig;
     use crate::crypto::vss::Vss;
     use crate::federation::{Federation, Federations};
@@ -49,6 +48,9 @@ pub mod test_vectors {
     use crate::tests::helper::rpc::MockRpc;
 
     use tapyrus::{PrivateKey, PublicKey};
+    use tapyrus::blockdata::block::Block;
+    use tapyrus::consensus::encode::deserialize;
+
     use curv::{FE, GE};
     use serde_json::Value;
     use std::collections::HashSet;
@@ -130,9 +132,8 @@ pub mod test_vectors {
         if block.is_null() {
             None
         } else {
-            let hex = hex::decode(block.as_str().unwrap()).unwrap();
-            let block = Block::new(hex);
-            Some(block)
+            let bytes = hex::decode(block.as_str().unwrap()).unwrap();
+            deserialize(&bytes).ok()
         }
     }
 

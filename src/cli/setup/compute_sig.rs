@@ -1,4 +1,3 @@
-use crate::blockdata::Block;
 use crate::cli::setup::index_of;
 use crate::cli::setup::traits::Response;
 use crate::cli::setup::vss_to_bidirectional_shared_secret_map;
@@ -13,6 +12,8 @@ use crate::sign::Sign;
 use crate::signer_node::NodeParameters;
 
 use tapyrus::{PrivateKey, PublicKey};
+use tapyrus::blockdata::block::Block;
+use tapyrus::consensus::encode::{serialize, deserialize};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
 use curv::elliptic::curves::traits::{ECPoint, ECScalar};
@@ -37,7 +38,7 @@ impl Response for ComputeSigResponse {}
 
 impl fmt::Display for ComputeSigResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.block_with_signature.hex())
+        write!(f, "{}", hex::encode(serialize(&self.block_with_signature)))
     }
 }
 
@@ -66,10 +67,10 @@ impl<'a> ComputeSigCommand {
             .map(|i| ECScalar::from(&i))
             .ok_or(Error::InvalidArgs("node-secret-share".to_string()))?;
 
-        let block: Block = matches
+        let mut block: Block = matches
             .value_of("block")
             .and_then(|s| hex::decode(s).ok())
-            .map(|hex| Block::new(hex))
+            .and_then(|hex| deserialize::<Block>(&hex).ok())
             .ok_or(Error::InvalidArgs("block".to_string()))?;
 
         let node_vss_vec: Vec<Vss> = matches
@@ -165,11 +166,12 @@ impl<'a> ComputeSigCommand {
             &shared_block_secrets,
             &priv_shared_keys,
         )?;
-        let hash = block.sighash().into_inner();
+        let hash = block.header.signature_hash();
         signature.verify(&hash, &priv_shared_keys.y)?;
         let sig_hex = Sign::format_signature(&signature);
-        let new_block: Block = block.add_proof(hex::decode(sig_hex).unwrap());
-        Ok(Box::new(ComputeSigResponse::new(new_block)))
+        let sig: tapyrus::util::signature::Signature = deserialize(&hex::decode(sig_hex).map_err(|_| Error::InvalidSig)?)?;
+        block.header.proof = Some(sig);
+        Ok(Box::new(ComputeSigResponse::new(block)))
     }
 
     pub fn args<'b>() -> App<'a, 'b> {
@@ -226,7 +228,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_execute() {
+    fn test_deserialize() {
+        let hex = "010000000000000000000000000000000000000000000000000000000000000000000000c0d6961ad2819f74eb6d085f04f9cceb0a9a6d5c153fd3c39fc47c3ca0bb548f85fbd09a5f7d8ac4c9552e52931ef6672984f64e52ad6d05d1cdb18907da8527db317c5e012103addb2555f37abf8f28f11f498bec7bd1460e7243c1813847c49a7ae326a97d1c00010100000001000000000000000000000000000000000000000000000000000000000000000000000000222103addb2555f37abf8f28f11f498bec7bd1460e7243c1813847c49a7ae326a97d1cffffffff0100f2052a010000001976a914a15f16ea2ba840d178e4c19781abca5f4fb1b4c288ac00000000";
+        let vec = hex::decode(hex).unwrap();
+        let block = deserialize::<Block>(&vec);
+        assert!(block.is_ok());
+    }
+
+    #[test]
+    fn test_execute_success() {
         let matches = ComputeSigCommand::args().get_matches_from(vec![
             "computesig",
             "--threshold",

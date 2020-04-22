@@ -18,7 +18,6 @@ extern crate lazy_static;
 extern crate derive_builder;
 extern crate sha2;
 
-pub mod blockdata;
 pub mod cli;
 pub mod command_args;
 pub mod crypto;

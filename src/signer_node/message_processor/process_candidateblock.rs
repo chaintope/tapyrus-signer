@@ -1,4 +1,3 @@
-use crate::blockdata::Block;
 use crate::errors::Error;
 use crate::net::{ConnectionManager, SignerID};
 use crate::rpc::TapyrusApi;
@@ -6,6 +5,7 @@ use crate::signer_node::message_processor::create_block_vss;
 use crate::signer_node::node_state::builder::{Builder, Member};
 use crate::signer_node::utils::sender_index;
 use crate::signer_node::{NodeParameters, NodeState};
+use tapyrus::blockdata::block::{Block, XField};
 
 pub fn process_candidateblock<T, C>(
     sender_id: &SignerID,
@@ -36,7 +36,7 @@ where
 
             log::info!(
                 "candidateblock received. block hash for signing: {:?}",
-                block.sighash()
+                block.header.signature_hash()
             );
 
             if let Err(e) = params.rpc.testproposedblock(&block) {
@@ -74,14 +74,10 @@ fn verify_block<T>(
 where
     T: TapyrusApi,
 {
-    match block.get_xfield_type() {
-        0 | 1 => {}
-        _ => return Err(Error::UnsupportedXField),
+    match block.header.xfield {
+        XField::Unknown(_, _) => return Err(Error::UnsupportedXField),
+        _ => {}
     }
-
-    // validate length of xfield
-    block.get_xfield_length()?;
-
     verify_aggregated_public_key(block, block_height, params)
 }
 
@@ -95,7 +91,7 @@ where
 {
     let next_block_height = block_height + 1;
     let federation = params.get_federation_by_block_height(next_block_height);
-    if let Some(public_key) = block.get_aggregated_public_key() {
+    if let Some(public_key) = block.header.aggregated_public_key() {
         if public_key == federation.aggregated_public_key()
             && next_block_height == federation.block_height()
         {
@@ -115,7 +111,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blockdata::Block;
     use crate::federation::{Federation, Federations};
     use crate::net::{Message, MessageType, SignerID};
     use crate::signer_node::node_state::builder::{Builder, Master, Member};
@@ -128,6 +123,7 @@ mod tests {
     use crate::tests::helper::node_vss::node_vss;
     use crate::tests::helper::rpc::MockRpc;
     use tapyrus::PublicKey;
+    use tapyrus::consensus::encode::deserialize;
     use std::str::FromStr;
 
     fn sender_id() -> SignerID {
@@ -198,7 +194,7 @@ mod tests {
     fn test_as_master_with_invalid_block() {
         let sender_id = sender_id();
         // invalid block
-        let candidate_block = Block::new(hex::decode("00000020ed658cc40670cceda23bb0b614821fe6d48a41d107d19f3f3a5608ad3d483092b151160ab71133b428e1f62eaeb598ae858ff66017c99601f29088b7c64a481d6284e145d29b70bf54392d29701031d2af9fed5f9bb21fbb284fa71ceb238f69a6d4095d00010200000000010100000000000000000000000000000000000000000000000000000000000000000c000000035c0101ffffffff0200f2052a010000001976a914cf12dbc04bb0de6fb6a87a5aeb4b2e74c97006b288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf90120000000000000000000000000000000000000000000000000000000000000000000000000").unwrap());
+        let candidate_block: Block = deserialize(&hex::decode("00000020ed658cc40670cceda23bb0b614821fe6d48a41d107d19f3f3a5608ad3d483092b151160ab71133b428e1f62eaeb598ae858ff66017c99601f29088b7c64a481d6284e145d29b70bf54392d29701031d2af9fed5f9bb21fbb284fa71ceb238f69a6d4095d0000010200000000010100000000000000000000000000000000000000000000000000000000000000000c000000035c0101ffffffff0200f2052a010000001976a914cf12dbc04bb0de6fb6a87a5aeb4b2e74c97006b288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf90120000000000000000000000000000000000000000000000000000000000000000000000000").unwrap()).unwrap();
         let prev_state = Master::for_test().build();
         let conman = TestConnectionManager::new();
         let rpc = MockRpc::new();
@@ -221,7 +217,7 @@ mod tests {
     fn test_as_member_with_invalid_block() {
         let sender_id = sender_id();
         // invalid block
-        let candidate_block = Block::new(hex::decode("00000020ed658cc40670cceda23bb0b614821fe6d48a41d107d19f3f3a5608ad3d483092b151160ab71133b428e1f62eaeb598ae858ff66017c99601f29088b7c64a481d6284e145d29b70bf54392d29701031d2af9fed5f9bb21fbb284fa71ceb238f69a6d4095d00010200000000010100000000000000000000000000000000000000000000000000000000000000000c000000035c0101ffffffff0200f2052a010000001976a914cf12dbc04bb0de6fb6a87a5aeb4b2e74c97006b288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf90120000000000000000000000000000000000000000000000000000000000000000000000000").unwrap());
+        let candidate_block: Block = deserialize(&hex::decode("00000020ed658cc40670cceda23bb0b614821fe6d48a41d107d19f3f3a5608ad3d483092b151160ab71133b428e1f62eaeb598ae858ff66017c99601f29088b7c64a481d6284e145d29b70bf54392d29701031d2af9fed5f9bb21fbb284fa71ceb238f69a6d4095d0000010200000000010100000000000000000000000000000000000000000000000000000000000000000c000000035c0101ffffffff0200f2052a010000001976a914cf12dbc04bb0de6fb6a87a5aeb4b2e74c97006b288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf90120000000000000000000000000000000000000000000000000000000000000000000000000").unwrap()).unwrap();
         let prev_state = Member::for_test().build();
         let conman = TestConnectionManager::new();
         let mut rpc = MockRpc::new();
@@ -291,12 +287,12 @@ mod tests {
 
     fn test_block_with_public_key() -> Block {
         let raw_block = hex::decode(TEST_BLOCK_WITH_PUBKEY).unwrap();
-        Block::new(raw_block)
+        deserialize(&raw_block).unwrap()
     }
 
     fn test_block_without_public_key() -> Block {
         let raw_block = hex::decode(TEST_BLOCK_WITHOUT_PUBKEY).unwrap();
-        Block::new(raw_block)
+        deserialize(&raw_block).unwrap()
     }
     #[test]
     fn test_verify_aggregated_public_key() {

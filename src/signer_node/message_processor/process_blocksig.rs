@@ -1,5 +1,3 @@
-use crate::blockdata::hash::SHA256Hash;
-use crate::blockdata::Block;
 use crate::crypto::multi_party_schnorr::Signature;
 use crate::crypto::vss::Vss;
 use crate::errors::Error;
@@ -11,14 +9,17 @@ use crate::signer_node::node_state::builder::{Builder, Master};
 use crate::signer_node::NodeParameters;
 use crate::signer_node::NodeState;
 use tapyrus::PublicKey;
+use tapyrus::blockdata::block::Block;
+use tapyrus::consensus::encode::deserialize;
 use curv::FE;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use tapyrus::hash_types::BlockSigHash;
 
 pub fn process_blocksig<T, C>(
     sender_id: &SignerID,
-    blockhash: SHA256Hash,
+    blockhash: BlockSigHash,
     gamma_i: FE,
     e: FE,
     prev_state: &NodeState,
@@ -129,6 +130,8 @@ where
         .collect();
 
     let federation = params.get_federation_by_block_height(block_height);
+
+
     let signature = match Vss::aggregate_and_verify_signature(
         candidate_block,
         new_signatures,
@@ -154,14 +157,13 @@ where
 
             #[cfg(feature = "dump")]
             dump_builder.build().unwrap().log();
-
             return state_builder.build();
         }
     };
 
     log::info!(
         "Round Success. candidateblock(block hash for sign)={:?}",
-        candidate_block.sighash(),
+        candidate_block.header.signature_hash(),
     );
 
     #[cfg(feature = "dump")]
@@ -193,7 +195,8 @@ where
     T: TapyrusApi,
 {
     let sig_hex = Sign::format_signature(sig);
-    let new_block: Block = block.add_proof(hex::decode(sig_hex).unwrap());
+    let mut new_block = block.clone();
+    new_block.header.proof = Some(deserialize(&hex::decode(sig_hex).map_err(|_| Error::InvalidSig)?)?);
     match rpc.submitblock(&new_block) {
         Ok(_) => Ok(new_block),
         Err(e) => Err(e),
@@ -236,7 +239,7 @@ impl Dump {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Received {
     sender: SignerID,
-    block_hash: SHA256Hash,
+    block_hash: BlockSigHash,
     gamma_i: FE,
     e: FE,
 }

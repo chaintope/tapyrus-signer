@@ -1,4 +1,3 @@
-use crate::blockdata::Block;
 use crate::cli::setup::index_of;
 use crate::cli::setup::traits::Response;
 use crate::cli::setup::vss_to_bidirectional_shared_secret_map;
@@ -10,6 +9,8 @@ use crate::rpc::Rpc;
 use crate::signer_node::NodeParameters;
 
 use tapyrus::{PrivateKey, PublicKey};
+use tapyrus::blockdata::block::Block;
+use tapyrus::consensus::encode::deserialize;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use curv::arithmetic::traits::Converter;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
@@ -63,7 +64,7 @@ impl<'a> SignCommand {
         let block: Block = matches
             .value_of("block")
             .and_then(|s| hex::decode(s).ok())
-            .map(|hex| Block::new(hex))
+            .and_then(|hex| deserialize::<Block>(&hex).ok())
             .ok_or(Error::InvalidArgs("block".to_string()))?;
 
         let node_secret_share: FE = matches

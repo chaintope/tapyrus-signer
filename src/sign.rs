@@ -8,13 +8,13 @@ use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::*;
 use curv::{BigInt, FE, GE};
 
-use crate::blockdata::hash::SHA256Hash;
 use crate::errors::Error;
 use crate::signer_node::SharedSecretMap;
 use crate::signer_node::ToShares;
 use crate::signer_node::ToVerifiableSS;
 use crate::util::*;
 use secp256k1::rand::thread_rng;
+use tapyrus::hash_types::BlockSigHash;
 
 pub struct Sign;
 
@@ -74,11 +74,10 @@ impl Sign {
     pub fn sign(
         eph_shared_keys: &SharedKeys,
         priv_shared_keys: &SharedKeys,
-        message: SHA256Hash,
+        message: BlockSigHash,
     ) -> LocalSig {
-        let message_slice = message.borrow_inner();
         let local_sig =
-            LocalSig::compute(&message_slice.clone(), &eph_shared_keys, &priv_shared_keys);
+            LocalSig::compute(&message[..], &eph_shared_keys, &priv_shared_keys);
         local_sig
     }
 
@@ -96,7 +95,7 @@ impl Sign {
         let v_as_str = v_as_int.to_str_radix(16);
         let s_as_int = signature.sigma.to_big_int();
         let s_as_str = s_as_int.to_str_radix(16);
-        format!("{:x}{:0>64}{:0>64}", 64, v_as_str, s_as_str)
+        format!("{:0>64}{:0>64}", v_as_str, s_as_str)
     }
 }
 
@@ -165,11 +164,11 @@ fn test_format_signature() {
         sigma: ECScalar::from(&pk),
         v: Secp256k1Point::from_coor(&x, &y),
     };
-    assert_eq!(Sign::format_signature(&sig), "40c726149bfb2d4ab64823e0cfd8245645a7950e605ef9222735d821ae570b1e91f2b3080d94faf40969c08b663ff1556fe7fbbcfcb648ac2763c16a15a08676f3");
+    assert_eq!(Sign::format_signature(&sig), "c726149bfb2d4ab64823e0cfd8245645a7950e605ef9222735d821ae570b1e91f2b3080d94faf40969c08b663ff1556fe7fbbcfcb648ac2763c16a15a08676f3");
 
     let sig_0 = Signature {
         sigma: ECScalar::from(&BigInt::one()),
         v: Secp256k1Point::from_coor(&x, &y),
     };
-    assert_eq!(Sign::format_signature(&sig_0), "40c726149bfb2d4ab64823e0cfd8245645a7950e605ef9222735d821ae570b1e910000000000000000000000000000000000000000000000000000000000000001");
+    assert_eq!(Sign::format_signature(&sig_0), "c726149bfb2d4ab64823e0cfd8245645a7950e605ef9222735d821ae570b1e910000000000000000000000000000000000000000000000000000000000000001");
 }

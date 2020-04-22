@@ -147,7 +147,7 @@
       "block_key": "619a25871f039bd9eff17e9239c0f6e1e39ca33ee66bfae6893f1524a024eed7",
       "received": {
         "sender": "02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900",
-        "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
+        "block_hash": "96ae2374d63d5475897c10f3237018ec108dfb860be2a68eeceefa91ded919f2",
         "vss_for_positive": {
           "parameters": {
             "threshold": 1,
@@ -256,7 +256,7 @@
       "block_key": "619a25871f039bd9eff17e9239c0f6e1e39ca33ee66bfae6893f1524a024eed7",
       "received": {
         "sender": "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
-        "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
+        "block_hash": "96ae2374d63d5475897c10f3237018ec108dfb860be2a68eeceefa91ded919f2",
         "vss_for_positive": {
           "parameters": {
             "threshold": 1,
@@ -394,7 +394,7 @@
       "block_key": "619a25871f039bd9eff17e9239c0f6e1e39ca33ee66bfae6893f1524a024eed7",
       "received": {
         "sender": "02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900",
-        "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
+        "block_hash": "96ae2374d63d5475897c10f3237018ec108dfb860be2a68eeceefa91ded919f2",
         "vss_for_positive": {
           "parameters": {
             "threshold": 1,
@@ -540,7 +540,7 @@
       "block_key": "619a25871f039bd9eff17e9239c0f6e1e39ca33ee66bfae6893f1524a024eed7",
       "received": {
         "sender": "02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900",
-        "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
+        "block_hash": "96ae2374d63d5475897c10f3237018ec108dfb860be2a68eeceefa91ded919f2",
         "vss_for_positive": {
           "parameters": {
             "threshold": 1,
@@ -634,7 +634,7 @@
       "block_key": "619a25871f039bd9eff17e9239c0f6e1e39ca33ee66bfae6893f1524a024eed7",
       "received": {
         "sender": "02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900",
-        "block_hash": "f219d9de91faeeec8ea6e20b86fb8d10ec187023f3107c8975543dd67423ae96",
+        "block_hash": "96ae2374d63d5475897c10f3237018ec108dfb860be2a68eeceefa91ded919f2",
         "vss_for_positive": {
           "parameters": {
             "threshold": 1,

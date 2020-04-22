@@ -9,8 +9,6 @@ pub use process_blockvss::process_blockvss;
 pub use process_candidateblock::process_candidateblock;
 pub use process_completedblock::process_completedblock;
 
-use crate::blockdata::hash::SHA256Hash;
-use crate::blockdata::Block;
 use crate::crypto::multi_party_schnorr::Keys;
 use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys};
 use crate::crypto::vss::Vss;
@@ -22,8 +20,10 @@ use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
 use crate::signer_node::SharedSecret;
 use crate::signer_node::{BidirectionalSharedSecretMap, NodeParameters, NodeState};
+use tapyrus::blockdata::block::Block;
+use tapyrus::hash_types::BlockSigHash;
 
-fn get_valid_block(state: &NodeState, blockhash: SHA256Hash) -> Result<&Block, Error> {
+fn get_valid_block(state: &NodeState, blockhash: BlockSigHash) -> Result<&Block, Error> {
     let block_opt = match state {
         NodeState::Master {
             candidate_block, ..
@@ -41,8 +41,8 @@ fn get_valid_block(state: &NodeState, blockhash: SHA256Hash) -> Result<&Block, E
             log::error!("Invalid message received. candidate block is not set.");
             Err(Error::InvalidBlock)
         }
-        Some(block) if block.sighash() != blockhash => {
-            log::error!("Invalid message received. Received message is based different block. expected: {:?}, actual: {:?}", block.sighash(), blockhash);
+        Some(block) if block.header.signature_hash() != blockhash => {
+            log::error!("Invalid message received. Received message is based different block. expected: {:?}, actual: {:?}", block.header.signature_hash(), blockhash);
             Err(Error::InvalidBlock)
         }
         Some(block) => Ok(block),
@@ -88,7 +88,7 @@ where
 
         conman.send_message(Message {
             message_type: MessageType::Blockvss(
-                block.sighash(),
+                block.header.signature_hash(),
                 vss_scheme_for_positive.clone(),
                 secret_shares_for_positive[i],
                 vss_scheme_for_negative.clone(),
@@ -115,7 +115,7 @@ where
 }
 
 fn generate_local_sig<T>(
-    blockhash: SHA256Hash,
+    blockhash: BlockSigHash,
     shared_block_secrets: &BidirectionalSharedSecretMap,
     prev_state: &NodeState,
     params: &NodeParameters<T>,
@@ -140,7 +140,7 @@ where
 }
 
 fn broadcast_localsig<C: ConnectionManager>(
-    sighash: SHA256Hash,
+    sighash: BlockSigHash,
     local_sig: &LocalSig,
     conman: &C,
     signer_id: &SignerID,
@@ -161,47 +161,49 @@ mod tests {
     use super::*;
     use crate::signer_node::node_state::builder::{Builder, Master, Member};
     use crate::tests::helper::node_state_builder::BuilderForTest;
+    use tapyrus::consensus::encode::deserialize;
+    use tapyrus::hashes::hex::FromHex;
 
     const BLOCK: &str = "01000000a8b61e31f3d6b655eb8fc387a22d139f141a14cb79c3a12a18192aa4d25941dfcb2edbbd1385a5d5c3bd037b6fd0ca8d691c13875fa74014a115f096a59be33a3447345d02f1420d9f5bc070aa00dc2bcb201ef470842fa5ec4f5c9986345ee91ae23b5e00000101000000010000000000000000000000000000000000000000000000000000000000000000260000000401260101ffffffff0200f2052a010000001976a9145f3f3758e7a4cf159c7bdb441ae4ff80999c62e888ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000";
-    const HASH: &str = "5b19db53903eb5d083a98e7d254f67b3985e7f2d2e5d9c138008e46059a83fa3";
+    const HASH: &str = "a33fa85960e40880139c5d2e2d7f5e98b3674f257d8ea983d0b53e9053db195b";
     const INVALID_HASH: &str = "0000db53903eb5d083a98e7d254f67b3985e7f2d2e5d9c138008e46059a83fa3";
 
     #[test]
     fn test_get_valid_block_valid_for_master() {
-        let block = Some(Block::new(hex::decode(BLOCK).unwrap()));
+        let block = deserialize::<Block>(&hex::decode(BLOCK).unwrap()).ok();
         let state = Master::for_test().candidate_block(block.clone()).build();
-        let blockhash = SHA256Hash::from_slice(&hex::decode(HASH).unwrap()[..]).unwrap();
+        let blockhash = BlockSigHash::from_hex(HASH).unwrap();
         assert_eq!(*get_valid_block(&state, blockhash).unwrap(), block.unwrap());
     }
 
     #[test]
     fn test_get_valid_block_valid_for_member() {
-        let block = Some(Block::new(hex::decode(BLOCK).unwrap()));
+        let block = deserialize::<Block>(&hex::decode(BLOCK).unwrap()).ok();
         let state = Member::for_test().candidate_block(block.clone()).build();
-        let blockhash = SHA256Hash::from_slice(&hex::decode(HASH).unwrap()[..]).unwrap();
+        let blockhash = BlockSigHash::from_hex(HASH).unwrap();
         assert_eq!(*get_valid_block(&state, blockhash).unwrap(), block.unwrap());
     }
 
     #[test]
     fn test_get_valid_block_invalid_node_state() {
         let state = NodeState::Joining;
-        let blockhash = SHA256Hash::from_slice(&hex::decode(HASH).unwrap()[..]).unwrap();
+        let blockhash = BlockSigHash::from_hex(HASH).unwrap();
         assert!(get_valid_block(&state, blockhash).is_err());
     }
 
     #[test]
     fn test_get_valid_block_invalid_blockhash_for_master() {
-        let block = Some(Block::new(hex::decode(BLOCK).unwrap()));
+        let block = deserialize::<Block>(&hex::decode(BLOCK).unwrap()).ok();
         let state = Master::for_test().candidate_block(block.clone()).build();
-        let blockhash = SHA256Hash::from_slice(&hex::decode(INVALID_HASH).unwrap()[..]).unwrap();
+        let blockhash = BlockSigHash::from_hex(INVALID_HASH).unwrap();
         assert!(get_valid_block(&state, blockhash).is_err());
     }
 
     #[test]
     fn test_get_valid_block_invalid_blockhash_for_member() {
-        let block = Some(Block::new(hex::decode(BLOCK).unwrap()));
+        let block = deserialize::<Block>(&hex::decode(BLOCK).unwrap()).ok();
         let state = Member::for_test().candidate_block(block.clone()).build();
-        let blockhash = SHA256Hash::from_slice(&hex::decode(INVALID_HASH).unwrap()[..]).unwrap();
+        let blockhash = BlockSigHash::from_hex(INVALID_HASH).unwrap();
         assert!(get_valid_block(&state, blockhash).is_err());
     }
 }

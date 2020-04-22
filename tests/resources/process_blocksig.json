@@ -16,7 +16,7 @@
       ],
       "received": {
         "sender": "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
-        "block_hash": "7fe0f358fbb99460fe6b70a156ce7d87728c14238107e21ae285a8f1fea3feb8",
+        "block_hash": "b8fea3fef1a885e21ae2078123148c72877dce56a1706bfe6094b9fb58f3e07f",
         "gamma_i": "43f10faf1f6bd9cb400eebbbe6cd2493a451c285d297f7d1eaa4ee422bba7fdb",
         "e": "bb1ad50bf39b995dc04de2ea238e78fa3d3254cf1708dd1717e552f4d0cfb276"
       },
@@ -154,7 +154,41 @@
               "y": "1ea8b8b6d8203f6821c6ac66a9f99ab730b5f43c3ae4490e6fcbc27fc424e43e"
             }
           ],
-          "candidate_block": "01000000954944fab7bca1d0bd42a346a5d981abc7a64f2f010dc4f3e32ad796fc84bfdbd2c07127f31ca5e3f380c30d39fbd273557d473ff3721a61a99fba385d8a2eae49dbbea59316df66bbe4ed6f5d25bc370a39b4fffe4d6b439371b345b15f1782743b7c5e000001010000000100000000000000000000000000000000000000000000000000000000000000000100000003510101ffffffff0200f2052a010000001976a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000",
+          "candidate_block": {
+            "header": {
+              "version": 1,
+              "prev_blockhash": "dbbf84fc96d72ae3f3c40d012f4fa6c7ab81d9a546a342bdd0a1bcb7fa444995",
+              "merkle_root": "ae2e8a5d38ba9fa9611a72f33f477d5573d2fb390dc380f3e3a51cf32771c0d2",
+              "im_merkle_root": "82175fb145b37193436b4dfeffb4390a37bc255d6fede4bb66df1693a5bedb49",
+              "time": 1585199988,
+              "xfield": "00",
+              "proof": null
+            }, 
+            "txdata":[
+              {
+                "version": 1,
+                "lock_time": 0,
+                "input": [
+                  {
+                    "previous_output": "0000000000000000000000000000000000000000000000000000000000000000:1",
+                    "script_sig": "510101",
+                    "sequence": 4294967295,
+                    "witness": []
+                  }
+                ],
+                "output": [
+                  {
+                    "value": 5000000000,
+                    "script_pubkey": "76a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac"
+                  },
+                  {
+                    "value": 0,
+                    "script_pubkey": "6a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf9"
+                  }
+                ]
+              }
+            ]
+          },
           "participants": [
             "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
             "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e"
@@ -317,7 +351,41 @@
               "y": "1ea8b8b6d8203f6821c6ac66a9f99ab730b5f43c3ae4490e6fcbc27fc424e43e"
             }
           ],
-          "candidate_block": "01000000954944fab7bca1d0bd42a346a5d981abc7a64f2f010dc4f3e32ad796fc84bfdbd2c07127f31ca5e3f380c30d39fbd273557d473ff3721a61a99fba385d8a2eae49dbbea59316df66bbe4ed6f5d25bc370a39b4fffe4d6b439371b345b15f1782743b7c5e000001010000000100000000000000000000000000000000000000000000000000000000000000000100000003510101ffffffff0200f2052a010000001976a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000",
+          "candidate_block": {
+            "header": {
+              "version": 1,
+              "prev_blockhash": "dbbf84fc96d72ae3f3c40d012f4fa6c7ab81d9a546a342bdd0a1bcb7fa444995",
+              "merkle_root": "ae2e8a5d38ba9fa9611a72f33f477d5573d2fb390dc380f3e3a51cf32771c0d2",
+              "im_merkle_root": "82175fb145b37193436b4dfeffb4390a37bc255d6fede4bb66df1693a5bedb49",
+              "time": 1585199988,
+              "xfield": "00",
+              "proof": null
+            }, 
+            "txdata":[
+              {
+                "version": 1,
+                "lock_time": 0,
+                "input": [
+                  {
+                    "previous_output": "0000000000000000000000000000000000000000000000000000000000000000:1",
+                    "script_sig": "510101",
+                    "sequence": 4294967295,
+                    "witness": []
+                  }
+                ],
+                "output": [
+                  {
+                    "value": 5000000000,
+                    "script_pubkey": "76a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac"
+                  },
+                  {
+                    "value": 0,
+                    "script_pubkey": "6a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf9"
+                  }
+                ]
+              }
+            ]
+          },
           "signatures": {
             "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e": [
               "f1235066960adfc36b3b5b311f85d5c752eb1b3d9385a4cb5a8b6defab9b7c68",
@@ -348,7 +416,7 @@
       ],
       "received": {
         "sender": "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
-        "block_hash": "7fe0f358fbb99460fe6b70a156ce7d87728c14238107e21ae285a8f1fea3feb8",
+        "block_hash": "b8fea3fef1a885e21ae2078123148c72877dce56a1706bfe6094b9fb58f3e07f",
         "gamma_i": "43f10faf1f6bd9cb400eebbbe6cd2493a451c285d297f7d1eaa4ee422bba7fdb",
         "e": "bb1ad50bf39b995dc04de2ea238e78fa3d3254cf1708dd1717e552f4d0cfb276"
       },
@@ -486,7 +554,41 @@
               "y": "1ea8b8b6d8203f6821c6ac66a9f99ab730b5f43c3ae4490e6fcbc27fc424e43e"
             }
           ],
-          "candidate_block": "01000000954944fab7bca1d0bd42a346a5d981abc7a64f2f010dc4f3e32ad796fc84bfdbd2c07127f31ca5e3f380c30d39fbd273557d473ff3721a61a99fba385d8a2eae49dbbea59316df66bbe4ed6f5d25bc370a39b4fffe4d6b439371b345b15f1782743b7c5e000001010000000100000000000000000000000000000000000000000000000000000000000000000100000003510101ffffffff0200f2052a010000001976a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000",
+          "candidate_block": {
+            "header": {
+              "version": 1,
+              "prev_blockhash": "dbbf84fc96d72ae3f3c40d012f4fa6c7ab81d9a546a342bdd0a1bcb7fa444995",
+              "merkle_root": "ae2e8a5d38ba9fa9611a72f33f477d5573d2fb390dc380f3e3a51cf32771c0d2",
+              "im_merkle_root": "82175fb145b37193436b4dfeffb4390a37bc255d6fede4bb66df1693a5bedb49",
+              "time": 1585199988,
+              "xfield": "00",
+              "proof": null
+            }, 
+            "txdata":[
+              {
+                "version": 1,
+                "lock_time": 0,
+                "input": [
+                  {
+                    "previous_output": "0000000000000000000000000000000000000000000000000000000000000000:1",
+                    "script_sig": "510101",
+                    "sequence": 4294967295,
+                    "witness": []
+                  }
+                ],
+                "output": [
+                  {
+                    "value": 5000000000,
+                    "script_pubkey": "76a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac"
+                  },
+                  {
+                    "value": 0,
+                    "script_pubkey": "6a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf9"
+                  }
+                ]
+              }
+            ]
+          },
           "signatures": {},
           "participants": [
             "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
@@ -512,7 +614,7 @@
       ],
       "received": {
         "sender": "02ce7edc292d7b747fab2f23584bbafaffde5c8ff17cf689969614441e0527b900",
-        "block_hash": "7fe0f358fbb99460fe6b70a156ce7d87728c14238107e21ae285a8f1fea3feb8",
+        "block_hash": "b8fea3fef1a885e21ae2078123148c72877dce56a1706bfe6094b9fb58f3e07f",
         "gamma_i": "43f10faf1f6bd9cb400eebbbe6cd2493a451c285d297f7d1eaa4ee422bba7fdb",
         "e": "bb1ad50bf39b995dc04de2ea238e78fa3d3254cf1708dd1717e552f4d0cfb276"
       },
@@ -650,7 +752,41 @@
               "y": "1ea8b8b6d8203f6821c6ac66a9f99ab730b5f43c3ae4490e6fcbc27fc424e43e"
             }
           ],
-          "candidate_block": "01000000954944fab7bca1d0bd42a346a5d981abc7a64f2f010dc4f3e32ad796fc84bfdbd2c07127f31ca5e3f380c30d39fbd273557d473ff3721a61a99fba385d8a2eae49dbbea59316df66bbe4ed6f5d25bc370a39b4fffe4d6b439371b345b15f1782743b7c5e000001010000000100000000000000000000000000000000000000000000000000000000000000000100000003510101ffffffff0200f2052a010000001976a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000",
+          "candidate_block": {
+            "header": {
+              "version": 1,
+              "prev_blockhash": "dbbf84fc96d72ae3f3c40d012f4fa6c7ab81d9a546a342bdd0a1bcb7fa444995",
+              "merkle_root": "ae2e8a5d38ba9fa9611a72f33f477d5573d2fb390dc380f3e3a51cf32771c0d2",
+              "im_merkle_root": "82175fb145b37193436b4dfeffb4390a37bc255d6fede4bb66df1693a5bedb49",
+              "time": 1585199988,
+              "xfield": "00",
+              "proof": null
+            }, 
+            "txdata":[
+              {
+                "version": 1,
+                "lock_time": 0,
+                "input": [
+                  {
+                    "previous_output": "0000000000000000000000000000000000000000000000000000000000000000:1",
+                    "script_sig": "510101",
+                    "sequence": 4294967295,
+                    "witness": []
+                  }
+                ],
+                "output": [
+                  {
+                    "value": 5000000000,
+                    "script_pubkey": "76a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac"
+                  },
+                  {
+                    "value": 0,
+                    "script_pubkey": "6a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf9"
+                  }
+                ]
+              }
+            ]
+          },
           "signatures": {
             "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e": [
               "f1235066960adfc36b3b5b311f85d5c752eb1b3d9385a4cb5a8b6defab9b7c68",
@@ -681,7 +817,7 @@
       ],
       "received": {
         "sender": "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
-        "block_hash": "7fe0f358fbb99460fe6b70a156ce7d87728c14238107e21ae285a8f1fea3feb8",
+        "block_hash": "b8fea3fef1a885e21ae2078123148c72877dce56a1706bfe6094b9fb58f3e07f",
         "gamma_i": "0000000000000000000000000000000000000000000000000000000000000001",
         "e": "bb1ad50bf39b995dc04de2ea238e78fa3d3254cf1708dd1717e552f4d0cfb276"
       },
@@ -819,7 +955,41 @@
               "y": "1ea8b8b6d8203f6821c6ac66a9f99ab730b5f43c3ae4490e6fcbc27fc424e43e"
             }
           ],
-          "candidate_block": "01000000954944fab7bca1d0bd42a346a5d981abc7a64f2f010dc4f3e32ad796fc84bfdbd2c07127f31ca5e3f380c30d39fbd273557d473ff3721a61a99fba385d8a2eae49dbbea59316df66bbe4ed6f5d25bc370a39b4fffe4d6b439371b345b15f1782743b7c5e000001010000000100000000000000000000000000000000000000000000000000000000000000000100000003510101ffffffff0200f2052a010000001976a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000",
+          "candidate_block": {
+            "header": {
+              "version": 1,
+              "prev_blockhash": "dbbf84fc96d72ae3f3c40d012f4fa6c7ab81d9a546a342bdd0a1bcb7fa444995",
+              "merkle_root": "ae2e8a5d38ba9fa9611a72f33f477d5573d2fb390dc380f3e3a51cf32771c0d2",
+              "im_merkle_root": "82175fb145b37193436b4dfeffb4390a37bc255d6fede4bb66df1693a5bedb49",
+              "time": 1585199988,
+              "xfield": "00",
+              "proof": null
+            }, 
+            "txdata":[
+              {
+                "version": 1,
+                "lock_time": 0,
+                "input": [
+                  {
+                    "previous_output": "0000000000000000000000000000000000000000000000000000000000000000:1",
+                    "script_sig": "510101",
+                    "sequence": 4294967295,
+                    "witness": []
+                  }
+                ],
+                "output": [
+                  {
+                    "value": 5000000000,
+                    "script_pubkey": "76a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac"
+                  },
+                  {
+                    "value": 0,
+                    "script_pubkey": "6a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf9"
+                  }
+                ]
+              }
+            ]
+          },
           "signatures": {
             "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e": [
               "f1235066960adfc36b3b5b311f85d5c752eb1b3d9385a4cb5a8b6defab9b7c68",
@@ -850,7 +1020,7 @@
       ],
       "received": {
         "sender": "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
-        "block_hash": "7fe0f358fbb99460fe6b70a156ce7d87728c14238107e21ae285a8f1fea3feb8",
+        "block_hash": "b8fea3fef1a885e21ae2078123148c72877dce56a1706bfe6094b9fb58f3e07f",
         "gamma_i": "43f10faf1f6bd9cb400eebbbe6cd2493a451c285d297f7d1eaa4ee422bba7fdb",
         "e": "bb1ad50bf39b995dc04de2ea238e78fa3d3254cf1708dd1717e552f4d0cfb276"
       },
@@ -988,7 +1158,41 @@
               "y": "1ea8b8b6d8203f6821c6ac66a9f99ab730b5f43c3ae4490e6fcbc27fc424e43e"
             }
           ],
-          "candidate_block": "01000000954944fab7bca1d0bd42a346a5d981abc7a64f2f010dc4f3e32ad796fc84bfdbd2c07127f31ca5e3f380c30d39fbd273557d473ff3721a61a99fba385d8a2eae49dbbea59316df66bbe4ed6f5d25bc370a39b4fffe4d6b439371b345b15f1782743b7c5e000001010000000100000000000000000000000000000000000000000000000000000000000000000100000003510101ffffffff0200f2052a010000001976a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000",
+          "candidate_block": {
+            "header": {
+              "version": 1,
+              "prev_blockhash": "dbbf84fc96d72ae3f3c40d012f4fa6c7ab81d9a546a342bdd0a1bcb7fa444995",
+              "merkle_root": "ae2e8a5d38ba9fa9611a72f33f477d5573d2fb390dc380f3e3a51cf32771c0d2",
+              "im_merkle_root": "82175fb145b37193436b4dfeffb4390a37bc255d6fede4bb66df1693a5bedb49",
+              "time": 1585199988,
+              "xfield": "00",
+              "proof": null
+            }, 
+            "txdata":[
+              {
+                "version": 1,
+                "lock_time": 0,
+                "input": [
+                  {
+                    "previous_output": "0000000000000000000000000000000000000000000000000000000000000000:1",
+                    "script_sig": "510101",
+                    "sequence": 4294967295,
+                    "witness": []
+                  }
+                ],
+                "output": [
+                  {
+                    "value": 5000000000,
+                    "script_pubkey": "76a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac"
+                  },
+                  {
+                    "value": 0,
+                    "script_pubkey": "6a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf9"
+                  }
+                ]
+              }
+            ]
+          },
           "signatures": {
             "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e": [
               "0000000000000000000000000000000000000000000000000000000000000001",
@@ -1019,7 +1223,7 @@
       ],
       "received": {
         "sender": "03831a69b8009833ab5b0326012eaf489bfea35a7321b1ca15b11d88131423fafc",
-        "block_hash": "7fe0f358fbb99460fe6b70a156ce7d87728c14238107e21ae285a8f1fea3feb8",
+        "block_hash": "b8fea3fef1a885e21ae2078123148c72877dce56a1706bfe6094b9fb58f3e07f",
         "gamma_i": "43f10faf1f6bd9cb400eebbbe6cd2493a451c285d297f7d1eaa4ee422bba7fdb",
         "e": "bb1ad50bf39b995dc04de2ea238e78fa3d3254cf1708dd1717e552f4d0cfb276"
       },
@@ -1157,7 +1361,41 @@
               "y": "1ea8b8b6d8203f6821c6ac66a9f99ab730b5f43c3ae4490e6fcbc27fc424e43e"
             }
           ],
-          "candidate_block": "01000000954944fab7bca1d0bd42a346a5d981abc7a64f2f010dc4f3e32ad796fc84bfdbd2c07127f31ca5e3f380c30d39fbd273557d473ff3721a61a99fba385d8a2eae49dbbea59316df66bbe4ed6f5d25bc370a39b4fffe4d6b439371b345b15f1782743b7c5e000001010000000100000000000000000000000000000000000000000000000000000000000000000100000003510101ffffffff0200f2052a010000001976a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000",
+          "candidate_block": {
+            "header": {
+              "version": 1,
+              "prev_blockhash": "dbbf84fc96d72ae3f3c40d012f4fa6c7ab81d9a546a342bdd0a1bcb7fa444995",
+              "merkle_root": "ae2e8a5d38ba9fa9611a72f33f477d5573d2fb390dc380f3e3a51cf32771c0d2",
+              "im_merkle_root": "82175fb145b37193436b4dfeffb4390a37bc255d6fede4bb66df1693a5bedb49",
+              "time": 1585199988,
+              "xfield": "00",
+              "proof": null
+            }, 
+            "txdata":[
+              {
+                "version": 1,
+                "lock_time": 0,
+                "input": [
+                  {
+                    "previous_output": "0000000000000000000000000000000000000000000000000000000000000000:1",
+                    "script_sig": "510101",
+                    "sequence": 4294967295,
+                    "witness": []
+                  }
+                ],
+                "output": [
+                  {
+                    "value": 5000000000,
+                    "script_pubkey": "76a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac"
+                  },
+                  {
+                    "value": 0,
+                    "script_pubkey": "6a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf9"
+                  }
+                ]
+              }
+            ]
+          },
           "signatures": {
             "02785a891f323acd6cef0fc509bb14304410595914267c50467e51c87142acbb5e": [
               "f1235066960adfc36b3b5b311f85d5c752eb1b3d9385a4cb5a8b6defab9b7c68",
@@ -1171,7 +1409,44 @@
           "round_is_done": false
         }
       },
-      "completed_block": "01000000954944fab7bca1d0bd42a346a5d981abc7a64f2f010dc4f3e32ad796fc84bfdbd2c07127f31ca5e3f380c30d39fbd273557d473ff3721a61a99fba385d8a2eae49dbbea59316df66bbe4ed6f5d25bc370a39b4fffe4d6b439371b345b15f1782743b7c5e0040ffdd2d890954c1acb89784d787faa0eaaef0fea6903e2a7b743c313f1597c5c1c7bc70c2515a62bf80d192ebbbe22e61cce059261c582b2a32957e800370da0e01010000000100000000000000000000000000000000000000000000000000000000000000000100000003510101ffffffff0200f2052a010000001976a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000"
+      "completed_block": {
+        "header": {
+          "version": 1,
+          "prev_blockhash": "dbbf84fc96d72ae3f3c40d012f4fa6c7ab81d9a546a342bdd0a1bcb7fa444995",
+          "merkle_root": "ae2e8a5d38ba9fa9611a72f33f477d5573d2fb390dc380f3e3a51cf32771c0d2",
+          "im_merkle_root": "82175fb145b37193436b4dfeffb4390a37bc255d6fede4bb66df1693a5bedb49",
+          "time": 1585199988,
+          "xfield": "00",
+          "proof": {
+            "r_x": [255, 221, 45, 137, 9, 84, 193, 172, 184, 151, 132, 215, 135, 250, 160, 234, 174, 240, 254, 166, 144, 62, 42, 123, 116, 60, 49, 63, 21, 151, 197, 193],
+            "sigma": [199, 188, 112, 194, 81, 90, 98, 191, 128, 209, 146, 235, 187, 226, 46, 97, 204, 224, 89, 38, 28, 88, 43, 42, 50, 149, 126, 128, 3, 112, 218, 14]
+          }
+        }, 
+        "txdata":[
+            {
+                "version": 1,
+                "lock_time": 0,
+                "input": [
+                    {
+                        "previous_output": "0000000000000000000000000000000000000000000000000000000000000000:1",
+                        "script_sig": "510101",
+                        "sequence": 4294967295,
+                        "witness": []
+                    }
+                ],
+                "output": [
+                    {
+                        "value": 5000000000,
+                        "script_pubkey": "76a9143f2ab2cc31283e0fa8467257f47bd47a7db1e51288ac"
+                    },
+                    {
+                        "value": 0,
+                        "script_pubkey": "6a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf9"
+                    }
+                ]
+            }
+        ]
+      }
     }
   }
 }

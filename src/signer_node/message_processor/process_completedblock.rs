@@ -1,7 +1,7 @@
-use crate::blockdata::Block;
 use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
 use crate::signer_node::{is_master, master_index, NodeParameters, NodeState};
+use tapyrus::blockdata::block::Block;
 
 pub fn process_completedblock<T>(
     sender_id: &SignerID,
