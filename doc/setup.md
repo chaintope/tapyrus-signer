@@ -23,7 +23,7 @@ In addition to [Tapyrus network parameters](https://github.com/chaintope/tapyrus
 **Node VSS**  
 Node VSS is a sort of Verifiable Secret Share(VSS), which is produced at 4.1 Key Generation Protocol in [the paper](https://doi.org/10.1007/3-540-47719-5_33).
 [The structure](#structure-of-vss) is mentioned later.
-All signers must have Node VSSs from all signers. The VSSs must include its VSS  in federations.toml config file to startup a node.
+All signers must have Node VSSs from all signers. The VSSs must include its VSS in federations.toml config file to startup a node.
 
 **Node secret share**
 Node secret share is a share that is produced at 4.1 Key Generation Protocol in [the paper](https://doi.org/10.1007/3-540-47719-5_33).
@@ -31,7 +31,7 @@ Each signer must have its Node secret share.
 This is calculated by collected Node VSSs.
 The value is 32bytes data of private key on secp256k1 curve.
 
-Tapyrus signer network uses the following unique parameters to each block generation round.
+Tapyrus Signer Network uses the following unique parameters to each block generation round.
 
 **Block VSS**
 Block VSS is a sort of VSS which is produced at 4.2 Signature Issuing Protocol in [the paper](https://doi.org/10.1007/3-540-47719-5_33).

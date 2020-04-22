@@ -28,7 +28,7 @@ Note that the same node public key can be used for the existing signer, so Step 
 
 :heavy_exclamation_mark:Caution: 
 > The RPC functionality is not implemented at 0.4.0 release. It is going to be implemented in a future release.
-> In 0.4.0 release, you can set federation information into `federations.toml` file directory. If you want to update federations settings, you can update the `federations.toml` and restart tapyrus-signerd.
+> In 0.4.0 release, you can set federation information into `federations.toml` file directly. If you want to update settings, you can update the `federations.toml` and restart tapyrus-signerd.
 
 Update the Aggregate public key held by the existing signer.
 For updating, use RPC `update_federation`.
