@@ -1,6 +1,6 @@
 use crate::net::{Message, MessageType, SignerID};
-use crate::tests::helper::keys::TEST_KEYS;
 use crate::tests::helper::blocks::get_block;
+use crate::tests::helper::keys::TEST_KEYS;
 use bitcoin::{Address, PrivateKey};
 
 pub mod blocks;

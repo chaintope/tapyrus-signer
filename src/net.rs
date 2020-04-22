@@ -344,10 +344,10 @@ impl ConnectionManager for RedisManager {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::tests::helper::blocks::get_block;
     use crate::tests::helper::keys::TEST_KEYS;
     use std::collections::BTreeMap;
     use std::str::FromStr;
-    use crate::tests::helper::blocks::get_block;
 
     #[test]
     #[should_panic(expected = "ConnectionManagerError")]
