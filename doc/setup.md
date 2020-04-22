@@ -43,7 +43,7 @@ Block secret share is a share that is produced at 4.2 Signature Issuing Protocol
 The value is 32bytes data of private key on secp256k1 curve.
 
 **Local signature**
-Local Signature is a signature, which is produced in each signer node at 4.2 Signature Issuing Protocol in [the paper](https://doi.org/10.1007/3-540-47719-5_33).
+Local signature is a signature, which is produced in each signer node at 4.2 Signature Issuing Protocol in [the paper](https://doi.org/10.1007/3-540-47719-5_33).
 By collecting Local signatures can generate a final signature, which can be verified by Aggregate public key, with calculating Lagrange interpolation.
 
 ## Generate Aggregate public key and Node secret share for Tapyrus Signer Network
@@ -151,9 +151,9 @@ If you don't have yet, get it following [Create new genesis block using tapyrus-
 The following steps can be summarized like this: 
 * Generate and distribute Block VSSs for all each signer.
 * By the distribution, you would collect Block VSSs for you from each other signer and yourself.
-* Generate Local Signature by the collected Block VSSs and Node secret share.
-* Share the Local Signature with all other signers.
-* Compute final signature for the block from all collected Local Signatures.
+* Generate Local signature by the collected Block VSSs and Node secret share.
+* Share the Local signature with all other signers.
+* Compute final signature for the block from all collected Local signatures.
 
 ### Step 1. Generate Block VSSs.
 
