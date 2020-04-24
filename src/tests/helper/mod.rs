@@ -1,4 +1,5 @@
 use crate::net::{Message, MessageType, SignerID};
+use crate::tests::helper::blocks::get_block;
 use crate::tests::helper::keys::TEST_KEYS;
 use bitcoin::{Address, PrivateKey};
 
@@ -22,8 +23,9 @@ pub fn enable_log(log_level: Option<log::Level>) {
 
 pub fn create_message() -> Message {
     let signer_id = SignerID::new(TEST_KEYS.pubkeys()[4]);
+    let block = get_block(0);
     Message {
-        message_type: MessageType::Roundfailure,
+        message_type: MessageType::Candidateblock(block),
         sender_id: signer_id,
         receiver_id: None,
     }

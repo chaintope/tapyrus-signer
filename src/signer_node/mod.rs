@@ -394,7 +394,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 &self.connection_manager,
                 &self.params,
             ),
-            MessageType::Roundfailure => self.process_roundfailure(&sender_id),
         }
     }
 
@@ -429,10 +428,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 .block_height(block_height)
                 .build();
         }
-    }
-
-    fn process_roundfailure(&self, _sender_id: &SignerID) -> NodeState {
-        self.current_state.clone()
     }
 }
 

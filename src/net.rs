@@ -104,7 +104,6 @@ pub enum MessageType {
     Blockvss(SHA256Hash, VerifiableSS, FE, VerifiableSS, FE),
     Blockparticipants(SHA256Hash, HashSet<SignerID>),
     Blocksig(SHA256Hash, FE, FE),
-    Roundfailure,
 }
 
 impl Display for MessageType {
@@ -115,7 +114,6 @@ impl Display for MessageType {
             MessageType::Blockvss(_, _, _, _, _) => write!(f, "Blockvss"),
             MessageType::Blockparticipants(_, _) => write!(f, "Blockparticipants"),
             MessageType::Blocksig(_, _, _) => write!(f, "Blocksig"),
-            MessageType::Roundfailure => write!(f, "Roundfailure"),
         }
     }
 }
@@ -346,6 +344,7 @@ impl ConnectionManager for RedisManager {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::tests::helper::blocks::get_block;
     use crate::tests::helper::keys::TEST_KEYS;
     use std::collections::BTreeMap;
     use std::str::FromStr;
@@ -359,8 +358,10 @@ mod test {
             pubkey: TEST_KEYS.pubkeys()[4],
         };
 
+        let block = get_block(0);
+
         let message = Message {
-            message_type: MessageType::Roundfailure,
+            message_type: MessageType::Candidateblock(block),
             sender_id,
             receiver_id: None,
         };
@@ -388,14 +389,16 @@ mod test {
         };
 
         let message_processor = move |message: Message| {
-            assert_eq!(message.message_type, MessageType::Roundfailure);
+            let block = get_block(0);
+            assert_eq!(message.message_type, MessageType::Candidateblock(block));
             ControlFlow::Break(())
         };
 
         let subscriber = connection_manager.subscribe(message_processor, sender_id);
 
+        let block = get_block(0);
         let message = Message {
-            message_type: MessageType::Roundfailure,
+            message_type: MessageType::Candidateblock(block),
             sender_id,
             receiver_id: None,
         };
