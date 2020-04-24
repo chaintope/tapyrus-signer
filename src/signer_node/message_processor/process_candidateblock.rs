@@ -23,21 +23,21 @@ where
         return prev_state.clone();
     }
 
-    log::info!(
-        "candidateblock received. block hash for signing: {:?}",
-        block.sighash()
-    );
-
     match &prev_state {
         NodeState::Member { block_height, .. } => {
-            if let Err(_) = verify_aggregated_public_key(block, *block_height, params) {
+            if let Err(_) = verify_block(block, *block_height, params) {
                 log::error!(
-                    "Aggregated public key is invalid. sender: {}, block: {:?}",
+                    "Block is invalid. sender: {}, block: {:?}",
                     sender_id,
                     block,
                 );
                 return prev_state.clone();
             }
+
+            log::info!(
+                "candidateblock received. block hash for signing: {:?}",
+                block.sighash()
+            );
 
             if let Err(e) = params.rpc.testproposedblock(&block) {
                 log::warn!(
@@ -64,6 +64,25 @@ where
         }
         _ => prev_state.clone(),
     }
+}
+
+fn verify_block<T>(
+    block: &Block,
+    block_height: u64,
+    params: &NodeParameters<T>,
+) -> Result<(), Error>
+where
+    T: TapyrusApi,
+{
+    match block.get_xfield_type() {
+        0 | 1 => {}
+        _ => return Err(Error::UnsupportedXField),
+    }
+
+    // validate length of xfield
+    block.get_xfield_length()?;
+
+    verify_aggregated_public_key(block, block_height, params)
 }
 
 fn verify_aggregated_public_key<T>(

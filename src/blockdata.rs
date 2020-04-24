@@ -2,8 +2,10 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+use crate::errors::Error;
 use crate::serialize::HexStrVisitor;
 use bitcoin::consensus::encode::serialize;
+use bitcoin::consensus::encode::Decodable;
 use bitcoin::PublicKey;
 use bitcoin::VarInt;
 use bitcoin_hashes::{sha256d, Hash};
@@ -97,8 +99,9 @@ impl Block {
     /// xfield: variable
     pub fn get_header_without_proof(&self) -> &[u8] {
         let position = match self.get_xfield_length() {
-            None => Self::XFIELD_POSITION,
-            Some(i) => Self::XFIELD_POSITION + i.len() + i.0 as usize,
+            Ok(None) => Self::XFIELD_POSITION,
+            Ok(Some(i)) => Self::XFIELD_POSITION + i.len() + i.0 as usize,
+            Err(_) => panic!("xField is unsupported"),
         };
         &self.0[..position]
     }
@@ -122,8 +125,9 @@ impl Block {
 
     pub fn add_proof(&self, proof: Vec<u8>) -> Block {
         let position = match self.get_xfield_length() {
-            None => Self::XFIELD_POSITION,
-            Some(i) => Self::XFIELD_POSITION + i.len() + i.0 as usize,
+            Ok(None) => Self::XFIELD_POSITION,
+            Ok(Some(i)) => Self::XFIELD_POSITION + i.len() + i.0 as usize,
+            Err(_) => panic!("xField is invalid"),
         };
         let (header, txs) = self.payload().split_at(position);
         let new_payload = [header, &proof[..], &txs[1..]].concat();
@@ -139,9 +143,12 @@ impl Block {
     }
 
     pub fn get_aggregated_public_key(&self) -> Option<PublicKey> {
-        match self.0[Self::XFIELD_POSITION - 1] {
+        match self.get_xfield_type() {
             1 => {
-                let len = self.get_xfield_length().expect("can not get xfield size");
+                let len = match self.get_xfield_length() {
+                    Ok(Some(i)) => i,
+                    _ => panic!("xField is invalid"),
+                };
                 let bytes = &self.payload()[Self::XFIELD_POSITION + len.len()
                     ..Self::XFIELD_POSITION + len.len() + len.0 as usize];
                 PublicKey::from_slice(bytes).ok()
@@ -150,57 +157,23 @@ impl Block {
         }
     }
 
+    pub fn get_xfield_type(&self) -> u8 {
+        self.0[Self::XFIELD_POSITION - 1]
+    }
+
     /// the length of xfield.
     /// return 0  if xfieldType is None.
     /// return 33 if xfieldType is AggregatePublicKey.
     /// return value of the first byte if xfieldType is unknown,
     /// this assumes that the leading of the new xfieldType added in the future is the length of the xfield value.
-    fn get_xfield_length(&self) -> Option<VarInt> {
-        match self.0[Self::XFIELD_POSITION - 1] {
-            0 => None,
-            _ => {
-                let n = self.0[Self::XFIELD_POSITION];
-                match n {
-                    0xFF => {
-                        let mut slice = [0u8; 8];
-                        slice.copy_from_slice(
-                            &self.0[Self::XFIELD_POSITION + 1..Self::XFIELD_POSITION + 9],
-                        );
-                        let x = u64::from_le_bytes(slice);
-                        if x < 0x100000000 {
-                            None
-                        } else {
-                            Some(VarInt(x))
-                        }
-                    }
-                    0xFE => {
-                        let mut slice = [0u8; 4];
-                        slice.copy_from_slice(
-                            &self.0[Self::XFIELD_POSITION + 1..Self::XFIELD_POSITION + 5],
-                        );
-                        let x = u32::from_le_bytes(slice);
-                        if x < 0x10000 {
-                            None
-                        } else {
-                            Some(VarInt(x as u64))
-                        }
-                    }
-                    0xFD => {
-                        let mut slice = [0u8; 2];
-                        slice.copy_from_slice(
-                            &self.0[Self::XFIELD_POSITION + 1..Self::XFIELD_POSITION + 3],
-                        );
-                        let x = u16::from_le_bytes(slice);
-                        if x < 0xFD {
-                            None
-                        } else {
-                            Some(VarInt(x as u64))
-                        }
-                    }
-                    n => Some(VarInt(n as u64)),
-                }
-            }
+    pub fn get_xfield_length(&self) -> Result<Option<VarInt>, Error> {
+        if self.get_xfield_type() == 0 {
+            return Ok(None);
         }
+        let mut slice = &self.0[Self::XFIELD_POSITION..];
+        VarInt::consensus_decode(&mut slice)
+            .map(|i| Some(i))
+            .map_err(|_| Error::InvalidBlock)
     }
 }
 
@@ -353,11 +326,11 @@ mod tests {
     #[test]
     fn test_get_xfield_length() {
         let block = test_block_with_pubkey();
-        let len = block.get_xfield_length().unwrap();
+        let len = block.get_xfield_length().unwrap().unwrap();
         assert_eq!(len, VarInt(33));
 
         let block = test_block_with_unknown_xfield();
-        let len = block.get_xfield_length().unwrap();
+        let len = block.get_xfield_length().unwrap().unwrap();
         assert_eq!(len, VarInt(550));
     }
 }
