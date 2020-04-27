@@ -1,59 +1,23 @@
+# You can find descriptions for each configration item in doc/configuration.md.
 [signer]
-# `public-key` is specify the signer own public key who hosted the node.
-# This is require and public key format is compressed hex string.
+to-address = "1Co1dFUNuYXY4izSNM9t71VpuUaYdMfq3S"
 public-key = "033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8"
-
-# The path to TOML file of the federations of the chain.
 federations-file = "/tmp/federations.toml"
 
 [rpc]
-# TapyrusCore RPC endpoint host name.
 rpc-endpoint-host = "localhost"
-
-# The `rpc-endpoint-port` is TapyrusCore RPC endpoint port number.
-# These are TapyrusCore default port,
-# mainnet: 2377, testnet: 12377, regtest: 12381.
-# this is optional, default is 2377(mainnet).
 rpc-endpoint-port = 12381
-
-# `rpc-endpoint-user` is TapyrusCore RPC user name for authentication.
-# require if you set username to your TapyrusCore RPC Server.
 rpc-endpoint-user = "user"
-
-# `rpc-endpoint-pass" is TapyrusCore RPC password for authentication.
-# require if you set password to your TapyrusCore RPC Server.
 rpc-endpoint-pass = "pass"
 
 [redis]
-# `redis-host` is Redis Server host name or IP Address.
 redis-host = "192.168.0.63"
-
-# `redis-port` is Redis Server port number. default is 6379.
 redis-port =  16379
 
 [general]
-# `round-duration` is round robin duration time(sec).
-# this is optional, default duration is 60 sec.
-# if you want more slowly or quickly block creation, then set more big/small duration time.
 round-duration = 5 # uint64
-
-# `log-quiet` is setted `true` to silent of log report.
-# this is optional, default false
 log-quiet = true
-
-# `log-level` is Log Level.
-# selectable values are `trace`, `debug`, `info`, `warn` or `error`.
-# this is optional, default vlue `info`.
 log-level = "debug"
-
-# `daemon` is flag for to run node as daemon process. Set true then the node run as daemon.
 daemon = true
-
-# `pid`
-# Specify pid file path. This option is enable when the node got '--daemon' flag.
 pid = "/tmp/tapyrus-signer.pid"
-
-# `log-file`
-# Specify where log file export to. This option is enable when the node fot '--daemon' flag.
-# If not, logs are put on stdout and stderr.
 log-file = "/var/log/tapyrus-signer.log"
