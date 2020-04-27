@@ -26,3 +26,5 @@ parts:
     plugin: rust
     build-packages:
       - libgmp3-dev
+    stage-packages:
+      - libgmp10
