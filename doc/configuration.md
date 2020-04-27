@@ -286,7 +286,7 @@ node-vss = [
 ]
 ```
 
-Before generating 99 height block proof, you should startup your tapyrus-signerd daemon. 
+Before generating 100 height block proof, you should startup your tapyrus-signerd daemon. 
 
 If you don't have Node VSSs and Aggregate public key for the federation you would join, you should follow steps in [Generate Aggregate public key and Node secret share for Tapyrus-signer network](doc/setup.md#generate-aggregate-public-key-and-node-secret-share-for-tapyrus-signer-network)
 
