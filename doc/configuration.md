@@ -6,7 +6,7 @@ After setting up with [How to set up new Tapyrus Signer Network](./setup.md), We
 
 `tapyrus-signerd` has two configure files. Both can be specified the path and the name with command line arguments.
 
-* **signer.toml**: This is a configuration file for general purpose to pass the arguments to `tapyrus-sigenrd`.
+* **signer.toml**: This is a configuration file for general purpose to pass the arguments to `tapyrus-signerd`.
 * **federations.toml**: This is a data file, which hosts federation parameters.
 
 You can set arguments that can be set on signer.toml is also able to set as command-line arguments. 
