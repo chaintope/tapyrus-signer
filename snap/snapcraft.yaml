@@ -5,13 +5,17 @@ description: |
         Tapyrus Signer Node 
 license: MIT
 base: core18
-grade: stable # must be 'stable' to release into candidate/stable channels
-confinement: strict # use 'strict' once you have the right plugs and slots
+grade: stable
+confinement: strict
 
 architectures:
   - build-on: [s390x, ppc64el, arm64, amd64, i386]
 
 apps:
+  service:
+    command: tapyrus-signerd
+    plugs: [network]
+    daemon: simple
   daemon:
     command: tapyrus-signerd
     plugs: [network]
