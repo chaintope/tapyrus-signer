@@ -32,11 +32,19 @@ have index. The index is assigned by public keys dictionary order index.
 Round master which is describing follow section is decided accoding to
 Signer Index.
 
-## Verifiable Secret Sharing Scheme
+## Threshold Signature Scheme
 
-Tapyrus Signer Network(TSN)'s signing algorithm is using [KZen-networks/multi-party-schnorr](https://github.com/KZen-networks/multi-party-schnorr) and it is based on [Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold Scheme for Implicit Certificates](https://github.com/KZen-networks/multi-party-schnorr/blob/master/papers/provably_secure_distributed_schnorr_signatures_and_a_threshold_scheme.pdf).
+Tapyrus Signer Network(TSN)'s signing algorithm bases on "Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold Scheme for Implicit Certificates"[^1].
+If you want to understand what is going on in TSN, We recommend reading section 4 "A (t, n) Threshold Signature Scheme" in the paper before.
 
-If you want to understand what is going on in TSN, We recommend to read section 4 "A (t, n) Threshold Signature Scheme" in the paper before.
+TSN produces schnorr signatures which is described in [Tapyrus Schnorr Singature Specification](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/schnorr_signature.md)
+
+> [^1]: Stinson, D. R., & Strobl, R. (2001). Provably secure distributed schnorr signatures and a (T, n) threshold scheme for implicit certificates. In Lecture Notes in Computer Science (including subseries Lecture Notes in Artificial Intelligence and Lecture Notes in Bioinformatics) (Vol. 2119, pp. 417–434). Springer Verlag. https://doi.org/10.1007/3-540-47719-5_33
+
+### Verifiable Secret Sharing
+
+The threshold signature scheme uses [Verifiable secret sharing(VSS)](https://en.wikipedia.org/wiki/Verifiable_secret_sharing) inside. And TSN uses [Feldman's scheme](https://en.wikipedia.org/wiki/Verifiable_secret_sharing#Feldman’s_scheme).
+The word of VSS appears in this repository means this scheme and sort of data format for VSS scheme.
 
 ## Overview of Tapyrus Signer Network(TSN) How it works
 
@@ -62,7 +70,6 @@ All messages has signer id field which is specify by signer public key.
 | blockparticipants | Vec &lt; PublicKey &gt; | Round master notify `signature issuing protocol` is going to be executed with the signers who are represented in payload keys |
 | blocksig          | LocalSig       | Broadcast local sig.                                         |
 | completedblock    | Block          | Round master broadcasts completed block.                     |
-| roundfailure      | N/A            | Round master notifies the round is failure.                  |
 
 
 Caution: Tapyrus-signer is using redis for to relay messages among each node. The word `send` and `broadcast` in the 

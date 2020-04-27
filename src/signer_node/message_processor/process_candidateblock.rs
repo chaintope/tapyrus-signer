@@ -23,21 +23,21 @@ where
         return prev_state.clone();
     }
 
-    log::info!(
-        "candidateblock received. block hash for signing: {:?}",
-        block.sighash()
-    );
-
     match &prev_state {
         NodeState::Member { block_height, .. } => {
-            if let Err(_) = verify_aggregated_public_key(block, *block_height, params) {
+            if let Err(_) = verify_block(block, *block_height, params) {
                 log::error!(
-                    "Aggregated public key is invalid. sender: {}, block: {:?}",
+                    "Block is invalid. sender: {}, block: {:?}",
                     sender_id,
                     block,
                 );
                 return prev_state.clone();
             }
+
+            log::info!(
+                "candidateblock received. block hash for signing: {:?}",
+                block.sighash()
+            );
 
             if let Err(e) = params.rpc.testproposedblock(&block) {
                 log::warn!(
@@ -64,6 +64,25 @@ where
         }
         _ => prev_state.clone(),
     }
+}
+
+fn verify_block<T>(
+    block: &Block,
+    block_height: u64,
+    params: &NodeParameters<T>,
+) -> Result<(), Error>
+where
+    T: TapyrusApi,
+{
+    match block.get_xfield_type() {
+        0 | 1 => {}
+        _ => return Err(Error::UnsupportedXField),
+    }
+
+    // validate length of xfield
+    block.get_xfield_length()?;
+
+    verify_aggregated_public_key(block, block_height, params)
 }
 
 fn verify_aggregated_public_key<T>(
@@ -267,7 +286,7 @@ mod tests {
         params.rpc.assert();
     }
 
-    const TEST_BLOCK_WITH_PUBKEY: &str = "010000000000000000000000000000000000000000000000000000000000000000000000e7c526d0125538b13a50b06465fb8b72120be13fb1142e93aba2aabb2a4f369826c18219f76e4d0ebddbaa9b744837c2ac65b347673695a23c3cc1a2be4141e1427d735e01030d856ac9f5871c3785a2d76e3a5d9eca6fcce70f4de63339671dfb9d1f33edb0000101000000010000000000000000000000000000000000000000000000000000000000000000000000002221025700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3ffffffff0100f2052a010000001976a914834e0737cdb9008db614cd95ec98824e952e3dc588ac00000000";
+    const TEST_BLOCK_WITH_PUBKEY: &str = "010000000000000000000000000000000000000000000000000000000000000000000000e7c526d0125538b13a50b06465fb8b72120be13fb1142e93aba2aabb2a4f369826c18219f76e4d0ebddbaa9b744837c2ac65b347673695a23c3cc1a2be4141e1427d735e0121030d856ac9f5871c3785a2d76e3a5d9eca6fcce70f4de63339671dfb9d1f33edb0000101000000010000000000000000000000000000000000000000000000000000000000000000000000002221025700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3ffffffff0100f2052a010000001976a914834e0737cdb9008db614cd95ec98824e952e3dc588ac00000000";
     const TEST_BLOCK_WITHOUT_PUBKEY: &str = "010000000000000000000000000000000000000000000000000000000000000000000000e7c526d0125538b13a50b06465fb8b72120be13fb1142e93aba2aabb2a4f369826c18219f76e4d0ebddbaa9b744837c2ac65b347673695a23c3cc1a2be4141e1427d735e00000101000000010000000000000000000000000000000000000000000000000000000000000000000000002221025700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3ffffffff0100f2052a010000001976a914834e0737cdb9008db614cd95ec98824e952e3dc588ac00000000";
 
     fn test_block_with_public_key() -> Block {

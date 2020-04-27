@@ -11,6 +11,7 @@ pub use crate::signer_node::node_parameters::NodeParameters;
 pub use crate::signer_node::node_state::NodeState;
 
 use crate::blockdata::Block;
+use crate::errors::Error;
 use crate::net::{ConnectionManager, Message, MessageType, SignerID};
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use crate::signer_node::message_processor::create_block_vss;
@@ -20,7 +21,6 @@ use crate::signer_node::message_processor::process_blockvss;
 use crate::signer_node::message_processor::process_candidateblock;
 use crate::signer_node::message_processor::process_completedblock;
 use crate::signer_node::node_state::builder::{Builder, Master, Member};
-
 use crate::timer::RoundTimeOutObserver;
 
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
@@ -292,6 +292,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             }
         };
 
+        if let Err(e) = self.verify_block(&block) {
+            log::error!("Invalid block. reason={:?}", e);
+            //Behave as master without block.
+            return Master::default().build();
+        }
+
         let block = self.add_aggregated_public_key_if_needed(block_height, block);
         log::info!(
             "Broadcast candidate block. block hash for signing: {:?}",
@@ -394,7 +400,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 &self.connection_manager,
                 &self.params,
             ),
-            MessageType::Roundfailure => self.process_roundfailure(&sender_id),
         }
     }
 
@@ -431,8 +436,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
-    fn process_roundfailure(&self, _sender_id: &SignerID) -> NodeState {
-        self.current_state.clone()
+    fn verify_block(&self, block: &Block) -> Result<(), Error> {
+        // master node accepts the block that has None xfield type.
+        match block.get_xfield_type() {
+            0 => Ok(()),
+            _ => Err(Error::UnsupportedXField),
+        }
     }
 }
 
@@ -485,6 +494,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::blockdata::Block;
     use crate::federation::{Federation, Federations};
     use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
     use crate::rpc::tests::{safety, MockRpc};
@@ -612,6 +622,12 @@ mod tests {
         (node, broadcaster)
     }
 
+    fn get_invalid_block() -> Block {
+        const TEST_BLOCK_WITH_UNKNOWN_XFIELD: &str = "010000000000000000000000000000000000000000000000000000000000000000000000e7c526d0125538b13a50b06465fb8b72120be13fb1142e93aba2aabb2a4f369826c18219f76e4d0ebddbaa9b744837c2ac65b347673695a23c3cc1a2be4141e1427d735efffd2602ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000101000000010000000000000000000000000000000000000000000000000000000000000000000000002221025700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3ffffffff0100f2052a010000001976a914834e0737cdb9008db614cd95ec98824e952e3dc588ac00000000";
+        let raw_block = hex::decode(TEST_BLOCK_WITH_UNKNOWN_XFIELD).unwrap();
+        Block::new(raw_block)
+    }
+
     #[test]
     fn test_is_federation_member() {
         let public_key = TEST_KEYS.pubkeys()[4];
@@ -697,6 +713,29 @@ mod tests {
         node.current_state = NodeState::Joining;
         node.start_next_round(next_master_index(&node.current_state, &node.params));
         assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
+    }
+
+    #[test]
+    fn test_verify_block() {
+        let arc_block = safety(get_block(0));
+        let rpc = MockRpc {
+            return_block: arc_block.clone(),
+        };
+        let node = create_node(
+            NodeState::Member {
+                block_key: None,
+                block_shared_keys: None,
+                shared_block_secrets: BidirectionalSharedSecretMap::new(),
+                candidate_block: None,
+                participants: HashSet::new(),
+                master_index: 0,
+                block_height: 0,
+            },
+            rpc,
+        );
+        assert!(node.verify_block(&get_block(0)).is_ok());
+
+        assert!(node.verify_block(&get_invalid_block()).is_err());
     }
 
     mod test_for_waiting_ibd_finish {
