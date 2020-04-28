@@ -150,7 +150,9 @@ impl Federation {
         self.threshold
     }
     pub fn nodevss(&self) -> &Vec<Vss> {
-        self.nodevss.as_ref().expect("The nodevss must not None, when it's used.")
+        self.nodevss
+            .as_ref()
+            .expect("The nodevss must not None, when it's used.")
     }
     pub fn aggregated_public_key(&self) -> PublicKey {
         self.aggregated_public_key
@@ -198,7 +200,7 @@ impl Federation {
     pub fn validate(&self) -> Result<(), Error> {
         // Skip validation if the signer of the node is not a member of the federation.
         if self.threshold.is_none() && self.nodevss.is_none() {
-            return Ok(())
+            return Ok(());
         }
 
         if self.threshold.is_none() || self.nodevss.is_none() {
@@ -228,7 +230,7 @@ impl Federation {
             return Err(Error::InvalidFederation(Some(self.block_height), "The nodevss has wrong receiver value. All VSS's receiver_public_key should be equal with publish key of the signer who runs the node."));
         }
 
-            // Check all commitment length is correct.
+        // Check all commitment length is correct.
         if let Some(threshold) = self.threshold {
             if self
                 .nodevss()
@@ -243,7 +245,8 @@ impl Federation {
         }
 
         // verify each vss.
-        if Sign::verify_vss_and_construct_key(&self.node_shared_secrets(), &(self.node_index() + 1)).is_err()
+        if Sign::verify_vss_and_construct_key(&self.node_shared_secrets(), &(self.node_index() + 1))
+            .is_err()
         {
             return Err(Error::InvalidFederation(
                 Some(self.block_height),
@@ -257,7 +260,7 @@ impl Federation {
     /// Returns whether the signer who hosts the node is a member of this federation.
     /// It is `true` if the signer is a member.
     pub fn is_member(&self) -> bool {
-        self.threshold.is_none() && self.nodevss.is_none()
+        self.threshold.is_some() && self.nodevss.is_some()
     }
 
     pub fn from(pubkey: PublicKey, ser: SerFederation) -> Self {
@@ -436,9 +439,9 @@ mod tests {
         // the federation has invalid secret share
         let mut federation = valid_federation();
 
-        federation.nodevss.as_mut().unwrap()[0].positive_secret = ECScalar::from(&BigInt::from_hex(
-            "9b77b12bf0ec14c6094be7657a3a3d473077bc3c8b694ead6c1b6d8c5b4e816c",
-        ));
+        federation.nodevss.as_mut().unwrap()[0].positive_secret = ECScalar::from(
+            &BigInt::from_hex("9b77b12bf0ec14c6094be7657a3a3d473077bc3c8b694ead6c1b6d8c5b4e816c"),
+        );
         match federation.validate() {
             Err(Error::InvalidFederation(_, m)) => {
                 assert_eq!(m, "The nodevss includes invalid share.")
@@ -528,7 +531,6 @@ mod tests {
 
         let federations = Federations::from_pubkey_and_toml(&pubkey, toml).unwrap();
         assert_eq!(federations.len(), 2);
-
 
         // toml has federation item which dosen't have required item 'aggregated_public_key'.
         let toml = r#"

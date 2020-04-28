@@ -328,10 +328,18 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             .build()
     }
 
-    fn is_federation_member(&self, sender_id: &SignerID) -> bool {
+    /// Returns true if the signer passed as an argument is a member of current federation.
+    fn is_federation_member(&self, signer_id: &SignerID) -> bool {
         let block_height = self.current_state.block_height();
         let federation = self.params.get_federation_by_block_height(block_height);
-        federation.signers().contains(sender_id)
+        federation.signers().contains(signer_id)
+    }
+
+    /// Returns true if the node is a member of current federation.
+    fn is_the_node_federation_member(&self) -> bool {
+        let block_height = self.current_state.block_height();
+        let federation = self.params.get_federation_by_block_height(block_height);
+        federation.is_member()
     }
 
     fn add_aggregated_public_key_if_needed(&self, block_height: u64, block: Block) -> Block {
@@ -352,9 +360,16 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         sender_id: &SignerID,
         message: MessageType,
     ) -> NodeState {
+        // Check the node, which receives the message is a member of the current federation.
+        if !self.is_the_node_federation_member() {
+            return self.current_state.clone();
+        }
+
+        // Check the node, which sent the message is a member of the current federation.
         if !self.is_federation_member(sender_id) {
             return self.current_state.clone();
         }
+
         match message {
             MessageType::Candidateblock(block) => process_candidateblock(
                 &sender_id,
@@ -587,9 +602,11 @@ mod tests {
     fn create_node<T: TapyrusApi>(
         current_state: NodeState,
         rpc: T,
+        federations: Option<Federations>,
     ) -> SignerNode<T, TestConnectionManager> {
         let closure: SpyMethod = Box::new(move |_message: Arc<Message>| {});
-        let (node, _) = create_node_with_closure_and_publish_count(current_state, rpc, closure, 1);
+        let (node, _) =
+            create_node_with_closure_and_publish_count(current_state, rpc, closure, 1, federations);
         node
     }
 
@@ -598,6 +615,7 @@ mod tests {
         rpc: T,
         spy: SpyMethod,
         publish_count: u32,
+        federations: Option<Federations>,
     ) -> (SignerNode<T, TestConnectionManager>, Sender<Message>) {
         let pubkey_list = TEST_KEYS.pubkeys();
         let threshold = Some(3);
@@ -605,13 +623,13 @@ mod tests {
         let to_address = address(&private_key);
         let public_key = pubkey_list[4].clone();
         let aggregated_public_key = TEST_KEYS.aggregated();
-        let federations = Federations::new(vec![Federation::new(
+        let federations = federations.unwrap_or(Federations::new(vec![Federation::new(
             public_key,
             0,
             threshold,
             Some(node_vss(0)),
             aggregated_public_key,
-        )]);
+        )]));
 
         let mut params = NodeParameters::new(to_address, public_key, rpc, 0, true, federations);
         params.round_duration = 0;
@@ -646,6 +664,7 @@ mod tests {
                 block_height: 0,
             },
             rpc,
+            None,
         );
         let result = node.is_federation_member(&SignerID::new(public_key));
         assert!(result);
@@ -660,6 +679,56 @@ mod tests {
     }
 
     #[test]
+    fn test_is_the_node_federation_member() {
+        let arc_block = safety(get_block(0));
+        let rpc = MockRpc {
+            return_block: arc_block.clone(),
+        };
+        let node = create_node(
+            NodeState::Member {
+                block_key: None,
+                block_shared_keys: None,
+                shared_block_secrets: BidirectionalSharedSecretMap::new(),
+                candidate_block: None,
+                participants: HashSet::new(),
+                master_index: 0,
+                block_height: 0,
+            },
+            rpc,
+            None,
+        );
+        let result = node.is_the_node_federation_member();
+        assert!(result);
+
+        // This signer is not member of the federation.
+        let rpc = MockRpc {
+            return_block: arc_block.clone(),
+        };
+        let federations = Federations::new(vec![Federation::new(
+            TEST_KEYS.pubkeys()[4],
+            0,
+            None,
+            None,
+            TEST_KEYS.aggregated(),
+        )]);
+        let node = create_node(
+            NodeState::Member {
+                block_key: None,
+                block_shared_keys: None,
+                shared_block_secrets: BidirectionalSharedSecretMap::new(),
+                candidate_block: None,
+                participants: HashSet::new(),
+                master_index: 0,
+                block_height: 0,
+            },
+            rpc,
+            Some(federations),
+        );
+        let result = node.is_the_node_federation_member();
+        assert!(!result);
+    }
+
+    #[test]
     fn test_timeout_roundrobin() {
         enable_log(None);
         let closure: SpyMethod = Box::new(move |_message: Arc<Message>| {});
@@ -669,7 +738,7 @@ mod tests {
             return_block: arc_block.clone(),
         };
         let (mut node, _broadcaster) =
-            create_node_with_closure_and_publish_count(initial_state, rpc, closure, 0);
+            create_node_with_closure_and_publish_count(initial_state, rpc, closure, 0, None);
 
         let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
         node.stop_handler(stop_handler);
@@ -701,6 +770,7 @@ mod tests {
                 block_height: 0,
             },
             rpc,
+            None,
         );
 
         assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
@@ -732,6 +802,7 @@ mod tests {
                 block_height: 0,
             },
             rpc,
+            None,
         );
         assert!(node.verify_block(&get_block(0)).is_ok());
 
@@ -798,6 +869,7 @@ mod tests {
                     block_height: 0,
                 },
                 rpc,
+                None,
             );
 
             node.wait_for_ibd_finish(std::time::Duration::from_millis(1));
