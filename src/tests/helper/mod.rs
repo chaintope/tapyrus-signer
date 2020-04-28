@@ -159,7 +159,7 @@ pub mod test_vectors {
             public_key,
             0,
             Some(threshold as u8),
-            node_vss.clone(),
+            Some(node_vss.clone()),
             aggregated_public_key,
         )];
         let federations = Federations::new(federations);

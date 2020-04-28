@@ -609,7 +609,7 @@ mod tests {
             public_key,
             0,
             threshold,
-            node_vss(0),
+            Some(node_vss(0)),
             aggregated_public_key,
         )]);
 
