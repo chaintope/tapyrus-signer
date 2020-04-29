@@ -150,7 +150,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
         // Start First Round
         log::info!("Start block creation rounds.");
-        self.start_next_round(INITIAL_MASTER_INDEX);
+        self.start_next_round();
 
         // get error_handler that is for catch error within connection_manager.
         let connection_manager_error_handler = self.connection_manager.error_handler();
@@ -195,12 +195,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     let next = self.process_round_message(&sender_id, message_type);
                     self.current_state = next;
 
-                    if let NodeState::RoundComplete {
-                        next_master_index, ..
-                    } = &self.current_state
-                    {
-                        let v = *next_master_index;
-                        self.start_next_round(v)
+                    if let NodeState::RoundComplete { .. } = &self.current_state {
+                        self.start_next_round()
                     }
 
                     log::debug!("Current state updated as {:?}", self.current_state);
@@ -215,8 +211,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             match self.round_timer.receiver.try_recv() {
                 Ok(_) => {
                     // Round duration is timeout. Starting next round.
-                    let next_master_index = next_master_index(&self.current_state, &self.params);
-                    self.start_next_round(next_master_index);
+                    self.start_next_round();
                     log::debug!("Current state updated as {:?}", self.current_state);
                 }
                 Err(TryRecvError::Empty) => {
@@ -354,7 +349,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         sender_id: &SignerID,
         message: MessageType,
     ) -> NodeState {
-        if let NodeState::Idling {..} = &self.current_state {
+        if let NodeState::Idling { .. } = &self.current_state {
             return self.current_state.clone();
         }
 
@@ -413,7 +408,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     /// Start next round.
     /// decide master of next round according to Round-robin.
-    fn start_next_round(&mut self, next_master_index: usize) {
+    fn start_next_round(&mut self) {
         self.round_timer.restart().unwrap();
 
         let block_height = match self.params.rpc.getblockchaininfo() {
@@ -439,6 +434,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             self.current_state = NodeState::Idling { block_height };
             return;
         }
+
+        let next_master_index = next_master_index(&self.current_state, &self.params);
 
         log::info!(
             "Start next round: self_index={}, master_index={}",
@@ -482,7 +479,7 @@ where
     T: TapyrusApi,
 {
     let next = match state {
-        NodeState::Joining => 0,
+        NodeState::Joining => INITIAL_MASTER_INDEX,
         NodeState::Idling { .. } => 0,
         NodeState::Master { .. } => params.self_node_index(state.block_height()) + 1,
         NodeState::Member { master_index, .. } => master_index + 1,
@@ -521,8 +518,7 @@ mod tests {
     use crate::rpc::tests::{safety, MockRpc};
     use crate::rpc::TapyrusApi;
     use crate::signer_node::{
-        master_index, next_master_index, BidirectionalSharedSecretMap, NodeParameters, NodeState,
-        SignerNode,
+        master_index, BidirectionalSharedSecretMap, NodeParameters, NodeState, SignerNode,
     };
     use crate::tests::helper::blocks::get_block;
     use crate::tests::helper::keys::TEST_KEYS;
@@ -731,13 +727,13 @@ mod tests {
 
         assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
 
-        node.start_next_round(next_master_index(&node.current_state, &node.params));
+        node.start_next_round();
         assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 1);
 
         // When the state is Joining, next round should be started as first round, so that,
         // the master index is 0.
         node.current_state = NodeState::Joining;
-        node.start_next_round(next_master_index(&node.current_state, &node.params));
+        node.start_next_round();
         assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
     }
 
