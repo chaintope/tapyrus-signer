@@ -336,13 +336,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         federation.signers().contains(signer_id)
     }
 
-    /// Returns true if the node is a member of current federation.
-    fn is_the_node_federation_member(&self) -> bool {
-        let block_height = self.current_state.block_height();
-        let federation = self.params.get_federation_by_block_height(block_height);
-        federation.is_member()
-    }
-
     fn add_aggregated_public_key_if_needed(&self, block_height: u64, block: Block) -> Block {
         let next_block_height = block_height + 1;
         let federation = self
@@ -361,8 +354,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         sender_id: &SignerID,
         message: MessageType,
     ) -> NodeState {
-        // Check the node, which receives the message is a member of the current federation.
-        if !self.is_the_node_federation_member() {
+        if let NodeState::Idling {..} = &self.current_state {
             return self.current_state.clone();
         }
 
@@ -689,56 +681,6 @@ mod tests {
         )
         .unwrap();
         let result = node.is_federation_member(&SignerID::new(public_key));
-        assert!(!result);
-    }
-
-    #[test]
-    fn test_is_the_node_federation_member() {
-        let arc_block = safety(get_block(0));
-        let rpc = MockRpc {
-            return_block: arc_block.clone(),
-        };
-        let node = create_node(
-            NodeState::Member {
-                block_key: None,
-                block_shared_keys: None,
-                shared_block_secrets: BidirectionalSharedSecretMap::new(),
-                candidate_block: None,
-                participants: HashSet::new(),
-                master_index: 0,
-                block_height: 0,
-            },
-            rpc,
-            None,
-        );
-        let result = node.is_the_node_federation_member();
-        assert!(result);
-
-        // This signer is not member of the federation.
-        let rpc = MockRpc {
-            return_block: arc_block.clone(),
-        };
-        let federations = Federations::new(vec![Federation::new(
-            TEST_KEYS.pubkeys()[4],
-            0,
-            None,
-            None,
-            TEST_KEYS.aggregated(),
-        )]);
-        let node = create_node(
-            NodeState::Member {
-                block_key: None,
-                block_shared_keys: None,
-                shared_block_secrets: BidirectionalSharedSecretMap::new(),
-                candidate_block: None,
-                participants: HashSet::new(),
-                master_index: 0,
-                block_height: 0,
-            },
-            rpc,
-            Some(federations),
-        );
-        let result = node.is_the_node_federation_member();
         assert!(!result);
     }
 
