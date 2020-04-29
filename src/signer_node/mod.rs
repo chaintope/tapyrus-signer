@@ -280,6 +280,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
+    /// A master node of the round starts new round with sending candidateblock message.
     pub fn start_new_round(&mut self, block_height: u64) -> NodeState {
         std::thread::sleep(Duration::from_secs(self.params.round_duration));
 
@@ -429,12 +430,24 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 ..
             }) => block_height,
             _ => match self.current_state {
+                NodeState::Idling { block_height } => block_height + 1,
                 NodeState::Member { block_height, .. } => block_height + 1,
                 NodeState::Master { block_height, .. } => block_height + 1,
                 NodeState::RoundComplete { block_height, .. } => block_height + 1,
                 _ => panic!("current_state is invalid"),
             },
         };
+
+        let federation = self.params.get_federation_by_block_height(block_height);
+        if !federation.is_member() {
+            log::info!(
+            "Start next round: self_index=None, master_index=None. Idling because the node is not a member of the current federation when the block height is {}.",
+            block_height,
+        );
+            self.current_state = NodeState::Idling { block_height };
+            return;
+        }
+
         log::info!(
             "Start next round: self_index={}, master_index={}",
             self.params.self_node_index(block_height),
@@ -478,6 +491,7 @@ where
 {
     let next = match state {
         NodeState::Joining => 0,
+        NodeState::Idling { .. } => 0,
         NodeState::Master { .. } => params.self_node_index(state.block_height()) + 1,
         NodeState::Member { master_index, .. } => master_index + 1,
         NodeState::RoundComplete {
