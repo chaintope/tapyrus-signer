@@ -74,11 +74,11 @@ pub enum NodeState {
 impl NodeState {
     pub fn block_height(&self) -> u64 {
         match &self {
-            NodeState::Joining => 0,
             NodeState::Idling { block_height } => *block_height,
             NodeState::Master { block_height, .. } => *block_height,
             NodeState::Member { block_height, .. } => *block_height,
             NodeState::RoundComplete { block_height, .. } => *block_height,
+            NodeState::Joining => unreachable!(),
         }
     }
 }
