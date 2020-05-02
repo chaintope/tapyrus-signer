@@ -482,8 +482,8 @@ where
     T: TapyrusApi,
 {
     let next = match state {
-        NodeState::Joining => INITIAL_MASTER_INDEX,
-        NodeState::Idling { .. } => 0,
+        NodeState::Joining => return INITIAL_MASTER_INDEX,
+        NodeState::Idling { .. } => return INITIAL_MASTER_INDEX,
         NodeState::Master { .. } => params.self_node_index(state.block_height()) + 1,
         NodeState::Member { master_index, .. } => master_index + 1,
         NodeState::RoundComplete {
