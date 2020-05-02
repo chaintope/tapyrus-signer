@@ -40,7 +40,6 @@ pub enum NodeState {
         participants: HashSet<SignerID>,
         /// Set true when the round is done.
         round_is_done: bool,
-        /// A height of the block which is the next block of the tip. It means that it is the height of the block which is the round would create.
         block_height: u64,
     },
     Member {
@@ -63,7 +62,6 @@ pub enum NodeState {
         /// are declared by Master node of the round.
         participants: HashSet<SignerID>,
         master_index: usize,
-        /// A height of the block which is the next block of the tip. It means that it is the height of the block which is the round would create.
         block_height: u64,
     },
     RoundComplete {
@@ -76,11 +74,11 @@ pub enum NodeState {
 impl NodeState {
     pub fn block_height(&self) -> u64 {
         match &self {
+            NodeState::Joining => 0,
             NodeState::Idling { block_height } => *block_height,
             NodeState::Master { block_height, .. } => *block_height,
             NodeState::Member { block_height, .. } => *block_height,
             NodeState::RoundComplete { block_height, .. } => *block_height,
-            NodeState::Joining => unreachable!(),
         }
     }
 }

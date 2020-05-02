@@ -411,11 +411,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     fn start_next_round(&mut self) {
         self.round_timer.restart().unwrap();
 
+        // Get a block height at next of the tip block.
         let block_height = match self.params.rpc.getblockchaininfo() {
             Ok(GetBlockchainInfoResult {
                 blocks: block_height,
                 ..
-            }) => block_height,
+            }) => block_height + 1,
             _ => match self.current_state {
                 NodeState::Idling { block_height } => block_height + 1,
                 NodeState::Member { block_height, .. } => block_height + 1,
