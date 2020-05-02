@@ -422,7 +422,9 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 NodeState::Member { block_height, .. } => block_height + 1,
                 NodeState::Master { block_height, .. } => block_height + 1,
                 NodeState::RoundComplete { block_height, .. } => block_height + 1,
-                _ => panic!("current_state is invalid"),
+                NodeState::Joining => {
+                    panic!("Couldn't start the node because of an RPC connection error.")
+                }
             },
         };
 
