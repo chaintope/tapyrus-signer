@@ -284,14 +284,14 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             Err(e) => {
                 log::error!("RPC getnewblock failed. reason={:?}", e);
                 //Behave as master without block.
-                return Master::default().build();
+                return Master::default().block_height(block_height).build();
             }
         };
 
         if let Err(e) = self.verify_block(&block) {
             log::error!("Invalid block. reason={:?}", e);
             //Behave as master without block.
-            return Master::default().build();
+            return Master::default().block_height(block_height).build();
         }
 
         let block = self.add_aggregated_public_key_if_needed(block_height, block);
@@ -441,7 +441,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         let next_master_index = next_master_index(&self.current_state, &self.params);
 
         log::info!(
-            "Start next round: self_index={}, master_index={}",
+            "Start next round: target_block_height={}, self_index={}, master_index={}",
+            block_height,
             self.params.self_node_index(block_height),
             next_master_index,
         );

@@ -120,7 +120,7 @@ pub mod builder {
                 signatures: self.signatures.clone(),
                 participants: self.participants.clone(),
                 round_is_done: self.round_is_done,
-                block_height: 0,
+                block_height: self.block_height,
             }
         }
 
