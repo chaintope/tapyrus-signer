@@ -419,9 +419,12 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             }) => block_height + 1,
             _ => match self.current_state {
                 NodeState::Idling { block_height } => block_height + 1,
-                NodeState::Member { block_height, .. } => block_height + 1,
-                NodeState::Master { block_height, .. } => block_height + 1,
                 NodeState::RoundComplete { block_height, .. } => block_height + 1,
+                // The case, which the node state is Member or Master, means that previous round
+                // was failure. If it was success, the state should be RoundComplete. So, the block
+                // height is not incremented here.
+                NodeState::Member { block_height, .. } => block_height,
+                NodeState::Master { block_height, .. } => block_height,
                 NodeState::Joining => {
                     panic!("Couldn't start the node because of an RPC connection error.")
                 }
