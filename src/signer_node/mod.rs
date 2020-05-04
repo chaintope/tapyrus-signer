@@ -487,9 +487,7 @@ where
         NodeState::Idling { .. } => return INITIAL_MASTER_INDEX,
         NodeState::Master { .. } => params.self_node_index(state.block_height()) + 1,
         NodeState::Member { master_index, .. } => master_index + 1,
-        NodeState::RoundComplete {
-            next_master_index, ..
-        } => *next_master_index,
+        NodeState::RoundComplete { master_index, .. } => master_index + 1,
     };
 
     let block_height = state.block_height();

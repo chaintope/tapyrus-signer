@@ -66,7 +66,6 @@ pub enum NodeState {
     },
     RoundComplete {
         master_index: usize,
-        next_master_index: usize,
         block_height: u64,
     },
 }
