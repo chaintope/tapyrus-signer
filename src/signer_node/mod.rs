@@ -441,7 +441,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             return;
         }
 
-        let next_master_index = next_master_index(&self.current_state, &self.params);
+        let next_master_index = next_master_index(&self.current_state, &self.params, block_height);
 
         log::info!(
             "Start next round: target_block_height={}, self_index={}, master_index={}",
@@ -481,11 +481,24 @@ where
     }
 }
 
-pub fn next_master_index<T>(state: &NodeState, params: &NodeParameters<T>) -> usize
+/// Returns master index of next round. If the node is not a member in the federation of the next
+/// round, it raises a panic. So you should check it before calling this function.
+/// This function is called when the next round about to start.
+///
+/// # Arguments
+///
+/// * `state` - A node state of the previous round.
+/// * `params` - Node Parameters
+/// * `target_block_height` - A target block height at a round, which about to start.
+fn next_master_index<T>(
+    state: &NodeState,
+    params: &NodeParameters<T>,
+    target_block_height: u64,
+) -> usize
 where
     T: TapyrusApi,
 {
-    let next = match state {
+    let next_index = match state {
         NodeState::Joining => return INITIAL_MASTER_INDEX,
         NodeState::Idling { .. } => return INITIAL_MASTER_INDEX,
         NodeState::Master { .. } => params.self_node_index(state.block_height()) + 1,
@@ -493,8 +506,7 @@ where
         NodeState::RoundComplete { master_index, .. } => master_index + 1,
     };
 
-    let block_height = state.block_height();
-    next % params.pubkey_list(block_height + 1).len()
+    next_index % params.pubkey_list(target_block_height).len()
 }
 
 pub fn is_master<T>(sender_id: &SignerID, state: &NodeState, params: &NodeParameters<T>) -> bool
