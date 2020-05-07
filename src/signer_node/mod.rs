@@ -34,7 +34,7 @@ use std::time::Duration;
 /// Round interval.
 pub static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
 /// Round time limit delta. Round timeout timer should be little longer than `ROUND_INTERVAL_DEFAULT_SECS`.
-static ROUND_TIMELIMIT_DELTA: u64 = 10;
+static ROUND_TIMELIMIT_DELTA: u64 = 15;
 
 pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     connection_manager: C,
@@ -714,7 +714,7 @@ mod tests {
 
         let ss = stop_signal.clone();
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(16)); // 16s = 1 round (10s) + idle time(5s) + 1s
+            thread::sleep(Duration::from_secs(21)); // 21s = 1 round (15s) + idle time(5s) + 1s
             ss.send(1).unwrap();
         });
         node.start();
