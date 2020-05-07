@@ -1,7 +1,7 @@
 use crate::blockdata::Block;
 use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
-use crate::signer_node::{is_master, master_index, next_master_index, NodeParameters, NodeState};
+use crate::signer_node::{is_master, master_index, NodeParameters, NodeState};
 
 pub fn process_completedblock<T>(
     sender_id: &SignerID,
@@ -29,7 +29,6 @@ where
     NodeState::RoundComplete {
         master_index: master_index(prev_state, params)
             .expect("Previous state getting round complete should have round master"),
-        next_master_index: next_master_index(prev_state, params),
         block_height: prev_state.block_height(),
     }
 }
@@ -54,7 +53,7 @@ mod tests {
         rpc.should_call_submitblock(Ok(()));
         let params = NodeParametersBuilder::new().rpc(rpc).build();
 
-        // check 1, next_master_index should be incremented after process completeblock message.
+        // check 1, node state should be RoundComplete after process completeblock message.
         let prev_state = Member::for_test().master_index(0).build();
         let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
         let state = process_completedblock(&sender_id, &block, &prev_state, &params);
@@ -62,26 +61,7 @@ mod tests {
         params.rpc.assert();
 
         match &state {
-            NodeState::RoundComplete {
-                next_master_index, ..
-            } => assert_eq!(*next_master_index, 1),
-            n => assert!(false, "Should be RoundComplete, but the state is {:?}", n),
-        }
-
-        // check 2, next master index should be back to 0 if the previous master index is the last number.
-        let mut rpc = MockRpc::new();
-        rpc.should_call_submitblock(Ok(()));
-        let params = NodeParametersBuilder::new().rpc(rpc).build();
-        let prev_state = Member::for_test().master_index(4).build();
-        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[4]);
-        let state = process_completedblock(&sender_id, &block, &prev_state, &params);
-
-        params.rpc.assert();
-
-        match &state {
-            NodeState::RoundComplete {
-                next_master_index, ..
-            } => assert_eq!(*next_master_index, 0),
+            NodeState::RoundComplete { master_index, .. } => assert_eq!(*master_index, 0),
             n => assert!(false, "Should be RoundComplete, but the state is {:?}", n),
         }
     }
@@ -106,9 +86,7 @@ mod tests {
         params.rpc.assert();
 
         match &state {
-            NodeState::RoundComplete {
-                next_master_index, ..
-            } => assert_eq!(*next_master_index, 1),
+            NodeState::RoundComplete { master_index, .. } => assert_eq!(*master_index, 0),
             n => assert!(false, "Should be RoundComplete, but the state is {:?}", n),
         }
     }

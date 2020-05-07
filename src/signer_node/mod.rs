@@ -150,7 +150,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
         // Start First Round
         log::info!("Start block creation rounds.");
-        self.start_next_round(INITIAL_MASTER_INDEX);
+        self.start_next_round();
 
         // get error_handler that is for catch error within connection_manager.
         let connection_manager_error_handler = self.connection_manager.error_handler();
@@ -195,12 +195,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     let next = self.process_round_message(&sender_id, message_type);
                     self.current_state = next;
 
-                    if let NodeState::RoundComplete {
-                        next_master_index, ..
-                    } = &self.current_state
-                    {
-                        let v = *next_master_index;
-                        self.start_next_round(v)
+                    if let NodeState::RoundComplete { .. } = &self.current_state {
+                        self.start_next_round()
                     }
 
                     log::debug!("Current state updated as {:?}", self.current_state);
@@ -215,8 +211,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             match self.round_timer.receiver.try_recv() {
                 Ok(_) => {
                     // Round duration is timeout. Starting next round.
-                    let next_master_index = next_master_index(&self.current_state, &self.params);
-                    self.start_next_round(next_master_index);
+                    self.start_next_round();
                     log::debug!("Current state updated as {:?}", self.current_state);
                 }
                 Err(TryRecvError::Empty) => {
@@ -280,6 +275,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
+    /// A master node of the round starts new round with sending candidateblock message.
     pub fn start_new_round(&mut self, block_height: u64) -> NodeState {
         std::thread::sleep(Duration::from_secs(self.params.round_duration));
 
@@ -288,14 +284,14 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             Err(e) => {
                 log::error!("RPC getnewblock failed. reason={:?}", e);
                 //Behave as master without block.
-                return Master::default().build();
+                return Master::default().block_height(block_height).build();
             }
         };
 
         if let Err(e) = self.verify_block(&block) {
             log::error!("Invalid block. reason={:?}", e);
             //Behave as master without block.
-            return Master::default().build();
+            return Master::default().block_height(block_height).build();
         }
 
         let block = self.add_aggregated_public_key_if_needed(block_height, block);
@@ -328,10 +324,11 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             .build()
     }
 
-    fn is_federation_member(&self, sender_id: &SignerID) -> bool {
+    /// Returns true if the signer passed as an argument is a member of current federation.
+    fn is_federation_member(&self, signer_id: &SignerID) -> bool {
         let block_height = self.current_state.block_height();
         let federation = self.params.get_federation_by_block_height(block_height);
-        federation.signers().contains(sender_id)
+        federation.signers().contains(signer_id)
     }
 
     fn add_aggregated_public_key_if_needed(&self, block_height: u64, block: Block) -> Block {
@@ -352,9 +349,15 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         sender_id: &SignerID,
         message: MessageType,
     ) -> NodeState {
+        if let NodeState::Idling { .. } = &self.current_state {
+            return self.current_state.clone();
+        }
+
+        // Check the node, which sent the message is a member of the current federation.
         if !self.is_federation_member(sender_id) {
             return self.current_state.clone();
         }
+
         match message {
             MessageType::Candidateblock(block) => process_candidateblock(
                 &sender_id,
@@ -405,23 +408,44 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     /// Start next round.
     /// decide master of next round according to Round-robin.
-    fn start_next_round(&mut self, next_master_index: usize) {
+    fn start_next_round(&mut self) {
         self.round_timer.restart().unwrap();
 
+        // Get a block height at next of the tip block.
         let block_height = match self.params.rpc.getblockchaininfo() {
             Ok(GetBlockchainInfoResult {
                 blocks: block_height,
                 ..
-            }) => block_height,
+            }) => block_height + 1,
             _ => match self.current_state {
-                NodeState::Member { block_height, .. } => block_height + 1,
-                NodeState::Master { block_height, .. } => block_height + 1,
+                NodeState::Idling { block_height } => block_height + 1,
                 NodeState::RoundComplete { block_height, .. } => block_height + 1,
-                _ => panic!("current_state is invalid"),
+                // The case, which the node state is Member or Master, means that previous round
+                // was failure. If it was success, the state should be RoundComplete. So, the block
+                // height is not incremented here.
+                NodeState::Member { block_height, .. } => block_height,
+                NodeState::Master { block_height, .. } => block_height,
+                NodeState::Joining => {
+                    panic!("Couldn't start the node because of an RPC connection error.")
+                }
             },
         };
+
+        let federation = self.params.get_federation_by_block_height(block_height);
+        if !federation.is_member() {
+            log::info!(
+            "Start next round: self_index=None, master_index=None. Idling because the node is not a member of the current federation when the block height is {}.",
+            block_height,
+        );
+            self.current_state = NodeState::Idling { block_height };
+            return;
+        }
+
+        let next_master_index = next_master_index(&self.current_state, &self.params, block_height);
+
         log::info!(
-            "Start next round: self_index={}, master_index={}",
+            "Start next round: target_block_height={}, self_index={}, master_index={}",
+            block_height,
             self.params.self_node_index(block_height),
             next_master_index,
         );
@@ -457,21 +481,32 @@ where
     }
 }
 
-pub fn next_master_index<T>(state: &NodeState, params: &NodeParameters<T>) -> usize
+/// Returns master index of next round. If the node is not a member in the federation of the next
+/// round, it raises a panic. So you should check it before calling this function.
+/// This function is called when the next round about to start.
+///
+/// # Arguments
+///
+/// * `state` - A node state of the previous round.
+/// * `params` - Node Parameters
+/// * `target_block_height` - A target block height at a round, which about to start.
+fn next_master_index<T>(
+    state: &NodeState,
+    params: &NodeParameters<T>,
+    target_block_height: u64,
+) -> usize
 where
     T: TapyrusApi,
 {
-    let next = match state {
-        NodeState::Joining => 0,
+    let next_index = match state {
+        NodeState::Joining => return INITIAL_MASTER_INDEX,
+        NodeState::Idling { .. } => return INITIAL_MASTER_INDEX,
         NodeState::Master { .. } => params.self_node_index(state.block_height()) + 1,
         NodeState::Member { master_index, .. } => master_index + 1,
-        NodeState::RoundComplete {
-            next_master_index, ..
-        } => *next_master_index,
+        NodeState::RoundComplete { master_index, .. } => master_index + 1,
     };
 
-    let block_height = state.block_height();
-    next % params.pubkey_list(block_height + 1).len()
+    next_index % params.pubkey_list(target_block_height).len()
 }
 
 pub fn is_master<T>(sender_id: &SignerID, state: &NodeState, params: &NodeParameters<T>) -> bool
@@ -500,8 +535,7 @@ mod tests {
     use crate::rpc::tests::{safety, MockRpc};
     use crate::rpc::TapyrusApi;
     use crate::signer_node::{
-        master_index, next_master_index, BidirectionalSharedSecretMap, NodeParameters, NodeState,
-        SignerNode,
+        master_index, BidirectionalSharedSecretMap, NodeParameters, NodeState, SignerNode,
     };
     use crate::tests::helper::blocks::get_block;
     use crate::tests::helper::keys::TEST_KEYS;
@@ -587,9 +621,11 @@ mod tests {
     fn create_node<T: TapyrusApi>(
         current_state: NodeState,
         rpc: T,
+        federations: Option<Federations>,
     ) -> SignerNode<T, TestConnectionManager> {
         let closure: SpyMethod = Box::new(move |_message: Arc<Message>| {});
-        let (node, _) = create_node_with_closure_and_publish_count(current_state, rpc, closure, 1);
+        let (node, _) =
+            create_node_with_closure_and_publish_count(current_state, rpc, closure, 1, federations);
         node
     }
 
@@ -598,6 +634,7 @@ mod tests {
         rpc: T,
         spy: SpyMethod,
         publish_count: u32,
+        federations: Option<Federations>,
     ) -> (SignerNode<T, TestConnectionManager>, Sender<Message>) {
         let pubkey_list = TEST_KEYS.pubkeys();
         let threshold = Some(3);
@@ -605,13 +642,13 @@ mod tests {
         let to_address = address(&private_key);
         let public_key = pubkey_list[4].clone();
         let aggregated_public_key = TEST_KEYS.aggregated();
-        let federations = Federations::new(vec![Federation::new(
+        let federations = federations.unwrap_or(Federations::new(vec![Federation::new(
             public_key,
             0,
             threshold,
-            node_vss(0),
+            Some(node_vss(0)),
             aggregated_public_key,
-        )]);
+        )]));
 
         let mut params = NodeParameters::new(to_address, public_key, rpc, 0, true, federations);
         params.round_duration = 0;
@@ -646,6 +683,7 @@ mod tests {
                 block_height: 0,
             },
             rpc,
+            None,
         );
         let result = node.is_federation_member(&SignerID::new(public_key));
         assert!(result);
@@ -669,7 +707,7 @@ mod tests {
             return_block: arc_block.clone(),
         };
         let (mut node, _broadcaster) =
-            create_node_with_closure_and_publish_count(initial_state, rpc, closure, 0);
+            create_node_with_closure_and_publish_count(initial_state, rpc, closure, 0, None);
 
         let (stop_signal, stop_handler): (Sender<u32>, Receiver<u32>) = channel();
         node.stop_handler(stop_handler);
@@ -701,17 +739,18 @@ mod tests {
                 block_height: 0,
             },
             rpc,
+            None,
         );
 
         assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
 
-        node.start_next_round(next_master_index(&node.current_state, &node.params));
+        node.start_next_round();
         assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 1);
 
         // When the state is Joining, next round should be started as first round, so that,
         // the master index is 0.
         node.current_state = NodeState::Joining;
-        node.start_next_round(next_master_index(&node.current_state, &node.params));
+        node.start_next_round();
         assert_eq!(master_index(&node.current_state, &node.params).unwrap(), 0);
     }
 
@@ -732,6 +771,7 @@ mod tests {
                 block_height: 0,
             },
             rpc,
+            None,
         );
         assert!(node.verify_block(&get_block(0)).is_ok());
 
@@ -798,6 +838,7 @@ mod tests {
                     block_height: 0,
                 },
                 rpc,
+                None,
             );
 
             node.wait_for_ibd_finish(std::time::Duration::from_millis(1));

@@ -410,7 +410,7 @@ mod tests {
             dump.public_key,
             0,
             Some(dump.threshold as u8),
-            dump.node_vss.clone(),
+            Some(dump.node_vss.clone()),
             dump.aggregated_public_key,
         )];
         let federations = Federations::new(federations);
@@ -454,7 +454,7 @@ mod tests {
             dump.public_key,
             0,
             Some(dump.threshold as u8),
-            dump.node_vss.clone(),
+            Some(dump.node_vss.clone()),
             dump.aggregated_public_key,
         )];
         let federations = Federations::new(federations);
@@ -500,7 +500,7 @@ mod tests {
             dump.public_key,
             0,
             Some(dump.threshold as u8),
-            dump.node_vss.clone(),
+            Some(dump.node_vss.clone()),
             dump.aggregated_public_key,
         )];
         let federations = Federations::new(federations);
