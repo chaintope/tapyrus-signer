@@ -51,6 +51,8 @@ This process assumes on Amazon Linux 2 environment. However it might work on any
 ```
 $ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 $ source $HOME/.cargo/env
+$ rustup toolchain install 1.41.0
+$ rustup default 1.41.0
 $ rustc --version
 rustc 1.41.0 (5e1a79984 2020-01-27)
 ```
@@ -58,13 +60,13 @@ rustc 1.41.0 (5e1a79984 2020-01-27)
 #### Install Packages
 
 ```$xslt
-$ sudo yum install gcc gcc-c++ gpm-devel
+$ sudo yum install gcc gcc-c++ gmp-devel git tar
 ```
 
 #### Build Tapyrus Signer
 
 ```
-$ git clone git@github.com:chaintope/tapyrus-signer.git
+$ git clone --depth=1 -b ${VERSION} https://github.com/chaintope/tapyrus-signer.git
 $ cd tapyrus-signer
 $ cargo build --release
 ```
@@ -74,6 +76,7 @@ $ cargo build --release
 ```
 $ mkdir -p tapyrus-signer-${VERSION}-x86_64-px-linux-gnu/bin
 $ cp target/release/tapyrus-signerd tapyrus-signer-${VERSION}-x86_64-px-linux-gnu/bin
+$ cp target/release/tapyrus-setup tapyrus-signer-${VERSION}-macOS/bin
 $ tar zcvf tapyrus-signer-${VERSION}-x86_64-px-linux-gnu.tar.gz tapyrus-signer-${VERSION}-x86_64-px-linux-gnu/
 ```
 
@@ -84,6 +87,8 @@ $ tar zcvf tapyrus-signer-${VERSION}-x86_64-px-linux-gnu.tar.gz tapyrus-signer-$
 ```
 $ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 $ source $HOME/.cargo/env
+$ rustup toolchain install 1.41.0
+$ rustup default 1.41.0
 $ rustc --version
 rustc 1.41.0 (5e1a79984 2020-01-27)
 ```
@@ -91,7 +96,7 @@ rustc 1.41.0 (5e1a79984 2020-01-27)
 #### Build Tapyrus Signer
 
 ```
-$ git clone git@github.com:chaintope/tapyrus-signer.git
+$ git clone --depth=1 -b ${VERSION} https://github.com/chaintope/tapyrus-signer.git
 $ cd tapyrus-signer
 $ cargo build --release
 ```
@@ -101,6 +106,7 @@ $ cargo build --release
 ```
 $ mkdir -p tapyrus-signer-${VERSION}-macOS/bin
 $ cp target/release/tapyrus-signerd tapyrus-signer-${VERSION}-macOS/bin
+$ cp target/release/tapyrus-setup tapyrus-signer-${VERSION}-macOS/bin
 $ tar zcvf tapyrus-signer-${VERSION}-macOS.tar.gz  tapyrus-signer-${VERSION}-macOS/
 ```
 
