@@ -304,14 +304,14 @@ mod tests {
             TEST_KEYS.pubkeys()[4],
             0,
             Some(3),
-            node_vss(0),
+            Some(node_vss(0)),
             TEST_KEYS.aggregated(),
         );
         let federation100 = Federation::new(
             TEST_KEYS.pubkeys()[4],
             100,
             Some(3),
-            node_vss(1),
+            Some(node_vss(1)),
             TEST_KEYS.aggregated(),
         );
         let another_key = PublicKey::from_str(
@@ -322,7 +322,7 @@ mod tests {
             TEST_KEYS.pubkeys()[4],
             200,
             Some(4),
-            node_vss(2),
+            Some(node_vss(2)),
             another_key,
         );
         let federations = Federations::new(vec![

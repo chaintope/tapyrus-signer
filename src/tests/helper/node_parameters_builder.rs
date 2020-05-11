@@ -28,7 +28,7 @@ impl NodeParametersBuilder {
                 TEST_KEYS.pubkeys()[1],
                 0,
                 Some(2),
-                node_vss(0),
+                Some(node_vss(0)),
                 TEST_KEYS.aggregated(),
             )]),
         }
