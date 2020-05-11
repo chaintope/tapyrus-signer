@@ -19,6 +19,8 @@ apps:
   daemon:
     command: tapyrus-signerd
     plugs: [network]
+  setup:
+    command: tapyrus-setup
 
 parts:
   tapyrus-signer:
