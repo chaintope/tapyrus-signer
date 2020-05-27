@@ -16,6 +16,7 @@ redis-port =  16379
 
 [general]
 round-duration = 5 # uint64
+round-limit = 15
 log-quiet = true
 log-level = "debug"
 daemon = true

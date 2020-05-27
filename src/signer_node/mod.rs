@@ -34,7 +34,7 @@ use std::time::Duration;
 /// Round interval.
 pub static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
 /// Round time limit delta. Round timeout timer should be little longer than `ROUND_INTERVAL_DEFAULT_SECS`.
-static ROUND_TIMELIMIT_DELTA: u64 = 15;
+pub static ROUND_LIMIT_DEFAULT_SECS: u64 = 15;
 
 pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     connection_manager: C,
@@ -109,7 +109,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     where
         Self: Sized,
     {
-        let timer_limit = params.round_duration + ROUND_TIMELIMIT_DELTA;
+        let timer_limit = params.round_duration + params.round_limit;
         SignerNode {
             connection_manager,
             params,
@@ -650,7 +650,7 @@ mod tests {
             aggregated_public_key,
         )]));
 
-        let mut params = NodeParameters::new(to_address, public_key, rpc, 0, true, federations);
+        let mut params = NodeParameters::new(to_address, public_key, rpc, 0, 10, true, federations);
         params.round_duration = 0;
         let con = TestConnectionManager::new(publish_count, spy);
         let broadcaster = con.sender.clone();

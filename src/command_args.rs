@@ -4,7 +4,7 @@
 
 use std::str::FromStr;
 
-use crate::signer_node::ROUND_INTERVAL_DEFAULT_SECS;
+use crate::signer_node::{ROUND_INTERVAL_DEFAULT_SECS, ROUND_LIMIT_DEFAULT_SECS};
 use bitcoin::{Address, PublicKey};
 use clap::{App, Arg};
 use log;
@@ -31,6 +31,7 @@ pub const OPTION_NAME_REDIS_PORT: &str = "redis_port";
 /// # General Config
 /// round category params.
 pub const OPTION_NAME_ROUND_DURATION: &str = "round_duration";
+pub const OPTION_NAME_ROUND_LIMIT: &str = "round_limit";
 /// log category params.
 pub const OPTION_NAME_LOG_QUIET: &str = "log_quiet";
 pub const OPTION_NAME_LOG_LEVEL: &str = "log_level";
@@ -100,6 +101,8 @@ pub struct RedisToml {
 pub struct GeneralToml {
     #[serde(rename = "round-duration")]
     round_duration: Option<u64>,
+    #[serde(rename = "round-limit")]
+    round_limit: Option<u64>,
     #[serde(rename = "log-level")]
     log_level: Option<String>,
     #[serde(rename = "log-quiet")]
@@ -260,6 +263,7 @@ impl<'a> RedisConfig<'a> {
 
 pub struct GeneralCommandArgs<'a> {
     round_duration: Option<&'a str>,
+    round_limit: Option<&'a str>,
     log_quiet: bool,
     log_level: Option<&'a str>,
     skip_waiting_ibd: bool,
@@ -281,6 +285,14 @@ impl<'a> GeneralConfig<'a> {
             .and_then(|d| d.parse().ok())
             .or(toml_value)
             .unwrap_or(ROUND_INTERVAL_DEFAULT_SECS)
+    }
+    pub fn round_limit(&'a self) -> u64 {
+        let toml_value = self.toml_config.and_then(|config| config.round_limit);
+        self.command_args
+            .round_limit
+            .and_then(|d| d.parse().ok())
+            .or(toml_value)
+            .unwrap_or(ROUND_LIMIT_DEFAULT_SECS)
     }
     pub fn log_level(&'a self) -> &'a str {
         let toml_value = self
@@ -404,6 +416,7 @@ impl<'a> CommandArgs<'a> {
         GeneralConfig {
             command_args: GeneralCommandArgs {
                 round_duration: self.matches.value_of(OPTION_NAME_REDIS_HOST),
+                round_limit: self.matches.value_of(OPTION_NAME_ROUND_LIMIT),
                 log_level: self.matches.value_of(OPTION_NAME_LOG_LEVEL),
                 log_quiet: self.matches.is_present(OPTION_NAME_LOG_QUIET),
                 skip_waiting_ibd: self.matches.is_present(OPTION_NAME_SKIP_WAITING_IBD),
@@ -485,6 +498,11 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
             .takes_value(true)
             .value_name("SECs")
             .help("Round interval times(sec)."))
+        .arg(Arg::with_name(OPTION_NAME_ROUND_LIMIT)
+            .long("round-limit")
+            .takes_value(true)
+            .value_name("SECs")
+            .help("Round limit times(sec).If the communications for rounds spends time more than round limit, the round would be regarded as a failure round and the next round would be started."))
         .arg(Arg::with_name(OPTION_NAME_SKIP_WAITING_IBD)
             .long("skip-waiting-ibd")
             .help("This flag make signer node don't waiting connected Tapyrus full node finishes Initial Block Download when signer node started. When block creation stopped much time, The status of Tapyrus full node changes to progressing Initial Block Download. In this case, block creation is never resume, because signer node waits the status is back to non-IBD. So you can use this flag to start signer node with ignore tapyrus full node status."))
@@ -560,6 +578,7 @@ fn test_load_from_file() {
 
     // general parameters are loaded from toml data.
     assert_eq!(args.general_config().round_duration(), 5);
+    assert_eq!(args.general_config().round_limit(), 15);
     assert_eq!(args.general_config().log_level(), "debug");
     assert_eq!(args.general_config().log_quiet(), true);
     assert_eq!(args.general_config().daemon(), true);
@@ -575,6 +594,7 @@ fn test_priority_commandline() {
     let matches = get_options().get_matches_from(vec![
         "node",
         "-c=tests/resources/signer_config.toml",
+        "--round-limit=99",
         "-p=033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8",
         "--federations-file=/tmp/federations.toml",
         "--rpc-host=tapyrus.dev.chaintope.com",
@@ -612,6 +632,7 @@ fn test_priority_commandline() {
     );
     assert_eq!(args.redis_config().port(), 88888);
 
+    assert_eq!(args.general_config().round_limit(), 99);
     assert_eq!(args.general_config().daemon(), true);
     assert_eq!(args.general_config().pid(), "/tmp/test.pid");
     assert_eq!(args.general_config().log_file(), "/tmp/tapyrus-signer.log");

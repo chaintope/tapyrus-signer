@@ -12,6 +12,7 @@ pub struct NodeParameters<T: TapyrusApi> {
     /// Own Signer ID. Actually it is signer own public key.
     pub signer_id: SignerID,
     pub round_duration: u64,
+    pub round_limit: u64,
     pub skip_waiting_ibd: bool,
     federations: Federations,
 }
@@ -22,6 +23,7 @@ impl<T: TapyrusApi> NodeParameters<T> {
         public_key: PublicKey,
         rpc: T,
         round_duration: u64,
+        round_limit: u64,
         skip_waiting_ibd: bool,
         federations: Federations,
     ) -> NodeParameters<T> {
@@ -32,6 +34,7 @@ impl<T: TapyrusApi> NodeParameters<T> {
             address: to_address,
             signer_id,
             round_duration,
+            round_limit,
             skip_waiting_ibd,
             federations,
         }

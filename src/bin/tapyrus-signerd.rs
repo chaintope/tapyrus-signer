@@ -61,6 +61,7 @@ fn main() {
         signer_config.public_key(),
         rpc,
         round_duration,
+        general_config.round_limit(),
         general_config.skip_waiting_ibd(),
         federations,
     );

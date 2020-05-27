@@ -60,6 +60,15 @@ This configuration file is for general settings about `tapyrus-signerd` process 
 This is an example file.
 
 ```toml
+[general]
+round-duration = 60
+round-limit = 15
+log-quiet = true
+log-level = "info"
+daemon = true
+pid = "/path/to/tapyrus-signer.pid"
+log-file = "/path/to/tapyrus-signer.log"
+
 [signer]
 to-address = "1Co1dFUN..."
 public-key = "033cfe7fa..."
@@ -74,14 +83,6 @@ rpc-endpoint-pass = "pass"
 [redis]
 redis-host = "127.0.0.1"
 redis-port =  6379
-
-[general]
-round-duration = 5
-log-quiet = true
-log-level = "info"
-daemon = true
-pid = "/path/to/tapyrus-signer.pid"
-log-file = "/path/to/tapyrus-signer.log"
 ```
 
 Here describe each item above.
@@ -93,6 +94,8 @@ Here describe each item above.
 * `round-duration` is round-robin duration time(sec).
 This is optional. The default duration is 60 sec.
 if you want more slowly or quickly block creation, then set more big/small duration time.
+* `round-limit` is time limit for the communication in each round. If the communications for rounds
+spends time more than round limit, the round would be regarded as a failure round and the next round would be started. This is optional, default is 15 sec.
 * `log-quiet` is set `true` to silent of log report.
 This is optional, default false
 * `log-level` is Log Level.
