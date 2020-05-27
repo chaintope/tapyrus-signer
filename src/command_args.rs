@@ -415,7 +415,7 @@ impl<'a> CommandArgs<'a> {
     pub fn general_config(&self) -> GeneralConfig {
         GeneralConfig {
             command_args: GeneralCommandArgs {
-                round_duration: self.matches.value_of(OPTION_NAME_REDIS_HOST),
+                round_duration: self.matches.value_of(OPTION_NAME_ROUND_DURATION),
                 round_limit: self.matches.value_of(OPTION_NAME_ROUND_LIMIT),
                 log_level: self.matches.value_of(OPTION_NAME_LOG_LEVEL),
                 log_quiet: self.matches.is_present(OPTION_NAME_LOG_QUIET),
@@ -594,6 +594,7 @@ fn test_priority_commandline() {
     let matches = get_options().get_matches_from(vec![
         "node",
         "-c=tests/resources/signer_config.toml",
+        "--duration=999",
         "--round-limit=99",
         "-p=033cfe7fa1be58191b9108883543e921d31dc7726e051ee773e0ea54786ce438f8",
         "--federations-file=/tmp/federations.toml",
@@ -632,6 +633,7 @@ fn test_priority_commandline() {
     );
     assert_eq!(args.redis_config().port(), 88888);
 
+    assert_eq!(args.general_config().round_duration(), 999);
     assert_eq!(args.general_config().round_limit(), 99);
     assert_eq!(args.general_config().daemon(), true);
     assert_eq!(args.general_config().pid(), "/tmp/test.pid");
