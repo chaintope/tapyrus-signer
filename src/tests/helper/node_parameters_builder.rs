@@ -10,6 +10,7 @@ pub struct NodeParametersBuilder {
     rpc: Option<MockRpc>,
     address: Address,
     round_duration: u64,
+    round_limit: u64,
     skip_waiting_ibd: bool,
     public_key: PublicKey,
     federations: Federations,
@@ -22,6 +23,7 @@ impl NodeParametersBuilder {
             rpc: None,
             address: address(&TEST_KEYS.key[4]),
             round_duration: 0,
+            round_limit: 15,
             skip_waiting_ibd: true,
             public_key: TEST_KEYS.pubkeys()[4],
             federations: Federations::new(vec![Federation::new(
@@ -40,6 +42,7 @@ impl NodeParametersBuilder {
             self.public_key,
             self.rpc.take().unwrap_or(MockRpc::new()),
             self.round_duration,
+            self.round_limit,
             self.skip_waiting_ibd,
             self.federations.clone(),
         )
@@ -62,6 +65,11 @@ impl NodeParametersBuilder {
 
     pub fn round_duration(&mut self, round_duration: u64) -> &mut Self {
         self.round_duration = round_duration;
+        self
+    }
+
+    pub fn round_limit(&mut self, round_limit: u64) -> &mut Self {
+        self.round_limit = round_limit;
         self
     }
 
