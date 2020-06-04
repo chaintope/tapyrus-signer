@@ -13,9 +13,14 @@ architectures:
 
 apps:
   service:
-    command: tapyrus-signerd
+    command: >-
+      tapyrus-signerd
+      $TAPYRUS_SIGNERD_OPTS
     plugs: [network]
+    environment:
+      HOME: $SNAP_USER_COMMON
     daemon: simple
+    restart-condition: always
   daemon:
     command: tapyrus-signerd
     plugs: [network]
