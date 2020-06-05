@@ -22,3 +22,4 @@ log-level = "debug"
 daemon = true
 pid = "/tmp/tapyrus-signer.pid"
 log-file = "/var/log/tapyrus-signer.log"
+skip-waiting-ibd = true

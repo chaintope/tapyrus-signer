@@ -587,6 +587,7 @@ fn test_load_from_file() {
         args.general_config().log_file(),
         "/var/log/tapyrus-signer.log"
     );
+    assert_eq!(args.general_config().skip_waiting_ibd(), true);
 }
 
 #[test]
@@ -607,6 +608,7 @@ fn test_priority_commandline() {
         "--daemon",
         "--pid=/tmp/test.pid",
         "--log-file=/tmp/tapyrus-signer.log",
+        "--skip-waiting-ibd",
     ]);
     let args = CommandArgs::load(matches).unwrap();
 
@@ -638,6 +640,7 @@ fn test_priority_commandline() {
     assert_eq!(args.general_config().daemon(), true);
     assert_eq!(args.general_config().pid(), "/tmp/test.pid");
     assert_eq!(args.general_config().log_file(), "/tmp/tapyrus-signer.log");
+    assert_eq!(args.general_config().skip_waiting_ibd(), true);
 }
 
 #[test]

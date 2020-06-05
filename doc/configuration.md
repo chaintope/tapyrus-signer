@@ -68,6 +68,7 @@ log-level = "info"
 daemon = true
 pid = "/path/to/tapyrus-signer.pid"
 log-file = "/path/to/tapyrus-signer.log"
+skip-waiting-ibd = true
 
 [signer]
 to-address = "1Co1dFUN..."
@@ -107,6 +108,11 @@ Specify the pid file path. This option is enabled when the node got '--daemon' f
 * `log-file`
 Specify where log file export to. This option is enabled when the node got '--daemon' flag.
 If not, logs are put on stdout and stderr.
+* `skip-waiting-ibd` is a flag make signer node don't waiting connected Tapyrus full node finishes Initial Block 
+Download when signer node started. When block creation stopped much time, The status of Tapyrus full node changes to 
+progressing Initial Block Download. In this case, block creation is never resume, because signer node waits the status 
+is back to non-IBD. So you can use this flag to start signer node with ignore tapyrus full node status.
+This is optional, default false.
 
 ### [signer] section
 
