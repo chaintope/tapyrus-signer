@@ -15,7 +15,7 @@ apps:
   service:
     command: >-
       tapyrus-signerd
-      $TAPYRUS_SIGNERD_OPTS
+      --config $SNAP_USER_COMMON/signer.toml
     plugs: [network]
     environment:
       HOME: $SNAP_USER_COMMON
