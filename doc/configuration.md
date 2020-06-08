@@ -15,7 +15,7 @@ You can get the details of command-line arguments on `-h` option like below:
 ```
 $ tapyrus-signerd -h
 node
-Tapyrus siner node
+Tapyrus signer node
 
 USAGE:
     tapyrus-signerd [FLAGS] [OPTIONS]

@@ -437,7 +437,7 @@ fn read_config(file_path: &str) -> Result<ConfigToml, crate::errors::Error> {
 
 pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
     App::new("node")
-        .about("Tapyrus siner node")
+        .about("Tapyrus signer node")
         .arg(Arg::with_name(OPTION_NAME_CONFIG)
             .short("c")
             .long("config")
