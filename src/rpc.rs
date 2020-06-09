@@ -2,10 +2,10 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use tapyrus::Address;
 use log::Level::Trace;
 use log::{log_enabled, trace};
 use serde::Deserialize;
+use tapyrus::Address;
 
 use crate::errors::Error;
 use tapyrus::blockdata::block::Block;

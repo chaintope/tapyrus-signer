@@ -163,7 +163,10 @@ fn broadcast_blockparticipants<C: ConnectionManager>(
     self_signer_id: &SignerID,
 ) {
     conman.broadcast_message(Message {
-        message_type: MessageType::Blockparticipants(block.header.signature_hash(), participants.clone()),
+        message_type: MessageType::Blockparticipants(
+            block.header.signature_hash(),
+            participants.clone(),
+        ),
         sender_id: self_signer_id.clone(),
         receiver_id: None,
     });

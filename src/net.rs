@@ -4,7 +4,6 @@
 
 use crate::errors;
 use crate::serialize::{ByteBufVisitor, HexStrVisitor};
-use tapyrus::PublicKey;
 use redis::{Client, Commands, ControlFlow, PubSubCommands, RedisError};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cmp::Ordering;
@@ -17,6 +16,7 @@ use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use tapyrus::PublicKey;
 
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::FE;

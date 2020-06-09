@@ -2,9 +2,9 @@ use crate::crypto::multi_party_schnorr::Parameters;
 use crate::federation::{Federation, Federations};
 use crate::net::SignerID;
 use crate::rpc::TapyrusApi;
-use tapyrus::{Address, PublicKey};
 use std::convert::TryInto;
 use std::sync::Arc;
+use tapyrus::{Address, PublicKey};
 
 pub struct NodeParameters<T: TapyrusApi> {
     pub rpc: std::sync::Arc<T>,

@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-extern crate tapyrus;
 extern crate secp256k1;
+extern crate tapyrus;
 #[macro_use]
 extern crate log;
 extern crate base64;

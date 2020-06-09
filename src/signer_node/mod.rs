@@ -543,9 +543,6 @@ mod tests {
     use crate::tests::helper::keys::TEST_KEYS;
     use crate::tests::helper::node_vss::node_vss;
     use crate::tests::helper::{address, enable_log};
-    use tapyrus::PublicKey;
-    use tapyrus::blockdata::block::Block;
-    use tapyrus::consensus::encode::deserialize;
     use redis::ControlFlow;
     use std::collections::HashSet;
     use std::str::FromStr;
@@ -554,6 +551,9 @@ mod tests {
     use std::thread;
     use std::thread::JoinHandle;
     use std::time::Duration;
+    use tapyrus::blockdata::block::Block;
+    use tapyrus::consensus::encode::deserialize;
+    use tapyrus::PublicKey;
 
     pub type SpyMethod = Box<dyn Fn(Arc<Message>) -> () + Send + 'static>;
 
@@ -787,10 +787,10 @@ mod tests {
         use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
         use crate::signer_node::tests::create_node;
         use crate::signer_node::{BidirectionalSharedSecretMap, NodeState};
-        use tapyrus::Address;
-        use tapyrus::blockdata::block::Block;
         use std::cell::Cell;
         use std::collections::HashSet;
+        use tapyrus::blockdata::block::Block;
+        use tapyrus::Address;
 
         struct MockRpc {
             pub results: [GetBlockchainInfoResult; 2],

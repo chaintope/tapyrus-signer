@@ -6,7 +6,6 @@ use crate::errors::Error;
 use crate::rpc::Rpc;
 use crate::sign::Sign;
 use crate::signer_node::NodeParameters;
-use tapyrus::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use curv::arithmetic::traits::Converter;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
@@ -15,6 +14,7 @@ use curv::elliptic::curves::traits::ECScalar;
 use curv::FE;
 use std::fmt;
 use std::str::FromStr;
+use tapyrus::{PrivateKey, PublicKey};
 
 pub struct AggregateResponse {
     aggregated_public_key: PublicKey,
@@ -100,10 +100,10 @@ impl<'a> AggregateCommand {
 mod tests {
     use super::*;
 
-    use tapyrus::PublicKey;
     use curv::elliptic::curves::traits::ECScalar;
     use curv::BigInt;
     use std::str::FromStr;
+    use tapyrus::PublicKey;
 
     #[test]
     fn test_aggregate_response() {

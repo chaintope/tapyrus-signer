@@ -3,11 +3,11 @@ use crate::crypto::vss::{Commitment, Vss};
 use crate::errors::Error;
 use crate::rpc::Rpc;
 use crate::signer_node::node_parameters::NodeParameters;
-use tapyrus::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
+use tapyrus::{PrivateKey, PublicKey};
 
 pub struct CreateNodeVssResponse {
     vss: BTreeMap<PublicKey, Vss>,

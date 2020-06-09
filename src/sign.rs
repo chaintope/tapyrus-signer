@@ -76,8 +76,7 @@ impl Sign {
         priv_shared_keys: &SharedKeys,
         message: BlockSigHash,
     ) -> LocalSig {
-        let local_sig =
-            LocalSig::compute(&message[..], &eph_shared_keys, &priv_shared_keys);
+        let local_sig = LocalSig::compute(&message[..], &eph_shared_keys, &priv_shared_keys);
         local_sig
     }
 

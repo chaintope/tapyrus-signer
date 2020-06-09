@@ -3,10 +3,10 @@ use crate::net::SignerID;
 use crate::signer_node::BidirectionalSharedSecretMap;
 use crate::signer_node::SharedSecret;
 use crate::signer_node::SharedSecretMap;
-use tapyrus::{PrivateKey, PublicKey};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::{
     ShamirSecretSharing, VerifiableSS,
 };
+use tapyrus::{PrivateKey, PublicKey};
 
 pub mod aggregate;
 pub mod compute_sig;
@@ -94,8 +94,8 @@ pub fn vss_to_bidirectional_shared_secret_map(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tapyrus::{PrivateKey, PublicKey};
     use std::str::FromStr;
+    use tapyrus::{PrivateKey, PublicKey};
 
     #[test]
     fn test_index_of() {

@@ -92,7 +92,12 @@ where
         }
     };
 
-    broadcast_localsig(block.header.signature_hash(), &local_sig, conman, &params.signer_id);
+    broadcast_localsig(
+        block.header.signature_hash(),
+        &local_sig,
+        conman,
+        &params.signer_id,
+    );
 
     create_next_state(
         sender_id,

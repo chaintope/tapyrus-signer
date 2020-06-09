@@ -11,9 +11,6 @@ use crate::rpc::Rpc;
 use crate::sign::Sign;
 use crate::signer_node::NodeParameters;
 
-use tapyrus::{PrivateKey, PublicKey};
-use tapyrus::blockdata::block::Block;
-use tapyrus::consensus::encode::{serialize, deserialize};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
 use curv::elliptic::curves::traits::{ECPoint, ECScalar};
@@ -21,6 +18,9 @@ use curv::{BigInt, FE, GE};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
+use tapyrus::blockdata::block::Block;
+use tapyrus::consensus::encode::{deserialize, serialize};
+use tapyrus::{PrivateKey, PublicKey};
 
 pub struct ComputeSigResponse {
     block_with_signature: Block,
@@ -169,7 +169,8 @@ impl<'a> ComputeSigCommand {
         let hash = block.header.signature_hash();
         signature.verify(&hash, &priv_shared_keys.y)?;
         let sig_hex = Sign::format_signature(&signature);
-        let sig: tapyrus::util::signature::Signature = deserialize(&hex::decode(sig_hex).map_err(|_| Error::InvalidSig)?)?;
+        let sig: tapyrus::util::signature::Signature =
+            deserialize(&hex::decode(sig_hex).map_err(|_| Error::InvalidSig)?)?;
         block.header.proof = Some(sig);
         Ok(Box::new(ComputeSigResponse::new(block)))
     }

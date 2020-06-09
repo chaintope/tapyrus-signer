@@ -8,14 +8,14 @@ use crate::signer_node::message_processor::get_valid_block;
 use crate::signer_node::node_state::builder::{Builder, Master};
 use crate::signer_node::NodeParameters;
 use crate::signer_node::NodeState;
-use tapyrus::PublicKey;
-use tapyrus::blockdata::block::Block;
-use tapyrus::consensus::encode::deserialize;
 use curv::FE;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use tapyrus::blockdata::block::Block;
+use tapyrus::consensus::encode::deserialize;
 use tapyrus::hash_types::BlockSigHash;
+use tapyrus::PublicKey;
 
 pub fn process_blocksig<T, C>(
     sender_id: &SignerID,
@@ -131,7 +131,6 @@ where
 
     let federation = params.get_federation_by_block_height(block_height);
 
-
     let signature = match Vss::aggregate_and_verify_signature(
         candidate_block,
         new_signatures,
@@ -196,7 +195,9 @@ where
 {
     let sig_hex = Sign::format_signature(sig);
     let mut new_block = block.clone();
-    new_block.header.proof = Some(deserialize(&hex::decode(sig_hex).map_err(|_| Error::InvalidSig)?)?);
+    new_block.header.proof = Some(deserialize(
+        &hex::decode(sig_hex).map_err(|_| Error::InvalidSig)?,
+    )?);
     match rpc.submitblock(&new_block) {
         Ok(_) => Ok(new_block),
         Err(e) => Err(e),

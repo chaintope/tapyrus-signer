@@ -47,9 +47,9 @@ pub mod test_vectors {
     use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
     use crate::tests::helper::rpc::MockRpc;
 
-    use tapyrus::{PrivateKey, PublicKey};
     use tapyrus::blockdata::block::Block;
     use tapyrus::consensus::encode::deserialize;
+    use tapyrus::{PrivateKey, PublicKey};
 
     use curv::{FE, GE};
     use serde_json::Value;

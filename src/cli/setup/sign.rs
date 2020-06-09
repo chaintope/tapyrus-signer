@@ -8,9 +8,6 @@ use crate::errors::Error;
 use crate::rpc::Rpc;
 use crate::signer_node::NodeParameters;
 
-use tapyrus::{PrivateKey, PublicKey};
-use tapyrus::blockdata::block::Block;
-use tapyrus::consensus::encode::deserialize;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use curv::arithmetic::traits::Converter;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
@@ -18,6 +15,9 @@ use curv::elliptic::curves::traits::{ECPoint, ECScalar};
 use curv::{BigInt, FE, GE};
 use std::fmt;
 use std::str::FromStr;
+use tapyrus::blockdata::block::Block;
+use tapyrus::consensus::encode::deserialize;
+use tapyrus::{PrivateKey, PublicKey};
 
 pub struct SignResponse {
     local_sig: LocalSig,

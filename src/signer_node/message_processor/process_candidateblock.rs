@@ -122,9 +122,9 @@ mod tests {
     use crate::tests::helper::node_state_builder::BuilderForTest;
     use crate::tests::helper::node_vss::node_vss;
     use crate::tests::helper::rpc::MockRpc;
-    use tapyrus::PublicKey;
-    use tapyrus::consensus::encode::deserialize;
     use std::str::FromStr;
+    use tapyrus::consensus::encode::deserialize;
+    use tapyrus::PublicKey;
 
     fn sender_id() -> SignerID {
         TEST_KEYS.signer_ids()[2]

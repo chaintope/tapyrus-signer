@@ -1,9 +1,9 @@
 use crate::errors::Error;
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
-use tapyrus::Address;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use tapyrus::blockdata::block::Block;
+use tapyrus::Address;
 
 /// Mock for Rpc
 ///

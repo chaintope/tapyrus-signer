@@ -12,9 +12,6 @@ use crate::signer_node::SharedSecretMap;
 use crate::signer_node::ToSharedSecretMap;
 use crate::signer_node::ToVerifiableSS;
 use crate::util::jacobi;
-use tapyrus::consensus::encode::{self, *};
-use tapyrus::{PrivateKey, PublicKey};
-use tapyrus::blockdata::block::Block;
 use curv::arithmetic::traits::Converter;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::ECScalar;
@@ -25,6 +22,9 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::io;
 use std::str::FromStr;
+use tapyrus::blockdata::block::Block;
+use tapyrus::consensus::encode::{self, *};
+use tapyrus::{PrivateKey, PublicKey};
 
 // | name                 | size      | explaination                                                                                      |
 // | -------------------- | --------- | ------------------------------------------------------------------------------------------------- |

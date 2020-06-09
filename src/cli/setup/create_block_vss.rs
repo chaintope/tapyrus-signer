@@ -5,11 +5,11 @@ use crate::errors::Error;
 use crate::rpc::Rpc;
 use crate::signer_node::NodeParameters;
 
-use tapyrus::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
+use tapyrus::{PrivateKey, PublicKey};
 
 pub struct CreateBlockVssResponse {
     vss: BTreeMap<PublicKey, Vss>,

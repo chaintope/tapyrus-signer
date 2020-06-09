@@ -1,6 +1,6 @@
 use crate::net::SignerID;
-use tapyrus::{PrivateKey, PublicKey};
 use std::str::FromStr;
+use tapyrus::{PrivateKey, PublicKey};
 
 pub struct TestKeys {
     pub key: [PrivateKey; 5],

@@ -5,11 +5,11 @@
 use std::str::FromStr;
 
 use crate::signer_node::{ROUND_INTERVAL_DEFAULT_SECS, ROUND_LIMIT_DEFAULT_SECS};
-use tapyrus::{Address, PublicKey};
 use clap::{App, Arg};
 use log;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
+use tapyrus::{Address, PublicKey};
 
 pub const OPTION_NAME_CONFIG: &str = "config";
 
