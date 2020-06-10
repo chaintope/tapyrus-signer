@@ -229,14 +229,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_deserialize() {
-        let hex = "010000000000000000000000000000000000000000000000000000000000000000000000c0d6961ad2819f74eb6d085f04f9cceb0a9a6d5c153fd3c39fc47c3ca0bb548f85fbd09a5f7d8ac4c9552e52931ef6672984f64e52ad6d05d1cdb18907da8527db317c5e012103addb2555f37abf8f28f11f498bec7bd1460e7243c1813847c49a7ae326a97d1c00010100000001000000000000000000000000000000000000000000000000000000000000000000000000222103addb2555f37abf8f28f11f498bec7bd1460e7243c1813847c49a7ae326a97d1cffffffff0100f2052a010000001976a914a15f16ea2ba840d178e4c19781abca5f4fb1b4c288ac00000000";
-        let vec = hex::decode(hex).unwrap();
-        let block = deserialize::<Block>(&vec);
-        assert!(block.is_ok());
-    }
-
-    #[test]
     fn test_execute_success() {
         let matches = ComputeSigCommand::args().get_matches_from(vec![
             "computesig",
