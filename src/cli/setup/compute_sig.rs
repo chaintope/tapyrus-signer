@@ -1,4 +1,3 @@
-use crate::blockdata::Block;
 use crate::cli::setup::index_of;
 use crate::cli::setup::traits::Response;
 use crate::cli::setup::vss_to_bidirectional_shared_secret_map;
@@ -12,7 +11,6 @@ use crate::rpc::Rpc;
 use crate::sign::Sign;
 use crate::signer_node::NodeParameters;
 
-use bitcoin::{PrivateKey, PublicKey};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
 use curv::elliptic::curves::traits::{ECPoint, ECScalar};
@@ -20,6 +18,9 @@ use curv::{BigInt, FE, GE};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
+use tapyrus::blockdata::block::Block;
+use tapyrus::consensus::encode::{deserialize, serialize};
+use tapyrus::{PrivateKey, PublicKey};
 
 pub struct ComputeSigResponse {
     block_with_signature: Block,
@@ -37,7 +38,7 @@ impl Response for ComputeSigResponse {}
 
 impl fmt::Display for ComputeSigResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.block_with_signature.hex())
+        write!(f, "{}", hex::encode(serialize(&self.block_with_signature)))
     }
 }
 
@@ -66,10 +67,10 @@ impl<'a> ComputeSigCommand {
             .map(|i| ECScalar::from(&i))
             .ok_or(Error::InvalidArgs("node-secret-share".to_string()))?;
 
-        let block: Block = matches
+        let mut block: Block = matches
             .value_of("block")
             .and_then(|s| hex::decode(s).ok())
-            .map(|hex| Block::new(hex))
+            .and_then(|hex| deserialize::<Block>(&hex).ok())
             .ok_or(Error::InvalidArgs("block".to_string()))?;
 
         let node_vss_vec: Vec<Vss> = matches
@@ -165,11 +166,13 @@ impl<'a> ComputeSigCommand {
             &shared_block_secrets,
             &priv_shared_keys,
         )?;
-        let hash = block.sighash().into_inner();
+        let hash = block.header.signature_hash();
         signature.verify(&hash, &priv_shared_keys.y)?;
         let sig_hex = Sign::format_signature(&signature);
-        let new_block: Block = block.add_proof(hex::decode(sig_hex).unwrap());
-        Ok(Box::new(ComputeSigResponse::new(new_block)))
+        let sig: tapyrus::util::signature::Signature =
+            deserialize(&hex::decode(sig_hex).map_err(|_| Error::InvalidSig)?)?;
+        block.header.proof = Some(sig);
+        Ok(Box::new(ComputeSigResponse::new(block)))
     }
 
     pub fn args<'b>() -> App<'a, 'b> {
@@ -226,7 +229,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_execute() {
+    fn test_execute_success() {
         let matches = ComputeSigCommand::args().get_matches_from(vec![
             "computesig",
             "--threshold",

@@ -1,7 +1,7 @@
 use crate::net::{Message, MessageType, SignerID};
 use crate::tests::helper::blocks::get_block;
 use crate::tests::helper::keys::TEST_KEYS;
-use bitcoin::{Address, PrivateKey};
+use tapyrus::{Address, PrivateKey};
 
 pub mod blocks;
 pub mod keys;
@@ -32,13 +32,12 @@ pub fn create_message() -> Message {
 }
 
 pub fn address(private_key: &PrivateKey) -> Address {
-    let secp = secp256k1::Secp256k1::new();
+    let secp = tapyrus::secp256k1::Secp256k1::new();
     let self_pubkey = private_key.public_key(&secp);
     Address::p2pkh(&self_pubkey, private_key.network)
 }
 
 pub mod test_vectors {
-    use crate::blockdata::Block;
     use crate::crypto::multi_party_schnorr::LocalSig;
     use crate::crypto::vss::Vss;
     use crate::federation::{Federation, Federations};
@@ -48,7 +47,10 @@ pub mod test_vectors {
     use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
     use crate::tests::helper::rpc::MockRpc;
 
-    use bitcoin::{PrivateKey, PublicKey};
+    use tapyrus::blockdata::block::Block;
+    use tapyrus::consensus::encode::deserialize;
+    use tapyrus::{PrivateKey, PublicKey};
+
     use curv::{FE, GE};
     use serde_json::Value;
     use std::collections::HashSet;
@@ -130,9 +132,8 @@ pub mod test_vectors {
         if block.is_null() {
             None
         } else {
-            let hex = hex::decode(block.as_str().unwrap()).unwrap();
-            let block = Block::new(hex);
-            Some(block)
+            let bytes = hex::decode(block.as_str().unwrap()).unwrap();
+            deserialize(&bytes).ok()
         }
     }
 

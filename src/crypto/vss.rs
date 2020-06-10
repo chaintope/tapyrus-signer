@@ -1,4 +1,3 @@
-use crate::blockdata::Block;
 use crate::crypto::multi_party_schnorr::Keys;
 use crate::crypto::multi_party_schnorr::LocalSig;
 use crate::crypto::multi_party_schnorr::SharedKeys;
@@ -13,8 +12,6 @@ use crate::signer_node::SharedSecretMap;
 use crate::signer_node::ToSharedSecretMap;
 use crate::signer_node::ToVerifiableSS;
 use crate::util::jacobi;
-use bitcoin::consensus::encode::{self, *};
-use bitcoin::{PrivateKey, PublicKey};
 use curv::arithmetic::traits::Converter;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::ECScalar;
@@ -25,6 +22,9 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::io;
 use std::str::FromStr;
+use tapyrus::blockdata::block::Block;
+use tapyrus::consensus::encode::{self, *};
+use tapyrus::{PrivateKey, PublicKey};
 
 // | name                 | size      | explaination                                                                                      |
 // | -------------------- | --------- | ------------------------------------------------------------------------------------------------- |
@@ -128,7 +128,7 @@ impl Vss {
         let local_sig_for_positive = Sign::sign(
             &shared_keys_for_positive,
             &priv_shared_keys,
-            block.sighash(),
+            block.header.signature_hash(),
         );
 
         let shared_keys_for_negative =
@@ -136,7 +136,7 @@ impl Vss {
         let local_sig_for_negative = Sign::sign(
             &shared_keys_for_negative,
             &priv_shared_keys,
-            block.sighash(),
+            block.header.signature_hash(),
         );
 
         let p = BigInt::from_str_radix(
@@ -189,8 +189,8 @@ impl Vss {
             block_shared_keys.unwrap().2,
         );
         let public_key = priv_shared_keys.y;
-        let hash = block.sighash().into_inner();
-        signature.verify(&hash, &public_key)?;
+        let hash = block.header.signature_hash();
+        signature.verify(&hash[..], &public_key)?;
         Ok(signature)
     }
 }

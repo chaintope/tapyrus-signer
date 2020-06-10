@@ -1,4 +1,3 @@
-use crate::blockdata::hash::SHA256Hash;
 use crate::crypto::multi_party_schnorr::LocalSig;
 use crate::net::{ConnectionManager, SignerID};
 use crate::rpc::TapyrusApi;
@@ -9,10 +8,11 @@ use crate::signer_node::node_state::builder::{Builder, Master, Member};
 use crate::signer_node::{NodeParameters, NodeState};
 use curv::{FE, GE};
 use std::collections::HashSet;
+use tapyrus::hash_types::BlockSigHash;
 
 pub fn process_blockparticipants<T, C>(
     sender_id: &SignerID,
-    blockhash: SHA256Hash,
+    blockhash: BlockSigHash,
     participants: HashSet<SignerID>,
     prev_state: &NodeState,
     conman: &C,
@@ -78,7 +78,7 @@ where
 
     // Generate local signature and broadcast it.
     let (block_shared_keys, local_sig) = match generate_local_sig(
-        block.sighash(),
+        block.header.signature_hash(),
         &shared_block_secrets_by_participants,
         prev_state,
         params,
@@ -92,7 +92,12 @@ where
         }
     };
 
-    broadcast_localsig(block.sighash(), &local_sig, conman, &params.signer_id);
+    broadcast_localsig(
+        block.header.signature_hash(),
+        &local_sig,
+        conman,
+        &params.signer_id,
+    );
 
     create_next_state(
         sender_id,
@@ -135,7 +140,6 @@ fn create_next_state(
 #[cfg(test)]
 mod tests {
     use super::process_blockparticipants;
-    use crate::blockdata::hash::SHA256Hash;
     use crate::crypto::multi_party_schnorr::LocalSig;
     use crate::net::SignerID;
     use crate::signer_node::node_state::builder::{Builder, Master, Member};
@@ -148,6 +152,8 @@ mod tests {
     use curv::{FE, GE};
     use serde_json::Value;
     use std::collections::HashSet;
+    use tapyrus::hash_types::BlockSigHash;
+    use tapyrus::hashes::hex::FromHex;
 
     #[test]
     fn test_process_blockparticipants_master() {
@@ -397,7 +403,7 @@ mod tests {
         rpc: MockRpc,
     ) -> (
         SignerID,
-        SHA256Hash,
+        BlockSigHash,
         HashSet<SignerID>,
         NodeState,
         NodeParameters<MockRpc>,
@@ -412,14 +418,14 @@ mod tests {
         let block = to_block(&v["candidate_block"]);
 
         let sender = to_signer_id(&v["received"]["sender"].as_str().unwrap().to_string());
-        let hex = hex::decode(v["received"]["block_hash"].as_str().unwrap()).unwrap();
+        let hex = v["received"]["block_hash"].as_str().unwrap();
         let received_participants: HashSet<SignerID> = {
             let r: HashSet<String> = serde_json::from_value(v["received"]["participants"].clone())
                 .unwrap_or(HashSet::new());
             r.iter().map(|i| to_signer_id(i)).collect()
         };
 
-        let blockhash = SHA256Hash::from_slice(&hex[..]).unwrap();
+        let blockhash = BlockSigHash::from_hex(hex).unwrap();
         let participants: HashSet<SignerID> = {
             let r: HashSet<String> =
                 serde_json::from_value(v["participants"].clone()).unwrap_or(HashSet::new());

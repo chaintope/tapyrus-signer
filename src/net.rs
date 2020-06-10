@@ -2,11 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use crate::blockdata::hash::SHA256Hash;
-use crate::blockdata::Block;
 use crate::errors;
 use crate::serialize::{ByteBufVisitor, HexStrVisitor};
-use bitcoin::PublicKey;
 use redis::{Client, Commands, ControlFlow, PubSubCommands, RedisError};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cmp::Ordering;
@@ -19,12 +16,15 @@ use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use tapyrus::PublicKey;
 
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::FE;
 use serde::export::fmt::Error;
 use serde::export::Formatter;
 use std::collections::HashSet;
+use tapyrus::blockdata::block::Block;
+use tapyrus::hash_types::BlockSigHash;
 
 /// Signer identifier is his public key.
 #[derive(Eq, Hash, Copy, Clone)]
@@ -101,9 +101,9 @@ impl<'de> Deserialize<'de> for SignerID {
 pub enum MessageType {
     Candidateblock(Block),
     Completedblock(Block),
-    Blockvss(SHA256Hash, VerifiableSS, FE, VerifiableSS, FE),
-    Blockparticipants(SHA256Hash, HashSet<SignerID>),
-    Blocksig(SHA256Hash, FE, FE),
+    Blockvss(BlockSigHash, VerifiableSS, FE, VerifiableSS, FE),
+    Blockparticipants(BlockSigHash, HashSet<SignerID>),
+    Blocksig(BlockSigHash, FE, FE),
 }
 
 impl Display for MessageType {

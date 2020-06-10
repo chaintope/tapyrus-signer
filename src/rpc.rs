@@ -2,13 +2,14 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-use bitcoin::Address;
 use log::Level::Trace;
 use log::{log_enabled, trace};
 use serde::Deserialize;
+use tapyrus::Address;
 
-use crate::blockdata::Block;
 use crate::errors::Error;
+use tapyrus::blockdata::block::Block;
+use tapyrus::consensus::encode::{deserialize, serialize};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct GetBlockchainInfoResult {
@@ -93,19 +94,20 @@ impl TapyrusApi for Rpc {
         match resp {
             Ok(v) => {
                 let raw_block = hex::decode(v).expect("Decoding block hex failed");
-                Ok(Block::new(raw_block))
+                deserialize(&raw_block).map_err(|_| Error::InvalidBlock)
             }
             Err(e) => Err(e),
         }
     }
 
     fn testproposedblock(&self, block: &Block) -> Result<bool, Error> {
-        let blockhex = serde_json::Value::from(block.hex());
+        let blockhex = serde_json::Value::from(hex::encode(serialize(block)));
         self.call::<bool>("testproposedblock", &[blockhex])
     }
 
     fn submitblock(&self, block: &Block) -> Result<(), Error> {
-        self.call::<()>("submitblock", &[block.hex().into()])
+        let blockhex = serde_json::Value::from(hex::encode(serialize(block)));
+        self.call::<()>("submitblock", &[blockhex])
     }
 
     fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error> {
@@ -117,7 +119,7 @@ impl TapyrusApi for Rpc {
 pub mod tests {
     use super::*;
     use crate::tests::helper::keys::TEST_KEYS;
-    use secp256k1::Secp256k1;
+    use tapyrus::secp256k1::Secp256k1;
 
     pub fn get_rpc_client() -> Rpc {
         Rpc::new(

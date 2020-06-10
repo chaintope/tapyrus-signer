@@ -4,11 +4,11 @@ use crate::errors::Error;
 use crate::net::SignerID;
 use crate::sign::Sign;
 use crate::signer_node::{SharedSecret, SharedSecretMap};
-use bitcoin::PublicKey;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::{
     ShamirSecretSharing, VerifiableSS,
 };
 use std::collections::HashSet;
+use tapyrus::PublicKey;
 
 #[derive(Debug, Clone)]
 pub struct Federations {
@@ -306,11 +306,11 @@ mod tests {
     use crate::net::SignerID;
     use crate::tests::helper::keys::TEST_KEYS;
     use crate::tests::helper::node_vss::node_vss;
-    use bitcoin::PublicKey;
     use curv::arithmetic::traits::Converter;
     use curv::elliptic::curves::traits::ECScalar;
     use curv::BigInt;
     use std::str::FromStr;
+    use tapyrus::PublicKey;
 
     #[test]
     fn test_get_by_block_height() {

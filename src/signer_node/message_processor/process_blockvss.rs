@@ -1,5 +1,3 @@
-use crate::blockdata::hash::SHA256Hash;
-use crate::blockdata::Block;
 use crate::errors::Error;
 use crate::net::{ConnectionManager, Message, MessageType, SignerID};
 use crate::rpc::TapyrusApi;
@@ -12,10 +10,12 @@ use crate::signer_node::{BidirectionalSharedSecretMap, NodeState, SharedSecret};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::FE;
 use std::collections::HashSet;
+use tapyrus::blockdata::block::Block;
+use tapyrus::hash_types::BlockSigHash;
 
 pub fn process_blockvss<T, C>(
     sender_id: &SignerID,
-    blockhash: SHA256Hash,
+    blockhash: BlockSigHash,
     vss_for_positive: VerifiableSS,
     secret_share_for_positive: FE,
     vss_for_negative: VerifiableSS,
@@ -78,7 +78,7 @@ where
                     .collect();
 
                 let (block_shared_keys, local_sig) = match generate_local_sig(
-                    candidate_block.sighash(),
+                    candidate_block.header.signature_hash(),
                     &shared_block_secrets_by_participants,
                     prev_state,
                     params,
@@ -100,7 +100,7 @@ where
                 );
 
                 broadcast_localsig(
-                    candidate_block.sighash(),
+                    candidate_block.header.signature_hash(),
                     &local_sig,
                     conman,
                     &params.signer_id,
@@ -124,7 +124,7 @@ where
             // nodes got blockvss message first, node needs to broadcast blocksig at this time.
             if participants.contains(&params.signer_id) {
                 let (block_shared_keys, local_sig) = match generate_local_sig(
-                    candidate_block.sighash(),
+                    candidate_block.header.signature_hash(),
                     &new_shared_block_secrets,
                     prev_state,
                     params,
@@ -139,7 +139,7 @@ where
                 };
 
                 broadcast_localsig(
-                    candidate_block.sighash(),
+                    candidate_block.header.signature_hash(),
                     &local_sig,
                     conman,
                     &params.signer_id,
@@ -163,7 +163,10 @@ fn broadcast_blockparticipants<C: ConnectionManager>(
     self_signer_id: &SignerID,
 ) {
     conman.broadcast_message(Message {
-        message_type: MessageType::Blockparticipants(block.sighash(), participants.clone()),
+        message_type: MessageType::Blockparticipants(
+            block.header.signature_hash(),
+            participants.clone(),
+        ),
         sender_id: self_signer_id.clone(),
         receiver_id: None,
     });
@@ -230,7 +233,6 @@ fn store_received_vss(
 #[cfg(test)]
 mod tests {
     use super::process_blockvss;
-    use crate::blockdata::hash::SHA256Hash;
     use crate::crypto::multi_party_schnorr::LocalSig;
     use crate::net::SignerID;
     use crate::signer_node::node_state::builder::{Builder, Master, Member};
@@ -244,6 +246,8 @@ mod tests {
     use curv::{FE, GE};
     use serde_json::Value;
     use std::collections::HashSet;
+    use tapyrus::hash_types::BlockSigHash;
+    use tapyrus::hashes::hex::FromHex;
 
     #[test]
     fn test_process_blockvss_master_invalid_block() {
@@ -621,7 +625,7 @@ mod tests {
         rpc: MockRpc,
     ) -> (
         SignerID,
-        SHA256Hash,
+        BlockSigHash,
         VerifiableSS,
         FE,
         VerifiableSS,
@@ -640,8 +644,8 @@ mod tests {
         let block = to_block(&v["candidate_block"]);
 
         let sender = to_signer_id(&v["received"]["sender"].as_str().unwrap().to_string());
-        let hex = hex::decode(v["received"]["block_hash"].as_str().unwrap()).unwrap();
-        let blockhash = SHA256Hash::from_slice(&hex[..]).unwrap();
+        let hex = v["received"]["block_hash"].as_str().unwrap();
+        let blockhash = BlockSigHash::from_hex(hex).unwrap();
         let vss_for_positive: VerifiableSS =
             serde_json::from_value(v["received"]["vss_for_positive"].clone()).unwrap();
         let secret_share_for_positive = to_fe(&v["received"]["secret_share_for_positive"]);
