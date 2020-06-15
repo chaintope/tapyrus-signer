@@ -32,6 +32,8 @@ parts:
     source: https://github.com/chaintope/tapyrus-signer.git
     plugin: rust
     build-packages:
+      - build-essential
+      - m4
       - libgmp3-dev
     stage-packages:
       - libgmp10
