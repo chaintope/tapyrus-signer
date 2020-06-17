@@ -43,7 +43,7 @@ mod tests {
     use super::process_completedblock;
     use crate::errors::Error;
     use crate::net::SignerID;
-    use crate::signer_node::node_state::builder::{Builder, Member};
+    use crate::signer_node::node_state::builder::{Builder, Master, Member};
     use crate::signer_node::{master_index, NodeState};
     use crate::tests::helper::blocks::get_block;
     use crate::tests::helper::keys::TEST_KEYS;
@@ -69,6 +69,20 @@ mod tests {
             NodeState::RoundComplete { master_index, .. } => assert_eq!(*master_index, 0),
             n => assert!(false, "Should be RoundComplete, but the state is {:?}", n),
         }
+    }
+
+    #[test]
+    fn test_process_master_received_completedblock() {
+        let block = get_block(0);
+        let params = NodeParametersBuilder::new().build();
+
+        let prev_state = Master::for_test().build();
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
+
+        let state = process_completedblock(&sender_id, &block, &prev_state, &params);
+
+        // if master receives completedblock message, it does not change state
+        assert_eq!(prev_state, state);
     }
 
     #[test]
