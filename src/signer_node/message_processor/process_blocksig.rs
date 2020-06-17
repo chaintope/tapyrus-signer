@@ -30,6 +30,11 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
+    // Ignore the message when the sender is myself.
+    if *sender_id == params.signer_id {
+        return prev_state.clone();
+    }
+
     let block_height = prev_state.block_height();
 
     #[cfg(feature = "dump")]

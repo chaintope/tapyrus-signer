@@ -22,7 +22,8 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
-    if params.signer_id == *sender_id {
+    // Ignore the message when the sender is myself.
+    if *sender_id == params.signer_id {
         return prev_state.clone();
     }
 
