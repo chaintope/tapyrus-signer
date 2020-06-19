@@ -148,11 +148,8 @@ impl<'a> SignerConfig<'a> {
         self.command_args
             .to_address
             .or(value_within_config)
-            .and_then(|s| match Address::from_str(s) {
-                Ok(p) => Some(p),
-                Err(e) => panic!(format!("'{}' is invalid address. error msg: {:?}", s, e)),
-            })
-            .expect("Must be specified to_address.")
+            .and_then(|s| Address::from_str(s).ok())
+            .expect("to-address isn't specified or is invalid.")
     }
 
     pub fn public_key(&self) -> PublicKey {
@@ -163,11 +160,8 @@ impl<'a> SignerConfig<'a> {
         self.command_args
             .public_key
             .or(value_within_config)
-            .and_then(|s| match PublicKey::from_str(s) {
-                Ok(p) => Some(p),
-                Err(e) => panic!(format!("'{}' is invalid public key. error msg: {:?}", s, e)),
-            })
-            .expect("Must be specified publickey.")
+            .and_then(|s| PublicKey::from_str(s).ok())
+            .expect("public-key isn't specified or is invalid.")
     }
 
     pub fn federations_file(&self) -> &Path {
@@ -644,7 +638,7 @@ fn test_priority_commandline() {
 }
 
 #[test]
-#[should_panic(expected = "'aabbccdd' is invalid public key. error msg:")]
+#[should_panic(expected = "public-key isn\'t specified or is invalid.")]
 fn test_invalid_public_key() {
     let matches = get_options().get_matches_from(vec!["node"]);
     let args = CommandArgs {
@@ -662,7 +656,7 @@ fn test_invalid_public_key() {
 }
 
 #[test]
-#[should_panic(expected = "Must be specified publickey.")]
+#[should_panic(expected = "public-key isn\'t specified or is invalid.")]
 fn test_no_public_key() {
     let matches = get_options().get_matches_from(vec!["node"]);
     let args = CommandArgs {
@@ -673,7 +667,7 @@ fn test_no_public_key() {
 }
 
 #[test]
-#[should_panic(expected = "'aabbccdd' is invalid address. error msg:")]
+#[should_panic(expected = "to-address isn\'t specified or is invalid.")]
 fn test_invalid_to_address() {
     let matches = get_options().get_matches_from(vec!["node"]);
     let args = CommandArgs {
