@@ -131,115 +131,118 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             log::info!("Skip waiting for ibd finish.")
         }
 
-        log::info!("Start thread for redis subscription");
-        let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
-        let closure = move |message: Message| match sender.send(message) {
-            Ok(_) => ControlFlow::Continue,
-            Err(error) => {
-                log::warn!("Happened error!: {:?}", error);
-                ControlFlow::Break(())
-            }
-        };
-        let id = self.params.signer_id;
-        let _handler = self.connection_manager.start(closure, id);
-
-        log::info!("Start Key generation Protocol");
-        // Idle 5s, before node starts Key Generation Protocol communication.
-        // To avoid that nodes which is late to startup can't receive messages.
-        log::info!("Idle 5 secs... ");
-        std::thread::sleep(Duration::from_secs(5));
-
-        // Start First Round
-        log::info!("Start block creation rounds.");
-        self.start_next_round();
-
-        // get error_handler that is for catch error within connection_manager.
-        let connection_manager_error_handler = self.connection_manager.error_handler();
         loop {
-            // After process when received message. Get message from receiver,
-            // then change that state in main thread side.
-            // messageを受け取った後の処理。receiverからmessageを受け取り、
-            // stateの変更はmain thread側で行う。
-            match &self.stop_signal {
-                Some(ref r) => match r.try_recv() {
-                    Ok(_) => {
-                        log::warn!("Stop by Terminate Signal.");
-                        self.round_timer.stop();
-                        break;
-                    }
-                    Err(std::sync::mpsc::TryRecvError::Empty) => {
-                        // Stop signal is empty. Continue to run. Do nothing.
-                    }
-                    Err(e) => {
-                        panic!("{:?}", e);
-                    }
-                },
-                None => {
-                    // Stop signal receiver is not set. Do nothing.
+            log::info!("Start thread for redis subscription");
+            let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
+            let closure = move |message: Message| match sender.send(message) {
+                Ok(_) => ControlFlow::Continue,
+                Err(error) => {
+                    log::warn!("Happened error!: {:?}", error);
+                    ControlFlow::Break(())
                 }
-            }
+            };
+            let id = self.params.signer_id;
+            let handler = self.connection_manager.start(closure, id);
 
-            // Receiving message.
-            match receiver.try_recv() {
-                Ok(Message {
-                    message_type,
-                    sender_id,
-                    ..
-                }) => {
-                    log::debug!(
-                        "Got {} message from {:?}. MessageType: {:?}",
+            log::info!("Start Key generation Protocol");
+            // Idle 5s, before node starts Key Generation Protocol communication.
+            // To avoid that nodes which is late to startup can't receive messages.
+            log::info!("Idle 5 secs... ");
+            std::thread::sleep(Duration::from_secs(5));
+
+            // Start First Round
+            log::info!("Start block creation rounds.");
+            self.start_next_round();
+
+            loop {
+                // After process when received message. Get message from receiver,
+                // then change that state in main thread side.
+                // messageを受け取った後の処理。receiverからmessageを受け取り、
+                // stateの変更はmain thread側で行う。
+                match &self.stop_signal {
+                    Some(ref r) => match r.try_recv() {
+                        Ok(_) => {
+                            log::warn!("Stop by Terminate Signal.");
+                            self.round_timer.stop();
+                            return;
+                        }
+                        Err(std::sync::mpsc::TryRecvError::Empty) => {
+                            // Stop signal is empty. Continue to run. Do nothing.
+                        }
+                        Err(e) => {
+                            panic!("{:?}", e);
+                        }
+                    },
+                    None => {
+                        // Stop signal receiver is not set. Do nothing.
+                    }
+                }
+
+                // Receiving message.
+                match receiver.try_recv() {
+                    Ok(Message {
                         message_type,
                         sender_id,
-                        message_type
-                    );
+                        ..
+                    }) => {
+                        log::debug!(
+                            "Got {} message from {:?}. MessageType: {:?}",
+                            message_type,
+                            sender_id,
+                            message_type
+                        );
 
-                    let next = self.process_round_message(&sender_id, message_type);
-                    self.current_state = next;
+                        let next = self.process_round_message(&sender_id, message_type);
+                        self.current_state = next;
 
-                    if let NodeState::RoundComplete { .. } = &self.current_state {
-                        self.start_next_round()
+                        if let NodeState::RoundComplete { .. } = &self.current_state {
+                            self.start_next_round()
+                        }
+
+                        log::debug!("Current state updated as {:?}", self.current_state);
                     }
+                    Err(TryRecvError::Empty) => {
+                        // No new messages. Do nothing.
+                    }
+                    Err(e) => { 
+                        log::warn!("Can't receive message: {:?}", e);
+                        // break;
+                    }
+                }
 
-                    log::debug!("Current state updated as {:?}", self.current_state);
+                // Checking whether the time limit of a round exceeds.
+                match self.round_timer.receiver.try_recv() {
+                    Ok(_) => {
+                        // Round duration is timeout. Starting next round.
+                        self.start_next_round();
+                        log::debug!("Current state updated as {:?}", self.current_state);
+                    }
+                    Err(TryRecvError::Empty) => {
+                        // Still waiting round duration interval. Do nothing.
+                    }
+                    Err(e) => log::warn!("Round timer generates an error: {:?}", e),
                 }
-                Err(TryRecvError::Empty) => {
-                    // No new messages. Do nothing.
-                }
-                Err(e) => log::warn!("Can't receive message: {:?}", e),
-            }
-
-            // Checking whether the time limit of a round exceeds.
-            match self.round_timer.receiver.try_recv() {
-                Ok(_) => {
-                    // Round duration is timeout. Starting next round.
-                    self.start_next_round();
-                    log::debug!("Current state updated as {:?}", self.current_state);
-                }
-                Err(TryRecvError::Empty) => {
-                    // Still waiting round duration interval. Do nothing.
-                }
-                Err(e) => log::warn!("Round timer generates an error: {:?}", e),
-            }
-            // Checking network connection error
-            match connection_manager_error_handler {
-                Some(ref receiver) => match receiver.try_recv() {
+                // Checking network connection error
+                match self.connection_manager.error_handler() {
                     Ok(e) => {
-                        self.round_timer.stop();
+                        // self.round_timer.stop();
                         log::error!("Connection Manager Error {:?}", e);
-                        panic!(e.to_string());
+                        // panic!(e.to_string());
+                        break;
                     }
                     Err(TryRecvError::Empty) => {
                         // No errors.
                     }
                     Err(e) => log::warn!("Connection manager can't send error: {:?}", e),
-                },
-                None => {
-                    log::warn!("Failed to get error_handler of connection_manager!");
-                }
+                };
+                // Wait for next loop 300 ms.
+                std::thread::sleep(Duration::from_millis(300));
             }
-
-            // Wait for next loop 300 ms.
-            std::thread::sleep(Duration::from_millis(300));
+            log::info!("Wait for join thread {:?}", handler.thread().id());
+            match handler.join() {
+                Ok(_) => {},
+                Err(e) => log::warn!("Failed to join thread {:?}", e),
+            }
         }
     }
 
@@ -615,8 +618,9 @@ mod tests {
 
         fn error_handler(
             &mut self,
-        ) -> Option<Receiver<ConnectionManagerError<crate::errors::Error>>> {
-            None::<Receiver<ConnectionManagerError<crate::errors::Error>>>
+        ) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError> {
+            let (_, r) = channel();
+            r.try_recv()
         }
     }
 

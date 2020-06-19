@@ -25,6 +25,7 @@ use serde::export::Formatter;
 use std::collections::HashSet;
 use tapyrus::blockdata::block::Block;
 use tapyrus::hash_types::BlockSigHash;
+use std::sync::mpsc::TryRecvError;
 
 /// Signer identifier is his public key.
 #[derive(Eq, Hash, Copy, Clone)]
@@ -160,7 +161,7 @@ pub trait ConnectionManager {
         message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
         id: SignerID,
     ) -> JoinHandle<()>;
-    fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<Self::ERROR>>>;
+    fn error_handler(&mut self) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError>;
 }
 
 #[derive(Debug)]
@@ -200,7 +201,7 @@ impl From<RedisError> for ConnectionManagerError<RedisError> {
 pub struct RedisManager {
     pub client: Arc<Client>,
     error_sender: Sender<ConnectionManagerError<RedisError>>,
-    pub error_receiver: Option<Receiver<ConnectionManagerError<RedisError>>>,
+    pub error_receiver: Receiver<ConnectionManagerError<RedisError>>,
 }
 
 impl RedisManager {
@@ -214,7 +215,7 @@ impl RedisManager {
         RedisManager {
             client,
             error_sender: s,
-            error_receiver: Some(r),
+            error_receiver: r,
         }
     }
 
@@ -260,11 +261,9 @@ impl RedisManager {
                     })?;
                     Ok(())
                 }
-                match inner_subscribe(id, client, message_processor, &channel_name) {
-                    Ok(()) => {}
-                    Err(e) => error_sender
-                        .send(e)
-                        .expect("Can't notify RedisManager connection error"),
+                let _ = match inner_subscribe(id, client, message_processor, &channel_name) {
+                    Ok(()) => Ok(()),
+                    Err(e) => error_sender.send(e),
                 };
             })
             .expect("Failed create RedisManagerThread.")
@@ -275,7 +274,7 @@ impl RedisManager {
         let error_sender = self.error_sender.clone();
         let message_in_thread = serde_json::to_string(&message).unwrap();
 
-        thread::Builder::new()
+        let thread = thread::Builder::new()
             .name("RedisBroadcastThread".to_string())
             .spawn(move || {
                 fn inner_process_message(
@@ -292,20 +291,33 @@ impl RedisManager {
                     let _: () = conn.publish(to, message)?;
                     Ok(())
                 }
-                match inner_process_message(client, &message_in_thread, &to) {
-                    Ok(()) => log::trace!(
-                        "Success to send message {} in channel {}",
-                        message_in_thread,
-                        to
-                    ),
-                    Err(e) => error_sender
-                        .send(e)
-                        .expect("Can't notify RedisManager connection error"),
+                let _result = match inner_process_message(client, &message_in_thread, &to) {
+                    Ok(()) => {
+                        log::trace!(
+                            "Success to send message {} in channel {}",
+                            message_in_thread,
+                            to
+                        );
+                        Ok(())
+                    },
+                    Err(e) => error_sender.send(e),
                 };
             })
-            .unwrap()
-            .join()
-            .expect("Can't connect to Redis Server.");
+            .unwrap();
+        match thread.join() {
+            Ok(_) => {},
+            Err(e) => log::error!("Can't connect to Redis Server: {:?}", e),
+        }
+    }
+
+    fn clear_error(&self) {
+        loop {
+            match self.error_receiver.try_recv() {
+                Ok(e) => log::warn!("Exhaust error {:?}", e),
+                Err(TryRecvError::Empty) => break,
+                Err(_) => break,
+            }
+        }
     }
 }
 
@@ -339,11 +351,12 @@ impl ConnectionManager for RedisManager {
         message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
         id: SignerID,
     ) -> JoinHandle<()> {
+        self.clear_error();
         self.subscribe(message_processor, id)
     }
 
-    fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<Self::ERROR>>> {
-        self.error_receiver.take()
+    fn error_handler(&mut self) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError> {
+        self.error_receiver.try_recv()
     }
 }
 
@@ -374,8 +387,7 @@ mod test {
 
         connection_manager.process_message(message, "channel".to_string());
 
-        let error_handler = connection_manager.error_handler().unwrap();
-        match error_handler.try_recv() {
+        match connection_manager.error_handler() {
             Ok(e) => {
                 panic!(e.to_string());
             }
