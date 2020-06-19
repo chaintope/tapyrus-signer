@@ -205,7 +205,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 Err(TryRecvError::Empty) => {
                     // No new messages. Do nothing.
                 }
-                Err(e) => log::debug!("{:?}", e),
+                Err(e) => log::warn!("Can't receive message: {:?}", e),
             }
 
             // Checking whether the time limit of a round exceeds.
@@ -218,9 +218,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 Err(TryRecvError::Empty) => {
                     // Still waiting round duration interval. Do nothing.
                 }
-                Err(e) => {
-                    log::debug!("{:?}", e);
-                }
+                Err(e) => log::warn!("Round timer generates an error: {:?}", e),
             }
             // Checking network connection error
             match connection_manager_error_handler {
@@ -233,7 +231,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     Err(TryRecvError::Empty) => {
                         // No errors.
                     }
-                    Err(e) => log::debug!("{:?}", e),
+                    Err(e) => log::warn!("Connection manager can't send error: {:?}", e),
                 },
                 None => {
                     log::warn!("Failed to get error_handler of connection_manager!");
