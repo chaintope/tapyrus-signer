@@ -11,7 +11,7 @@ pub use crate::signer_node::node_parameters::NodeParameters;
 pub use crate::signer_node::node_state::NodeState;
 
 use crate::errors::Error;
-use crate::net::{ConnectionManager, Message, MessageType, SignerID};
+use crate::net::{ConnectionManager, ConnectionManagerError, Message, MessageType, SignerID};
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use crate::signer_node::message_processor::create_block_vss;
 use crate::signer_node::message_processor::process_blockparticipants;
@@ -155,86 +155,20 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             self.start_next_round();
 
             loop {
-                // After process when received message. Get message from receiver,
-                // then change that state in main thread side.
-                // messageを受け取った後の処理。receiverからmessageを受け取り、
-                // stateの変更はmain thread側で行う。
-                match &self.stop_signal {
-                    Some(ref r) => match r.try_recv() {
-                        Ok(_) => {
-                            log::warn!("Stop by Terminate Signal.");
-                            self.round_timer.stop();
-                            return;
-                        }
-                        Err(std::sync::mpsc::TryRecvError::Empty) => {
-                            // Stop signal is empty. Continue to run. Do nothing.
-                        }
-                        Err(e) => {
-                            panic!("{:?}", e);
-                        }
-                    },
-                    None => {
-                        // Stop signal receiver is not set. Do nothing.
-                    }
+                match self.handle_signal() {
+                    Some(()) => return,
+                    None => {},
                 }
 
-                // Receiving message.
-                match receiver.try_recv() {
-                    Ok(Message {
-                        message_type,
-                        sender_id,
-                        ..
-                    }) => {
-                        log::debug!(
-                            "Got {} message from {:?}. MessageType: {:?}",
-                            message_type,
-                            sender_id,
-                            message_type
-                        );
+                self.handle_message(&receiver);
 
-                        let next = self.process_round_message(&sender_id, message_type);
-                        self.current_state = next;
+                self.handle_timer();
 
-                        if let NodeState::RoundComplete { .. } = &self.current_state {
-                            self.start_next_round()
-                        }
-
-                        log::debug!("Current state updated as {:?}", self.current_state);
-                    }
-                    Err(TryRecvError::Empty) => {
-                        // No new messages. Do nothing.
-                    }
-                    Err(e) => { 
-                        log::warn!("Can't receive message: {:?}", e);
-                        // break;
-                    }
+                match self.handle_connection() {
+                    Some(_) => break,
+                    None => {},
                 }
 
-                // Checking whether the time limit of a round exceeds.
-                match self.round_timer.receiver.try_recv() {
-                    Ok(_) => {
-                        // Round duration is timeout. Starting next round.
-                        self.start_next_round();
-                        log::debug!("Current state updated as {:?}", self.current_state);
-                    }
-                    Err(TryRecvError::Empty) => {
-                        // Still waiting round duration interval. Do nothing.
-                    }
-                    Err(e) => log::warn!("Round timer generates an error: {:?}", e),
-                }
-                // Checking network connection error
-                match self.connection_manager.error_handler() {
-                    Ok(e) => {
-                        // self.round_timer.stop();
-                        log::error!("Connection Manager Error {:?}", e);
-                        // panic!(e.to_string());
-                        break;
-                    }
-                    Err(TryRecvError::Empty) => {
-                        // No errors.
-                    }
-                    Err(e) => log::warn!("Connection manager can't send error: {:?}", e),
-                };
                 // Wait for next loop 300 ms.
                 std::thread::sleep(Duration::from_millis(300));
             }
@@ -246,6 +180,98 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
+    fn handle_signal(&mut self) -> Option<()> {
+        // After process when received message. Get message from receiver,
+        // then change that state in main thread side.
+        // messageを受け取った後の処理。receiverからmessageを受け取り、
+        // stateの変更はmain thread側で行う。
+        match &self.stop_signal {
+            Some(ref r) => match r.try_recv() {
+                Ok(_) => {
+                    log::warn!("Stop by Terminate Signal.");
+                    self.round_timer.stop();
+                    Some(())
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => {
+                    // Stop signal is empty. Continue to run. Do nothing.
+                    None
+                }
+                Err(_) => {
+                    Some(())
+                }
+            },
+            None => {
+                // Stop signal receiver is not set. Do nothing.
+                None
+            }
+        }
+    }
+
+    fn handle_message(&mut self, receiver: &Receiver<Message>) {
+        // Receiving message.
+        match receiver.try_recv() {
+            Ok(Message {
+                message_type,
+                sender_id,
+                ..
+            }) => {
+                log::debug!(
+                    "Got {} message from {:?}. MessageType: {:?}",
+                    message_type,
+                    sender_id,
+                    message_type
+                );
+
+                let next = self.process_round_message(&sender_id, message_type);
+                self.current_state = next;
+
+                if let NodeState::RoundComplete { .. } = &self.current_state {
+                    self.start_next_round()
+                }
+
+                log::debug!("Current state updated as {:?}", self.current_state);
+            }
+            Err(TryRecvError::Empty) => {
+                // No new messages. Do nothing.
+            }
+            Err(e) => { 
+                log::warn!("Can't receive message: {:?}", e);
+            }
+        }
+    }
+
+    fn handle_timer(&mut self) {
+        // Checking whether the time limit of a round exceeds.
+        match self.round_timer.receiver.try_recv() {
+            Ok(_) => {
+                // Round duration is timeout. Starting next round.
+                self.start_next_round();
+                log::debug!("Current state updated as {:?}", self.current_state);
+            }
+            Err(TryRecvError::Empty) => {
+                // Still waiting round duration interval. Do nothing.
+            }
+            Err(e) => log::warn!("Round timer generates an error: {:?}", e),
+        }
+    }
+
+    fn handle_connection(&mut self) -> Option<ConnectionManagerError<C::ERROR>> {
+        // Checking network connection error
+        match self.connection_manager.error_handler() {
+            Ok(e) => {
+                log::error!("Connection Manager Error {:?}", e);
+                Some(e)
+            }
+            Err(TryRecvError::Empty) => {
+                // No errors.
+                None
+            }
+            Err(e) => {
+                log::warn!("Connection manager can't send error: {:?}", e);
+                None
+            }
+        }
+    }
     /// Signer Node waits for connected Tapyrus Core Node complete IBD(Initial Block Download).
     fn wait_for_ibd_finish(&self, interval: Duration) {
         log::info!("Waiting finish Initial Block Download ...");
