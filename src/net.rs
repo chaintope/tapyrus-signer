@@ -161,7 +161,7 @@ pub trait ConnectionManager {
         message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
         id: SignerID,
     ) -> JoinHandle<()>;
-    fn error_handler(&mut self) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError>;
+    fn take_error(&mut self) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError>;
 }
 
 #[derive(Debug)]
@@ -355,7 +355,7 @@ impl ConnectionManager for RedisManager {
         self.subscribe(message_processor, id)
     }
 
-    fn error_handler(&mut self) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError> {
+    fn take_error(&mut self) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError> {
         self.error_receiver.try_recv()
     }
 }
@@ -387,7 +387,7 @@ mod test {
 
         connection_manager.process_message(message, "channel".to_string());
 
-        match connection_manager.error_handler() {
+        match connection_manager.take_error() {
             Ok(e) => {
                 panic!(e.to_string());
             }

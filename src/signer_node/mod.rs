@@ -257,7 +257,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     fn handle_connection(&mut self) -> Option<ConnectionManagerError<C::ERROR>> {
         // Checking network connection error
-        match self.connection_manager.error_handler() {
+        match self.connection_manager.take_error() {
             Ok(e) => {
                 log::error!("Connection Manager Error {:?}", e);
                 Some(e)
@@ -642,7 +642,7 @@ mod tests {
                 .unwrap()
         }
 
-        fn error_handler(
+        fn take_error(
             &mut self,
         ) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError> {
             let (_, r) = channel();
