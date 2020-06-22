@@ -157,7 +157,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             loop {
                 match self.handle_signal() {
                     Some(()) => return,
-                    None => {},
+                    None => {}
                 }
 
                 self.handle_message(&receiver);
@@ -166,7 +166,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
                 match self.handle_connection() {
                     Some(_) => break,
-                    None => {},
+                    None => {}
                 }
 
                 // Wait for next loop 300 ms.
@@ -174,7 +174,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             }
             log::info!("Wait for join thread {:?}", handler.thread().id());
             match handler.join() {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => log::warn!("Failed to join thread {:?}", e),
             }
         }
@@ -196,9 +196,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     // Stop signal is empty. Continue to run. Do nothing.
                     None
                 }
-                Err(_) => {
-                    Some(())
-                }
+                Err(_) => Some(()),
             },
             None => {
                 // Stop signal receiver is not set. Do nothing.
@@ -234,7 +232,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             Err(TryRecvError::Empty) => {
                 // No new messages. Do nothing.
             }
-            Err(e) => { 
+            Err(e) => {
                 log::warn!("Can't receive message: {:?}", e);
             }
         }

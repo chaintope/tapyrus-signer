@@ -23,9 +23,9 @@ use curv::FE;
 use serde::export::fmt::Error;
 use serde::export::Formatter;
 use std::collections::HashSet;
+use std::sync::mpsc::TryRecvError;
 use tapyrus::blockdata::block::Block;
 use tapyrus::hash_types::BlockSigHash;
-use std::sync::mpsc::TryRecvError;
 
 /// Signer identifier is his public key.
 #[derive(Eq, Hash, Copy, Clone)]
@@ -161,7 +161,9 @@ pub trait ConnectionManager {
         message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
         id: SignerID,
     ) -> JoinHandle<()>;
-    fn take_error(&mut self) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError>;
+    fn take_error(
+        &mut self,
+    ) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError>;
 }
 
 #[derive(Debug)]
@@ -299,13 +301,13 @@ impl RedisManager {
                             to
                         );
                         Ok(())
-                    },
+                    }
                     Err(e) => error_sender.send(e),
                 };
             })
             .unwrap();
         match thread.join() {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(e) => log::error!("Can't connect to Redis Server: {:?}", e),
         }
     }
@@ -355,7 +357,9 @@ impl ConnectionManager for RedisManager {
         self.subscribe(message_processor, id)
     }
 
-    fn take_error(&mut self) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError> {
+    fn take_error(
+        &mut self,
+    ) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError> {
         self.error_receiver.try_recv()
     }
 }

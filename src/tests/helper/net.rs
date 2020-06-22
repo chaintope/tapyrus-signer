@@ -68,7 +68,9 @@ impl ConnectionManager for TestConnectionManager {
         thread::Builder::new().spawn(|| {}).unwrap()
     }
 
-    fn take_error(&mut self) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError> {
+    fn take_error(
+        &mut self,
+    ) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError> {
         let (_s, r) = channel();
         r.try_recv()
     }
