@@ -236,6 +236,7 @@ impl RedisManager {
             .name("RedisManagerThread".to_string())
             .spawn(move || {
                 fn inner_subscribe<F2>(
+                    id: SignerID,
                     client: Arc<Client>,
                     mut message_processor: F2,
                     channel_name: &str,
@@ -250,11 +251,16 @@ impl RedisManager {
                         log::trace!("receive message. payload: {}", payload);
 
                         let message: Message = serde_json::from_str(&payload).unwrap();
-                        message_processor(message)
+                        if id == message.sender_id {
+                            // Ignore the message when the sender is myself.
+                            ControlFlow::Continue
+                        } else {
+                            message_processor(message)
+                        }
                     })?;
                     Ok(())
                 }
-                match inner_subscribe(client, message_processor, &channel_name) {
+                match inner_subscribe(id, client, message_processor, &channel_name) {
                     Ok(()) => {}
                     Err(e) => error_sender
                         .send(e)

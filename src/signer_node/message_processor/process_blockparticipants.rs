@@ -22,10 +22,6 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
-    if params.signer_id == *sender_id {
-        return prev_state.clone();
-    }
-
     // Get values from the node state.
     let (shared_block_secrets, master_id) = match &prev_state {
         NodeState::Master {

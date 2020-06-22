@@ -18,11 +18,6 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
-    // Ignore the message when the sender is myself.
-    if *sender_id == params.signer_id {
-        return prev_state.clone();
-    }
-
     match &prev_state {
         NodeState::Member { block_height, .. } => {
             if let Err(_) = verify_block(block, *block_height, params) {
