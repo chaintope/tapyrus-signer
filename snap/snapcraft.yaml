@@ -28,6 +28,7 @@ apps:
 parts:
   tapyrus-signer:
     source: https://github.com/chaintope/tapyrus-signer.git
+    source-branch: release/v0.4.0
     plugin: rust
     build-packages:
       - build-essential
