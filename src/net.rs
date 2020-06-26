@@ -263,10 +263,9 @@ impl RedisManager {
                     })?;
                     Ok(())
                 }
-                let _ = match inner_subscribe(id, client, message_processor, &channel_name) {
-                    Ok(()) => Ok(()),
-                    Err(e) => error_sender.send(e),
-                };
+                if let Err(e) = inner_subscribe(id, client, message_processor, &channel_name) {
+                    let _ = error_sender.send(e);
+                }
             })
             .expect("Failed create RedisManagerThread.")
     }
@@ -293,22 +292,20 @@ impl RedisManager {
                     let _: () = conn.publish(to, message)?;
                     Ok(())
                 }
-                let _result = match inner_process_message(client, &message_in_thread, &to) {
-                    Ok(()) => {
-                        log::trace!(
-                            "Success to send message {} in channel {}",
-                            message_in_thread,
-                            to
-                        );
-                        Ok(())
+                match inner_process_message(client, &message_in_thread, &to) {
+                    Ok(()) => log::trace!(
+                        "Success to send message {} in channel {}",
+                        message_in_thread,
+                        to
+                    ),
+                    Err(e) => {
+                        let _ = error_sender.send(e);
                     }
-                    Err(e) => error_sender.send(e),
                 };
             })
             .unwrap();
-        match thread.join() {
-            Ok(_) => {}
-            Err(e) => log::error!("Can't connect to Redis Server: {:?}", e),
+        if let Err(e) = thread.join() {
+            log::error!("Can't connect to Redis Server: {:?}", e);
         }
     }
 

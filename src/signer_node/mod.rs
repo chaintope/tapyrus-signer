@@ -167,9 +167,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 std::thread::sleep(Duration::from_millis(300));
             }
             log::info!("Wait for join thread {:?}", handler.thread().id());
-            match handler.join() {
-                Ok(_) => {}
-                Err(e) => log::warn!("Failed to join thread {:?}", e),
+            if let Err(e) = handler.join() {
+                log::warn!("Failed to join thread {:?}", e);
             }
         }
     }
