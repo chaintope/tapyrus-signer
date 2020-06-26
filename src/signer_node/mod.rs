@@ -144,12 +144,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             let id = self.params.signer_id;
             let handler = self.connection_manager.start(closure, id);
 
-            log::info!("Start Key generation Protocol");
-            // Idle 5s, before node starts Key Generation Protocol communication.
-            // To avoid that nodes which is late to startup can't receive messages.
-            log::info!("Idle 5 secs... ");
-            std::thread::sleep(Duration::from_secs(5));
-
             // Start First Round
             log::info!("Start block creation rounds.");
             self.start_next_round();
@@ -744,7 +738,7 @@ mod tests {
 
         let ss = stop_signal.clone();
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(21)); // 21s = 1 round (15s) + idle time(5s) + 1s
+            thread::sleep(Duration::from_secs(16)); // 16s = 1 round (15s) + 1s
             ss.send(1).unwrap();
         });
         node.start();
