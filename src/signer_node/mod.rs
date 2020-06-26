@@ -132,7 +132,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
 
         loop {
-            log::info!("Start thread for redis subscription");
             let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
             let closure = move |message: Message| match sender.send(message) {
                 Ok(_) => ControlFlow::Continue,
@@ -141,6 +140,18 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     ControlFlow::Break(())
                 }
             };
+
+            match self.connection_manager.test_connection() {
+                Ok(_) => {
+                    log::debug!("Connection is established.");
+                }
+                Err(e) => {
+                    log::debug!("Can't establish redis connection: {:?}", e);
+                    std::thread::sleep(Duration::from_millis(5000));
+                    continue;
+                }
+            }
+
             let id = self.params.signer_id;
             let handler = self.connection_manager.start(closure, id);
 
@@ -550,6 +561,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::errors;
     use crate::federation::{Federation, Federations};
     use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
     use crate::rpc::tests::{safety, MockRpc};
@@ -631,6 +643,10 @@ mod tests {
                     thread::sleep(Duration::from_millis(300));
                 })
                 .unwrap()
+        }
+
+        fn test_connection(&self) -> Result<(), errors::Error> {
+            Ok(())
         }
 
         fn take_error(

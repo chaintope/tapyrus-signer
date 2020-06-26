@@ -161,6 +161,7 @@ pub trait ConnectionManager {
         message_processor: impl FnMut(Message) -> ControlFlow<()> + Send + 'static,
         id: SignerID,
     ) -> JoinHandle<()>;
+    fn test_connection(&self) -> Result<(), errors::Error>;
     fn take_error(
         &mut self,
     ) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError>;
@@ -218,13 +219,6 @@ impl RedisManager {
             client,
             error_sender: s,
             error_receiver: r,
-        }
-    }
-
-    pub fn test_connection(&self) -> Result<(), errors::Error> {
-        match self.client.get_connection() {
-            Ok(_) => Ok(()),
-            Err(e) => Err(errors::Error::from(e)),
         }
     }
 
@@ -352,6 +346,13 @@ impl ConnectionManager for RedisManager {
     ) -> JoinHandle<()> {
         self.clear_error();
         self.subscribe(message_processor, id)
+    }
+
+    fn test_connection(&self) -> Result<(), errors::Error> {
+        match self.client.get_connection() {
+            Ok(_) => Ok(()),
+            Err(e) => Err(errors::Error::from(e)),
+        }
     }
 
     fn take_error(

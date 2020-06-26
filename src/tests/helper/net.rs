@@ -5,6 +5,8 @@ use std::sync::mpsc::channel;
 use std::thread;
 use std::thread::JoinHandle;
 
+use crate::errors;
+
 pub struct TestConnectionManager {
     should_broadcast: Vec<Message>,
     pub broadcasted: RefCell<Vec<Message>>,
@@ -66,6 +68,10 @@ impl ConnectionManager for TestConnectionManager {
 
         // This is for just returns JoinHandle instance.
         thread::Builder::new().spawn(|| {}).unwrap()
+    }
+
+    fn test_connection(&self) -> Result<(), errors::Error> {
+        Ok(())
     }
 
     fn take_error(
