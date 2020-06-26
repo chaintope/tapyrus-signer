@@ -158,7 +158,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
                 self.handle_timer();
 
-                match self.handle_connection() {
+                match self.handle_connection_error() {
                     Some(_) => break,
                     None => {}
                 }
@@ -246,7 +246,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
-    fn handle_connection(&mut self) -> Option<ConnectionManagerError<C::ERROR>> {
+    fn handle_connection_error(&mut self) -> Option<ConnectionManagerError<C::ERROR>> {
         // Checking network connection error
         match self.connection_manager.take_error() {
             Ok(e) => {
