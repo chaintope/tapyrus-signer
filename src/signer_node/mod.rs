@@ -165,6 +165,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     None => {}
                 }
 
+                // After process when received message. Get message from receiver,
+                // then change that state in main thread side.
                 self.handle_message(&receiver);
 
                 self.handle_timer();
@@ -184,11 +186,9 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
+    /// Check if the node receives signal.
+    /// if any signal, stop the round timer.
     fn handle_signal(&mut self) -> Option<()> {
-        // After process when received message. Get message from receiver,
-        // then change that state in main thread side.
-        // messageを受け取った後の処理。receiverからmessageを受け取り、
-        // stateの変更はmain thread側で行う。
         match &self.stop_signal {
             Some(ref r) => match r.try_recv() {
                 Ok(_) => {
@@ -209,6 +209,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
+    /// Check if the node recieves a new message from other nodes.
+    /// if received, process the received message.
     fn handle_message(&mut self, receiver: &Receiver<Message>) {
         // Receiving message.
         match receiver.try_recv() {
@@ -242,6 +244,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
+    /// Check if round timer elapsed
+    /// if elapsed, the node start new round.
     fn handle_timer(&mut self) {
         // Checking whether the time limit of a round exceeds.
         match self.round_timer.receiver.try_recv() {
@@ -257,6 +261,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
+    /// Check connection to redis server.
     fn handle_connection_error(&mut self) -> Option<ConnectionManagerError<C::ERROR>> {
         // Checking network connection error
         match self.connection_manager.take_error() {
