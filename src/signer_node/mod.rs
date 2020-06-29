@@ -132,15 +132,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
 
         loop {
-            let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
-            let closure = move |message: Message| match sender.send(message) {
-                Ok(_) => ControlFlow::Continue,
-                Err(error) => {
-                    log::warn!("Happened error!: {:?}", error);
-                    ControlFlow::Break(())
-                }
-            };
-
             match self.connection_manager.test_connection() {
                 Ok(_) => {
                     log::debug!("Connection is established.");
@@ -151,6 +142,15 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     continue;
                 }
             }
+
+            let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
+            let closure = move |message: Message| match sender.send(message) {
+                Ok(_) => ControlFlow::Continue,
+                Err(error) => {
+                    log::warn!("Happened error!: {:?}", error);
+                    ControlFlow::Break(())
+                }
+            };
 
             let id = self.params.signer_id;
             let handler = self.connection_manager.start(closure, id);
