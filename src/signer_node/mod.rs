@@ -11,7 +11,7 @@ pub use crate::signer_node::node_parameters::NodeParameters;
 pub use crate::signer_node::node_state::NodeState;
 
 use crate::errors::Error;
-use crate::net::{ConnectionManager, Message, MessageType, SignerID};
+use crate::net::{ConnectionManager, ConnectionManagerError, Message, MessageType, SignerID};
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use crate::signer_node::message_processor::create_block_vss;
 use crate::signer_node::message_processor::process_blockparticipants;
@@ -131,120 +131,154 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             log::info!("Skip waiting for ibd finish.")
         }
 
-        log::info!("Start thread for redis subscription");
-        let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
-        let closure = move |message: Message| match sender.send(message) {
-            Ok(_) => ControlFlow::Continue,
-            Err(error) => {
-                log::warn!("Happened error!: {:?}", error);
-                ControlFlow::Break(())
-            }
-        };
-        let id = self.params.signer_id;
-        let _handler = self.connection_manager.start(closure, id);
-
-        log::info!("Start Key generation Protocol");
-        // Idle 5s, before node starts Key Generation Protocol communication.
-        // To avoid that nodes which is late to startup can't receive messages.
-        log::info!("Idle 5 secs... ");
-        std::thread::sleep(Duration::from_secs(5));
-
-        // Start First Round
-        log::info!("Start block creation rounds.");
-        self.start_next_round();
-
-        // get error_handler that is for catch error within connection_manager.
-        let connection_manager_error_handler = self.connection_manager.error_handler();
         loop {
-            // After process when received message. Get message from receiver,
-            // then change that state in main thread side.
-            // messageを受け取った後の処理。receiverからmessageを受け取り、
-            // stateの変更はmain thread側で行う。
-            match &self.stop_signal {
-                Some(ref r) => match r.try_recv() {
-                    Ok(_) => {
-                        log::warn!("Stop by Terminate Signal.");
-                        self.round_timer.stop();
-                        break;
-                    }
-                    Err(std::sync::mpsc::TryRecvError::Empty) => {
-                        // Stop signal is empty. Continue to run. Do nothing.
-                    }
-                    Err(e) => {
-                        panic!("{:?}", e);
-                    }
-                },
-                None => {
-                    // Stop signal receiver is not set. Do nothing.
-                }
-            }
-
-            // Receiving message.
-            match receiver.try_recv() {
-                Ok(Message {
-                    message_type,
-                    sender_id,
-                    ..
-                }) => {
-                    log::debug!(
-                        "Got {} message from {:?}. MessageType: {:?}",
-                        message_type,
-                        sender_id,
-                        message_type
-                    );
-
-                    let next = self.process_round_message(&sender_id, message_type);
-                    self.current_state = next;
-
-                    if let NodeState::RoundComplete { .. } = &self.current_state {
-                        self.start_next_round()
-                    }
-
-                    log::debug!("Current state updated as {:?}", self.current_state);
-                }
-                Err(TryRecvError::Empty) => {
-                    // No new messages. Do nothing.
-                }
-                Err(e) => log::debug!("{:?}", e),
-            }
-
-            // Checking whether the time limit of a round exceeds.
-            match self.round_timer.receiver.try_recv() {
+            match self.connection_manager.test_connection() {
                 Ok(_) => {
-                    // Round duration is timeout. Starting next round.
-                    self.start_next_round();
-                    log::debug!("Current state updated as {:?}", self.current_state);
-                }
-                Err(TryRecvError::Empty) => {
-                    // Still waiting round duration interval. Do nothing.
+                    log::debug!("Connection is established.");
                 }
                 Err(e) => {
-                    log::debug!("{:?}", e);
-                }
-            }
-            // Checking network connection error
-            match connection_manager_error_handler {
-                Some(ref receiver) => match receiver.try_recv() {
-                    Ok(e) => {
-                        self.round_timer.stop();
-                        log::error!("Connection Manager Error {:?}", e);
-                        panic!(e.to_string());
-                    }
-                    Err(TryRecvError::Empty) => {
-                        // No errors.
-                    }
-                    Err(e) => log::debug!("{:?}", e),
-                },
-                None => {
-                    log::warn!("Failed to get error_handler of connection_manager!");
+                    log::debug!("Can't establish redis connection: {:?}", e);
+                    std::thread::sleep(Duration::from_millis(5000));
+                    continue;
                 }
             }
 
-            // Wait for next loop 300 ms.
-            std::thread::sleep(Duration::from_millis(300));
+            let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
+            let closure = move |message: Message| match sender.send(message) {
+                Ok(_) => ControlFlow::Continue,
+                Err(error) => {
+                    log::warn!("Happened error!: {:?}", error);
+                    ControlFlow::Break(())
+                }
+            };
+
+            let id = self.params.signer_id;
+            let handler = self.connection_manager.start(closure, id);
+
+            // Start First Round
+            log::info!("Start block creation rounds.");
+            self.start_next_round();
+
+            loop {
+                match self.handle_signal() {
+                    Some(()) => return,
+                    None => {}
+                }
+
+                // After process when received message. Get message from receiver,
+                // then change that state in main thread side.
+                self.handle_message(&receiver);
+
+                self.handle_timer();
+
+                match self.handle_connection_error() {
+                    Some(_) => break,
+                    None => {}
+                }
+
+                // Wait for next loop 300 ms.
+                std::thread::sleep(Duration::from_millis(300));
+            }
+            log::info!("Wait for join thread {:?}", handler.thread().id());
+            if let Err(e) = handler.join() {
+                log::warn!("Failed to join thread {:?}", e);
+            }
         }
     }
 
+    /// Check if the node receives signal.
+    /// if any signal, stop the round timer.
+    fn handle_signal(&mut self) -> Option<()> {
+        match &self.stop_signal {
+            Some(ref r) => match r.try_recv() {
+                Ok(_) => {
+                    log::warn!("Stop by Terminate Signal.");
+                    self.round_timer.stop();
+                    Some(())
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => {
+                    // Stop signal is empty. Continue to run. Do nothing.
+                    None
+                }
+                Err(_) => Some(()),
+            },
+            None => {
+                // Stop signal receiver is not set. Do nothing.
+                None
+            }
+        }
+    }
+
+    /// Check if the node recieves a new message from other nodes.
+    /// if received, process the received message.
+    fn handle_message(&mut self, receiver: &Receiver<Message>) {
+        // Receiving message.
+        match receiver.try_recv() {
+            Ok(Message {
+                message_type,
+                sender_id,
+                ..
+            }) => {
+                log::debug!(
+                    "Got {} message from {:?}. MessageType: {:?}",
+                    message_type,
+                    sender_id,
+                    message_type
+                );
+
+                let next = self.process_round_message(&sender_id, message_type);
+                self.current_state = next;
+
+                if let NodeState::RoundComplete { .. } = &self.current_state {
+                    self.start_next_round()
+                }
+
+                log::debug!("Current state updated as {:?}", self.current_state);
+            }
+            Err(TryRecvError::Empty) => {
+                // No new messages. Do nothing.
+            }
+            Err(e) => {
+                log::warn!("Can't receive message: {:?}", e);
+            }
+        }
+    }
+
+    /// Check if round timer elapsed
+    /// if elapsed, the node start new round.
+    fn handle_timer(&mut self) {
+        // Checking whether the time limit of a round exceeds.
+        match self.round_timer.receiver.try_recv() {
+            Ok(_) => {
+                // Round duration is timeout. Starting next round.
+                self.start_next_round();
+                log::debug!("Current state updated as {:?}", self.current_state);
+            }
+            Err(TryRecvError::Empty) => {
+                // Still waiting round duration interval. Do nothing.
+            }
+            Err(e) => log::warn!("Round timer generates an error: {:?}", e),
+        }
+    }
+
+    /// Check connection to redis server.
+    fn handle_connection_error(&mut self) -> Option<ConnectionManagerError<C::ERROR>> {
+        // Checking network connection error
+        match self.connection_manager.take_error() {
+            Ok(e) => {
+                log::error!("Connection Manager Error {:?}", e);
+                Some(e)
+            }
+            Err(TryRecvError::Empty) => {
+                // No errors.
+                None
+            }
+            Err(e) => {
+                log::warn!("Connection manager can't send error: {:?}", e);
+                None
+            }
+        }
+    }
     /// Signer Node waits for connected Tapyrus Core Node complete IBD(Initial Block Download).
     fn wait_for_ibd_finish(&self, interval: Duration) {
         log::info!("Waiting finish Initial Block Download ...");
@@ -532,6 +566,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::errors;
     use crate::federation::{Federation, Federations};
     use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
     use crate::rpc::tests::{safety, MockRpc};
@@ -615,10 +650,15 @@ mod tests {
                 .unwrap()
         }
 
-        fn error_handler(
+        fn test_connection(&self) -> Result<(), errors::Error> {
+            Ok(())
+        }
+
+        fn take_error(
             &mut self,
-        ) -> Option<Receiver<ConnectionManagerError<crate::errors::Error>>> {
-            None::<Receiver<ConnectionManagerError<crate::errors::Error>>>
+        ) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError> {
+            let (_, r) = channel();
+            r.try_recv()
         }
     }
 
@@ -718,7 +758,7 @@ mod tests {
 
         let ss = stop_signal.clone();
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(21)); // 21s = 1 round (15s) + idle time(5s) + 1s
+            thread::sleep(Duration::from_secs(16)); // 16s = 1 round (15s) + 1s
             ss.send(1).unwrap();
         });
         node.start();

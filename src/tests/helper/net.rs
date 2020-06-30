@@ -1,9 +1,11 @@
 use crate::net::{ConnectionManager, ConnectionManagerError, Message, SignerID};
 use redis::ControlFlow;
 use std::cell::RefCell;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::channel;
 use std::thread;
 use std::thread::JoinHandle;
+
+use crate::errors;
 
 pub struct TestConnectionManager {
     should_broadcast: Vec<Message>,
@@ -68,7 +70,14 @@ impl ConnectionManager for TestConnectionManager {
         thread::Builder::new().spawn(|| {}).unwrap()
     }
 
-    fn error_handler(&mut self) -> Option<Receiver<ConnectionManagerError<Self::ERROR>>> {
-        None::<Receiver<ConnectionManagerError<crate::errors::Error>>>
+    fn test_connection(&self) -> Result<(), errors::Error> {
+        Ok(())
+    }
+
+    fn take_error(
+        &mut self,
+    ) -> Result<ConnectionManagerError<Self::ERROR>, std::sync::mpsc::TryRecvError> {
+        let (_s, r) = channel();
+        r.try_recv()
     }
 }
