@@ -18,47 +18,52 @@ where
     T: TapyrusApi,
     C: ConnectionManager,
 {
+    // Guard the prev_states is not Master and Member.
     match &prev_state {
-        NodeState::Member { block_height, .. } => {
-            if let Err(_) = verify_block(block, *block_height, params) {
-                log::error!(
-                    "Block is invalid. sender: {}, block: {:?}",
-                    sender_id,
-                    block,
-                );
-                return prev_state.clone();
-            }
-
-            log::info!(
-                "candidateblock received. block hash for signing: {:?}",
-                block.header.signature_hash()
-            );
-
-            if let Err(e) = params.rpc.testproposedblock(&block) {
-                log::warn!(
-                    "Received Invalid candidate block sender: {}, {:?}",
-                    sender_id,
-                    e
-                );
-                return prev_state.clone();
-            }
-
-            let (key, shared_secret_for_positive, shared_secret_for_negative) =
-                create_block_vss(block.clone(), params, conman, *block_height);
-
-            Member::from_node_state(prev_state.clone())
-                .block_key(Some(key.u_i))
-                .candidate_block(Some(block.clone()))
-                .master_index(sender_index(sender_id, &params.pubkey_list(*block_height)))
-                .insert_shared_block_secrets(
-                    params.signer_id.clone(),
-                    shared_secret_for_positive,
-                    shared_secret_for_negative,
-                )
-                .build()
-        }
-        _ => prev_state.clone(),
+        NodeState::Idling { .. } => return prev_state.clone(),
+        NodeState::RoundComplete { .. } => return prev_state.clone(),
+        NodeState::Joining => return prev_state.clone(),
+        _ => {}
     }
+
+    let block_height = prev_state.block_height();
+    if let Err(_) = verify_block(block, block_height, params) {
+        log::error!(
+            "Block is invalid. sender: {}, block: {:?}",
+            sender_id,
+            block,
+        );
+        return prev_state.clone();
+    }
+
+    log::info!(
+        "candidateblock received. block hash for signing: {:?}",
+        block.header.signature_hash()
+    );
+
+    if let Err(e) = params.rpc.testproposedblock(&block) {
+        log::warn!(
+            "Received Invalid candidate block sender: {}, {:?}",
+            sender_id,
+            e
+        );
+        return prev_state.clone();
+    }
+
+    let (key, shared_secret_for_positive, shared_secret_for_negative) =
+        create_block_vss(block.clone(), params, conman, block_height);
+
+    Member::default()
+        .block_height(block_height)
+        .block_key(Some(key.u_i))
+        .candidate_block(Some(block.clone()))
+        .master_index(sender_index(sender_id, &params.pubkey_list(block_height)))
+        .insert_shared_block_secrets(
+            params.signer_id.clone(),
+            shared_secret_for_positive,
+            shared_secret_for_negative,
+        )
+        .build()
 }
 
 fn verify_block<T>(
@@ -192,7 +197,8 @@ mod tests {
         let candidate_block: Block = deserialize(&hex::decode("00000020ed658cc40670cceda23bb0b614821fe6d48a41d107d19f3f3a5608ad3d483092b151160ab71133b428e1f62eaeb598ae858ff66017c99601f29088b7c64a481d6284e145d29b70bf54392d29701031d2af9fed5f9bb21fbb284fa71ceb238f69a6d4095d0000010200000000010100000000000000000000000000000000000000000000000000000000000000000c000000035c0101ffffffff0200f2052a010000001976a914cf12dbc04bb0de6fb6a87a5aeb4b2e74c97006b288ac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf90120000000000000000000000000000000000000000000000000000000000000000000000000").unwrap()).unwrap();
         let prev_state = Master::for_test().build();
         let conman = TestConnectionManager::new();
-        let rpc = MockRpc::new();
+        let mut rpc = MockRpc::new();
+        rpc.should_call_testproposedblock_and_returns_invalid_block_error();
         let params = NodeParametersBuilder::new().rpc(rpc).build();
 
         let next_state =
@@ -233,9 +239,8 @@ mod tests {
         params.rpc.assert();
     }
 
-    /// When a node's state is Member, the node receives candidateblock message from the other
-    /// node who are not assumed as a master of the round, the node change the assumption to
-    /// that the other node is master.
+    /// The node receives candidateblock message from the other node who are not assumed as a Master
+    /// node of the round, then the node change the assumption to that the other node is Master.
     ///
     /// The test scenario is below.
     ///
@@ -248,7 +253,7 @@ mod tests {
     /// 2. Send candidateblock message from index 4 node(array index is 4).
     ///    It must change master_index assumption to 4.
     #[test]
-    fn test_modify_master_index() {
+    fn test_as_member_for_updateing_master_index() {
         let candidate_block = get_block(0);
         let conman = TestConnectionManager::new();
         let mut rpc = MockRpc::new();
@@ -273,6 +278,30 @@ mod tests {
         let state =
             process_candidateblock(&sender_id, &candidate_block, &prev_state, &conman, &params);
         assert_eq!(master_index(&state, &params).unwrap(), 4);
+
+        params.rpc.assert();
+    }
+
+    /// This is a case for the node is Master. In this case, the node also update own status to
+    /// Member whose round's Master node is sender node of the candidateblock message.
+    #[test]
+    fn test_as_master_for_updateing_master_index() {
+        let candidate_block = get_block(0);
+        let conman = TestConnectionManager::new();
+        let mut rpc = MockRpc::new();
+        // It should call testproposedblock RPC once for each execution of process_candidateblock().
+        rpc.should_call_testproposedblock(Ok(true));
+
+        let prev_state = Master::for_test().build();
+        let params = NodeParametersBuilder::new()
+            .public_key(TEST_KEYS.pubkeys()[1])
+            .rpc(rpc)
+            .build();
+
+        let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
+        let state =
+            process_candidateblock(&sender_id, &candidate_block, &prev_state, &conman, &params);
+        assert_eq!(master_index(&state, &params).unwrap(), 0);
 
         params.rpc.assert();
     }
