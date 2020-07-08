@@ -181,7 +181,14 @@ This is sequence diagram for communication among tapyrus-signer nodes.
 ### Round Master Flow
 
 1. Start Next Round
-     * Sleep 60 secs. (This is default value. It can be changed by --duration option.)
+     * If the round-duration timer is not started
+           *  The node starts the timer for counting the round-duration
+     * If the round-duration timer is started
+           * If the timer is not up
+                * If the node receives candidateblock message
+                     * The node works as a Member node and leaves this flow.
+           * If the timer is up
+                * The node goes 2nd step.
 2. Produce a candidate block
      * Call getnewblock
           * In getnewblock RPC, it test block validity, so we no longer call testproposedblock RPC.
