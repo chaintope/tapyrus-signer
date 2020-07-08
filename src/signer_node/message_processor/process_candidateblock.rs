@@ -170,26 +170,6 @@ mod tests {
         params.rpc.assert();
     }
 
-    /// This is a case of receiving own candidateblock message.
-    /// It should ignore the message because it is from myself and already have.
-    #[test]
-    fn test_as_master_with_valid_args() {
-        let sender_id = sender_id();
-        let candidate_block = get_block(0);
-        let prev_state = Master::for_test()
-            .candidate_block(Some(candidate_block.clone()))
-            .build();
-        let conman = TestConnectionManager::new();
-        let rpc = MockRpc::new();
-        let params = NodeParametersBuilder::new().rpc(rpc).build();
-
-        let next_state =
-            process_candidateblock(&sender_id, &candidate_block, &prev_state, &conman, &params);
-
-        assert_eq!(prev_state, next_state);
-        params.rpc.assert();
-    }
-
     #[test]
     fn test_as_master_with_invalid_block() {
         let sender_id = sender_id();
