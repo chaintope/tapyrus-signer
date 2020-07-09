@@ -281,7 +281,12 @@ mod tests {
         let sender_id = SignerID::new(TEST_KEYS.pubkeys()[0]);
         let state =
             process_candidateblock(&sender_id, &candidate_block, &prev_state, &conman, &params);
-        assert_eq!(master_index(&state, &params).unwrap(), 0);
+
+        // The state should be Member and master_index should be 0.
+        match state {
+            NodeState::Member { master_index, .. } => assert_eq!(master_index, 0),
+            _ => assert!(false),
+        }
 
         params.rpc.assert();
     }
