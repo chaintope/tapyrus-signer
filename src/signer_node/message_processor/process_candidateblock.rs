@@ -262,7 +262,7 @@ mod tests {
         params.rpc.assert();
     }
 
-    /// This is a case for the node is Master. In this case, the node also update own status to
+    /// This is a case that the node is Master. In this case, the node also update own status to
     /// Member whose round's Master node is sender node of the candidateblock message.
     #[test]
     fn test_as_master_for_updating_master_index() {
