@@ -233,7 +233,7 @@ mod tests {
     /// 2. Send candidateblock message from index 4 node(array index is 4).
     ///    It must change master_index assumption to 4.
     #[test]
-    fn test_as_member_for_updateing_master_index() {
+    fn test_as_member_for_updating_master_index() {
         let candidate_block = get_block(0);
         let conman = TestConnectionManager::new();
         let mut rpc = MockRpc::new();
@@ -265,7 +265,7 @@ mod tests {
     /// This is a case for the node is Master. In this case, the node also update own status to
     /// Member whose round's Master node is sender node of the candidateblock message.
     #[test]
-    fn test_as_master_for_updateing_master_index() {
+    fn test_as_master_for_updating_master_index() {
         let candidate_block = get_block(0);
         let conman = TestConnectionManager::new();
         let mut rpc = MockRpc::new();
