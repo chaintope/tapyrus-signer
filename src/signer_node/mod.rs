@@ -42,14 +42,21 @@ pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     params: NodeParameters<T>,
     current_state: NodeState,
     stop_signal: Option<Receiver<u32>>,
-    /// ## Round Timer
+    /// ## Round Limit Timer
     /// If the round duration is over, notify it and go through next round.
+    /// The round limit consists from round_interval and round_limit.
     ///
     /// Round timer must follow below rules.
     /// * The timer is started on rounds start only.
     /// * New round is started on only receiving completedblock message
     ///   or previous round is timeout.
-    round_timer: RoundTimeOutObserver,
+    round_limit_timer: RoundTimeOutObserver,
+
+    /// ## Round Interval Timer
+    /// The timer will be started when the node starts a round as a Master.
+    /// If the timer was up, the node starts round communication with getting a block and sending
+    /// candidateblock message.
+    round_interval_timer: RoundTimeOutObserver,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -111,12 +118,14 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         Self: Sized,
     {
         let timer_limit = params.round_duration + params.round_limit;
+        let round_interval = params.round_duration;
         SignerNode {
             connection_manager,
             params,
             current_state: NodeState::Joining,
             stop_signal: None,
-            round_timer: RoundTimeOutObserver::new("round_timer", timer_limit),
+            round_limit_timer: RoundTimeOutObserver::new("round_limit_timer", timer_limit),
+            round_interval_timer: RoundTimeOutObserver::new("round_interval_timer", round_interval),
         }
     }
 
@@ -165,6 +174,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     None => {}
                 }
 
+                self.handle_round_interval_timer();
+
                 // After process when received message. Get message from receiver,
                 // then change that state in main thread side.
                 self.handle_message(&receiver);
@@ -193,7 +204,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             Some(ref r) => match r.try_recv() {
                 Ok(_) => {
                     log::warn!("Stop by Terminate Signal.");
-                    self.round_timer.stop();
+                    self.round_limit_timer.stop();
                     Some(())
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => {
@@ -248,7 +259,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     /// if elapsed, the node start new round.
     fn handle_timer(&mut self) {
         // Checking whether the time limit of a round exceeds.
-        match self.round_timer.receiver.try_recv() {
+        match self.round_limit_timer.receiver.try_recv() {
             Ok(_) => {
                 // Round duration is timeout. Starting next round.
                 self.start_next_round();
@@ -258,6 +269,25 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 // Still waiting round duration interval. Do nothing.
             }
             Err(e) => log::warn!("Round timer generates an error: {:?}", e),
+        }
+    }
+
+    /// Check if round interval timer elapsed
+    /// If elapsed, the node start round communication.
+    fn handle_round_interval_timer(&mut self) {
+        // Checking whether the time limit of a round exceeds.
+        match self.round_interval_timer.receiver.try_recv() {
+            Ok(_) => {
+                // Round interval is timeout.
+                if let NodeState::Master { block_height, .. } = self.current_state {
+                    self.current_state = self.start_round_communication(block_height);
+                    log::debug!("Current state updated as {:?}", self.current_state);
+                }
+            }
+            Err(TryRecvError::Empty) => {
+                // Still waiting round interval. Do nothing.
+            }
+            Err(e) => log::warn!("Round interval timer generates an error: {:?}", e),
         }
     }
 
@@ -310,10 +340,13 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
-    /// A master node of the round starts new round with sending candidateblock message.
-    pub fn start_new_round(&mut self, block_height: u64) -> NodeState {
-        std::thread::sleep(Duration::from_secs(self.params.round_duration));
+    fn start_new_round(&mut self, block_height: u64) -> NodeState {
+        self.round_interval_timer.restart().unwrap();
+        Master::default().block_height(block_height).build()
+    }
 
+    /// A master node of the round starts a round communication with sending candidateblock message.
+    pub fn start_round_communication(&mut self, block_height: u64) -> NodeState {
         let block = match self.params.rpc.getnewblock(&self.params.address) {
             Ok(block) => block,
             Err(e) => {
@@ -446,7 +479,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     /// Start next round.
     /// decide master of next round according to Round-robin.
     fn start_next_round(&mut self) {
-        self.round_timer.restart().unwrap();
+        self.round_limit_timer.restart().unwrap();
 
         // Get a block height at next of the tip block.
         let block_height = match self.params.rpc.getblockchaininfo() {
