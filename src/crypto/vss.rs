@@ -11,7 +11,7 @@ use crate::signer_node::BidirectionalSharedSecretMap;
 use crate::signer_node::SharedSecretMap;
 use crate::signer_node::ToSharedSecretMap;
 use crate::signer_node::ToVerifiableSS;
-use crate::util::jacobi;
+
 use curv::arithmetic::traits::Converter;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::ECScalar;
@@ -24,6 +24,7 @@ use std::io;
 use std::str::FromStr;
 use tapyrus::blockdata::block::Block;
 use tapyrus::consensus::encode::{self, *};
+use tapyrus::util::prime::jacobi;
 use tapyrus::{PrivateKey, PublicKey};
 
 // | name                 | size      | explaination                                                                                      |
@@ -139,12 +140,11 @@ impl Vss {
             block.header.signature_hash(),
         );
 
-        let p = BigInt::from_str_radix(
-            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
-            16,
-        )
-        .unwrap();
-        let is_positive = jacobi(&shared_keys_for_positive.y.y_coor().unwrap(), &p) == 1;
+        let y = shared_keys_for_positive
+            .y
+            .y_coor()
+            .expect("can not get y_coor");
+        let is_positive = jacobi(&Converter::to_vec(&y)) == 1;
         let (shared_keys, local_sig) = if is_positive {
             (shared_keys_for_positive, local_sig_for_positive)
         } else {
