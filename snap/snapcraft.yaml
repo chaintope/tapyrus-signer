@@ -9,7 +9,20 @@ grade: stable
 confinement: strict
 
 architectures:
-  - build-on: [s390x, ppc64el, arm64, amd64, i386]
+  - build-on: s390x
+    run-on: s390x
+
+  - build-on: ppc64el
+    run-on: ppc64el
+
+  - build-on: arm64
+    run-on: arm64
+
+  - build-on: amd64
+    run-on: amd64
+
+  - build-on: i386
+    run-on: i386
 
 apps:
   service:
