@@ -3,7 +3,7 @@ Tapyrus Signer Node is provide and deploy federation signer network.
 
 ## Overview
 - Communicate each signer node, using redis Pub/Sub.
-- Using Tapyrus core for candidate block generationg, broadcasting and so on.
+- Using Tapyrus core for candidate block generation, broadcasting and so on.
 
 
 ## Requirement
@@ -59,7 +59,7 @@ The following describes in detail the messages used to exchange between the sign
 ## Message Types
 
 The communication among each node is perform on passing Message which is
-boradcasted on Redis pub/sub.
+broadcasted on Redis pub/sub.
 
 All messages has signer id field which is specify by signer public key.
 
@@ -88,7 +88,7 @@ BlockVSS has two VSS secrets. The first one is for positive and the other one is
 The word `positive` means that the secret share is generated based on not negated ephemeral key and other one is based 
 on negated. 
 Why the BlockVSS need to have these two VSS is that k value (which is described in 
-[Tapyrus schnorr singature specification](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/schnorr_signature.md#signing-algorithm)) 
+[Tapyrus schnorr signature specification](https://github.com/chaintope/tapyrus-core/blob/master/doc/tapyrus/schnorr_signature.md#signing-algorithm)) 
 must be chosen as y coordinate of R becomes quadratic residue. 
 
 * `Blockvss[0]` Sighash from the candidate block.
@@ -96,7 +96,7 @@ must be chosen as y coordinate of R becomes quadratic residue.
      * `parameter` Object of secret sharing parameters
           * `threshold` Integer value of threshold - 1.
           * `share_count` Integer value of signer count. (And also it is the number which shares should be created.)
-     * `commitments` Array of commitment. A commitment is a point of secp256k1 curve. Which has x and y cordinates.
+     * `commitments` Array of commitment. A commitment is a point of secp256k1 curve. Which has x and y coordinates.
 * `Blockvss[2]` Secret share for *positive*. Hex formatted scalar value of secp256k1 curve.
 * `Blockvss[3]` Object of additional data for the negative VSS. The fields are same with positive VSS's one.
 * `Blockvss[4]` Secret share for *negative*. Hex formatted scalar value of secp256k1 curve..
@@ -200,7 +200,7 @@ This is sequence diagram for communication among tapyrus-signer nodes.
      * Call submitblock RPC
      * Publish completed block with completedblock message.
 5. Decide Next Master
-     * Decide next master node accoding to signer's public keys dictionary order.
+     * Decide next master node according to signer's public keys dictionary order.
      * Start next round as member.
 
 ### Round Member Flow
@@ -237,7 +237,7 @@ This is sequence diagram for communication among tapyrus-signer nodes.
      * This step must be done by only signers who was designated in `blockparticipants` message. And all participants must have all VSSs from all other participants.
      * Calculate own share from VSSs got in "Sharing VSSs".
      * Calculate temporary aggregated public key from commitments which correspond constant term's coefficients
-     * Generate local signature from below informations.
+     * Generate local signature from below information.
           * Two shares which are generated in Key Generation Protocol and previous step.
           * Aggregated public key which is generated in Key Generation Protocol.
           * Temporary aggregated public key which is created in previous step.
@@ -250,7 +250,7 @@ This is sequence diagram for communication among tapyrus-signer nodes.
 
 Each round need to finish in 65 secs, otherwise the round was fail and start
 next round. This mechanism is for availability. Because of timeout, Signer
-Network can continue if some signer node stoped.
+Network can continue if some signer node stopped.
 
 65 secs is consisted of round duration and actually time limit for round process.
 Round duration can be set by `--duration` option. Default is 60 secs.
