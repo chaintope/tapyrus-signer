@@ -101,9 +101,9 @@ dependencies = [
 
 [[package]]
 name = "bitcoin_hashes"
-version = "0.7.6"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b375d62f341cef9cd9e77793ec8f1db3fc9ce2e4d57e982c8fe697a2c16af3b6"
+checksum = "3b0ab784be052cc1e915a78b8aaf5101eebbc2d0ab2b6f5124985f3677ae2bea"
 dependencies = [
  "serde",
 ]
@@ -1006,8 +1006,9 @@ dependencies = [
 
 [[package]]
 name = "secp256k1"
-version = "0.17.2"
-source = "git+https://github.com/rantan/rust-secp256k1?branch=add_negate_support#1742973a1fb0d4e3e65220d972cfacb7ce59f821"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee5070fdc6f26ca5be6dcfc3d07c76fdb974a63a8b246b459854274145f5a258"
 dependencies = [
  "rand 0.6.5",
  "secp256k1-sys",
@@ -1016,8 +1017,9 @@ dependencies = [
 
 [[package]]
 name = "secp256k1-sys"
-version = "0.1.2"
-source = "git+https://github.com/rantan/rust-secp256k1?branch=add_negate_support#1742973a1fb0d4e3e65220d972cfacb7ce59f821"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67e4b6455ee49f5901c8985b88f98fb0a0e1d90a6661f5a03f4888bd987dad29"
 dependencies = [
  "cc",
 ]
@@ -1165,13 +1167,12 @@ dependencies = [
 
 [[package]]
 name = "tapyrus"
-version = "0.2.0"
-source = "git+https://github.com/chaintope/rust-tapyrus?tag=v0.2.0#14bc8bbcccd68e99855f063c039aa70ca075e6f3"
+version = "0.4.5"
+source = "git+https://github.com/chaintope/rust-tapyrus?tag=v0.4.5#02cda49e6e887425991cfd1d5acf214b0506bbd9"
 dependencies = [
- "bitcoin_hashes 0.7.6",
- "hex",
+ "bitcoin_hashes 0.8.0",
  "rug",
- "secp256k1 0.17.2",
+ "secp256k1 0.20.2",
  "serde",
 ]
 
