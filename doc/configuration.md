@@ -222,7 +222,7 @@ This is optional.
 Verifiable Secret Share and commitments from all signers in the federation.
 This field may be empty when the signer is not a member of the federation.
 This item should not specify if the signer is not a member of the federation.
-See also [Tapyrus signer network paramters](doc/setup.md#tapyrus-signer-network-parameters).
+See also [Tapyrus signer network parameters](./setup.md#tapyrus-signer-network-parameters).
 
 Here describe some `federations.toml` examples for particular scenarios.
 
@@ -245,7 +245,7 @@ node-vss = [
 ]
 ```
 
-If you don't have Node VSSs and Aggregate public key, you should follow steps in [Generate Aggregate public key and Node secret share for Tapyrus-signer network](doc/setup.md#generate-aggregate-public-key-and-node-secret-share-for-tapyrus-signer-network)
+If you don't have Node VSSs and Aggregate public key, you should follow steps in [Generate Aggregate public key and Node secret share for Tapyrus-signer network](./setup.md#generate-aggregate-public-key-and-node-secret-share-for-tapyrus-signer-network)
 
 ## Scenario 2: The signer is out of the federation member from future block height.
 
@@ -297,7 +297,7 @@ node-vss = [
 
 Before generating 100 height block proof, you should startup your tapyrus-signerd daemon. 
 
-If you don't have Node VSSs and Aggregate public key for the federation you would join, you should follow steps in [Generate Aggregate public key and Node secret share for Tapyrus-signer network](doc/setup.md#generate-aggregate-public-key-and-node-secret-share-for-tapyrus-signer-network)
+If you don't have Node VSSs and Aggregate public key for the federation you would join, you should follow steps in [Generate Aggregate public key and Node secret share for Tapyrus-signer network](./setup.md#generate-aggregate-public-key-and-node-secret-share-for-tapyrus-signer-network)
 
 ## Scenario 4: The signer is a member of the current federation and would be a member of the changed federation in future height.
 
@@ -330,7 +330,7 @@ node-vss = [
 ]
 ``` 
 
-If you don't have Node VSSs and Aggregate public key for the new federation, you should follow steps in [Generate Aggregate public key and Node secret share for Tapyrus-signer network](doc/setup.md#generate-aggregate-public-key-and-node-secret-share-for-tapyrus-signer-network)
+If you don't have Node VSSs and Aggregate public key for the new federation, you should follow steps in [Generate Aggregate public key and Node secret share for Tapyrus-signer network](./setup.md#generate-aggregate-public-key-and-node-secret-share-for-tapyrus-signer-network)
 
 ## Start Signer Node
 
