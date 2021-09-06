@@ -71,7 +71,11 @@ impl<'a> AggregateCommand {
         let shared_keys = Sign::verify_vss_and_construct_key(&vss_map, &index)?;
 
         let slice = shared_keys.y.pk_to_key_slice();
-        let public_key = PublicKey::from_slice(&slice).map_err(|_| Error::InvalidKey)?;
+
+        let uncompressed = PublicKey::from_slice(&slice).map_err(|_| Error::InvalidKey)?;
+        // Convert compressed public key
+        let public_key =
+            PublicKey::from_slice(&uncompressed.key.serialize()).map_err(|_| Error::InvalidKey)?;
 
         Ok(Box::new(AggregateResponse::new(
             public_key,
@@ -131,6 +135,9 @@ mod tests {
         ]);
         let response = AggregateCommand::execute(&matches);
         assert!(response.is_ok());
+        let pubkey = response.unwrap();
+        // Result must be compressed public key.
+        assert_eq!(format!("{}", pubkey), "03addb2555f37abf8f28f11f498bec7bd1460e7243c1813847c49a7ae326a97d1c 84fa4423ba9c5e324443b60868319f3b2910f275415b4083a527e8104aab3a70");
     }
 
     #[test]
