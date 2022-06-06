@@ -46,12 +46,12 @@ OPTIONS:
         --redis-host <HOST_NAME or IP>    Redis host.
         --redis-port <PORT>               Redis port.
     -d, --duration <SECs>                 Round interval times(sec).
-        --rpc-host <HOST_NAME or IP>      TapyrusCore RPC endpoint host.
-        --rpc-pass <PASS>                 TapyrusCore RPC user password.
-        --rpc-port <PORT>                 TapyrusCore RPC endpoint port number. The default is `2377`. Tapyrus-Core
+        --rpc-host <HOST_NAME or IP>      Tapyrus Core RPC endpoint host.
+        --rpc-pass <PASS>                 Tapyrus Core RPC user password.
+        --rpc-port <PORT>                 Tapyrus Core RPC endpoint port number. The default is `2377`. Tapyrus-Core
                                           default RPC ports are here. For production chain: `2377`. For development
                                           chain: `12381`.
-        --rpc-user <USER>                 TapyrusCore RPC user name.
+        --rpc-user <USER>                 Tapyrus Core RPC user name.
 ```  
 
 ## signer.toml
@@ -133,7 +133,7 @@ This is required. This specifies the path to the TOML file of the federations of
 
 * `rpc-endpoint-host`
 This is optional.
-TapyrusCore RPC endpoint hostname. The default value is `127.0.0.1`.
+Tapyrus Core RPC endpoint hostname. The default value is `127.0.0.1`.
 * `rpc-endpoint-port`
 This is optional. 
 This is the Tapyrus Core RPC endpoint port number.
@@ -143,12 +143,12 @@ For production chain: `2377`. For development chain: `12381`.
 * `rpc-endpoint-user`
 This is optional.
 This is the Tapyrus Core RPC user name for authentication.
-This is required if you set a username to your TapyrusCore RPC Server.
+This is required if you set a username to your Tapyrus Core RPC Server.
 There is no default value.
 * `rpc-endpoint-pass`
 This is optional.
 This is the Tapyrus Core RPC password for authentication.
-This is required if you set a password to your TapyrusCore RPC Server.
+This is required if you set a password to your Tapyrus Core RPC Server.
 There is no default value.
 
 ### [redis] seciton
