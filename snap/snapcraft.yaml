@@ -3,7 +3,7 @@ version: git
 summary: Tapyrus Signer
 description: |
         Tapyrus Signer Node 
-license: MIT
+license: GPLv3
 base: core18
 grade: stable
 confinement: strict

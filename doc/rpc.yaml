@@ -7,8 +7,8 @@ info:
   contact:
     email: h_yamaguchi@chaintope.com
   license:
-    name: MIT
-    url: "https://opensource.org/licenses/mit-license.php"
+    name: GPLv3
+    url: "https://www.gnu.org/licenses/gpl-3.0.html"
 servers:
   - url: "http://127.0.0.1:3000"
 tags:

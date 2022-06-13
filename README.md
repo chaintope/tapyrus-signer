@@ -1,4 +1,5 @@
-# Tapyrus Signer Node
+# Tapyrus Signer Node [![Build Status](https://github.com/chaintope/tapyrus-signer/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/chaintope/tapyrus-signer/actions/workflows/ci.yml) [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
 Tapyrus Signer Node is provide and deploy federation signer network.
 
 ## Overview
