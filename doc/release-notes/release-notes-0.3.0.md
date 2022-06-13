@@ -18,7 +18,7 @@ source-only tarballs/zipballs directly from there:
 *Node Starting Process*
 
 * Support reading options from toml format file.
-* Added checking connection to TapyrusCore RPC endpoint when the node is started. If the Core's in Initial Block 
+* Added checking connection to Tapyrus Core RPC endpoint when the node is started. If the Core's in Initial Block 
 Download(IBD), signer node is going to wait to finish the IBD. If you don't want to wait, you can use 
 `--skip-waiting-ibd` option. 
 

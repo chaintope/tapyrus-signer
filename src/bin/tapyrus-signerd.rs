@@ -98,7 +98,7 @@ fn connect_rpc(rpc_config: RpcConfig) -> Rpc {
     let pass = rpc_config.password().map(str::to_string);
     let rpc = tapyrus_signer::rpc::Rpc::new(url.clone(), user.clone(), pass);
     rpc.test_connection().expect(&format!(
-        "RPC connect failed. Please confirm RPC connection info. url: {}, user: '{}' ,",
+        "Tapyrus Core RPC connection failed. Please confirm RPC connection info. url: {}, user: '{}' ,",
         url,
         user.unwrap_or("".to_string())
     ));
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "RPC connect failed. Please confirm RPC connection info. url: http://127.0.0.1:9999, user: '' "
+        expected = "Tapyrus Core RPC connection failed. Please confirm RPC connection info. url: http://127.0.0.1:9999, user: '' "
     )]
     fn test_connect_rpc() {
         use tapyrus_signer::command_args::RpcCommandArgs;
