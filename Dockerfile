@@ -6,23 +6,14 @@ RUN echo "TARGETARCH = $TARGETARCH"
 
 WORKDIR /tapyrus-signer
 
+ENV TARGET_ARM "aarch64-unknown-linux-gnu"
+ENV TARGET_X86 "x86_64-unknown-linux-gnu"
+
 COPY . .
 
-RUN case "$TARGETARCH" in \
-        "386") \
-            RUST_TARGET="i686-unknown-linux-gnu" \
-            ;; \
-        "amd64") \
-            RUST_TARGET="x86_64-unknown-linux-gnu" \
-            ;; \
-        "arm64") \
-            RUST_TARGET="aarch64-unknown-linux-gnu" \
-            ;; \
-        *) \
-            echo "Doesn't support $TARGETARCH architecture" \
-            exit 1 \
-            ;; \
-        esac && \
+RUN if [ "$TARGETARCH" = "arm64" ]; then RUST_TARGET=$TARGET_ARM; else RUST_TARGET=$TARGET_X86; fi && \
+    rustup target add "$RUST_TARGET" && \
+    rustup toolchain install "stable-$RUST_TARGET" && \
     cargo build --target "$RUST_TARGET" --release && \
     mv target/$RUST_TARGET/release/tapyrus-* target/release/
 
