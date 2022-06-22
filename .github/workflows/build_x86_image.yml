@@ -1,4 +1,4 @@
-name: Push Docker Image
+name: Push Docker Image for x86
 
 on:
   push:
