@@ -297,10 +297,10 @@ impl Signature {
 
 fn compute_e(r: &GE, y: &GE, message: &[u8]) -> FE {
     let mut hasher = Sha256::new();
-    hasher.input(&r.get_element().serialize()[1..33]);
-    hasher.input(&y.get_element().serialize()[..]);
-    hasher.input(message);
-    let e_bn = BigInt::from(&hasher.result()[..]);
+    hasher.update(&r.get_element().serialize()[1..33]);
+    hasher.update(&y.get_element().serialize()[..]);
+    hasher.update(message);
+    let e_bn = BigInt::from(&hasher.finalize()[..]);
 
     ECScalar::from(&e_bn)
 }
