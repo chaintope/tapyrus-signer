@@ -94,7 +94,7 @@ fn connect_rpc(rpc_config: RpcConfig) -> Rpc {
     let url = format!("http://{}:{}", rpc_config.host(), rpc_config.port());
     let user = rpc_config.user_name().map(str::to_string);
     let pass = rpc_config.password().map(str::to_string);
-    let rpc = tapyrus_signer::rpc::Rpc::new(url.clone(), user.clone(), pass);
+    let rpc = tapyrus_signer::rpc::Rpc::new(&url, user.clone(), pass);
     rpc.test_connection().expect(&format!(
         "Tapyrus Core RPC connection failed. Please confirm RPC connection info. url: {}, user: '{}' ,",
         url,
