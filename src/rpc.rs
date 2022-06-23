@@ -88,9 +88,8 @@ impl Rpc {
 impl TapyrusApi for Rpc {
     /// Call getnewblock rpc
     fn getnewblock(&self, address: &Address) -> Result<Block, Error> {
-        let args = RawValue::from_string(address.to_string())?;
+        let args = serde_json::value::to_raw_value(&serde_json::Value::from(address.to_string()))?;
         let resp = self.call::<String>("getnewblock", &[args]);
-
         match resp {
             Ok(v) => {
                 let raw_block = hex::decode(v).expect("Decoding block hex failed");
@@ -101,12 +100,12 @@ impl TapyrusApi for Rpc {
     }
 
     fn testproposedblock(&self, block: &Block) -> Result<bool, Error> {
-        let block_hex = RawValue::from_string(hex::encode(serialize(block)))?;
+        let block_hex = serde_json::value::to_raw_value(&hex::encode(serialize(block)))?;
         self.call::<bool>("testproposedblock", &[block_hex])
     }
 
     fn submitblock(&self, block: &Block) -> Result<(), Error> {
-        let block_hex = RawValue::from_string(hex::encode(serialize(block)))?;
+        let block_hex = serde_json::value::to_raw_value(&hex::encode(serialize(block)))?;
         self.call::<()>("submitblock", &[block_hex])
     }
 
