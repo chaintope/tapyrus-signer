@@ -9,7 +9,6 @@ use crate::errors::Error;
 use tapyrus::blockdata::block::Block;
 use tapyrus::consensus::encode::{deserialize, serialize};
 use jsonrpc::Client;
-use jsonrpc::simple_http::SimpleHttpTransport;
 use serde_json::value::RawValue;
 
 #[derive(Debug, Deserialize, Clone)]

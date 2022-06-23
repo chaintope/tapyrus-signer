@@ -163,7 +163,7 @@ mod tests {
                     message_type: MessageType::Blockvss(..),
                     ..
                 } => assert!(true),
-                m => assert!(false, format!("Sent unexpected message {:?}", m)),
+                m => assert!(false, "Sent unexpected message {:?}", m),
             }
         }
 

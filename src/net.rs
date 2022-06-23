@@ -389,7 +389,7 @@ mod test {
 
         match connection_manager.take_error() {
             Ok(e) => {
-                panic!(e.to_string());
+                panic!("{}", e.to_string());
             }
             Err(_e) => {}
         }
