@@ -6,10 +6,10 @@ use serde::Deserialize;
 use tapyrus::Address;
 
 use crate::errors::Error;
-use tapyrus::blockdata::block::Block;
-use tapyrus::consensus::encode::{deserialize, serialize};
 use jsonrpc::Client;
 use serde_json::value::RawValue;
+use tapyrus::blockdata::block::Block;
+use tapyrus::consensus::encode::{deserialize, serialize};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct GetBlockchainInfoResult {
@@ -41,7 +41,7 @@ impl Rpc {
         // Check that if we have a password, we have a username; other way around is ok
         debug_assert!(pass.is_none() || user.is_some());
         Rpc {
-            client: Client::simple_http(url, user, pass).unwrap()
+            client: Client::simple_http(url, user, pass).unwrap(),
         }
     }
 
