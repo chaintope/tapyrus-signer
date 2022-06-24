@@ -12,12 +12,12 @@ pub fn sum_point(points: &Vec<GE>) -> GE {
 }
 
 const STOP_SIGNALS: [usize; 6] = [
-    signal_hook::SIGABRT as usize,
-    signal_hook::SIGHUP as usize,
-    signal_hook::SIGINT as usize,
-    signal_hook::SIGQUIT as usize,
-    signal_hook::SIGTERM as usize,
-    signal_hook::SIGTRAP as usize,
+    signal_hook::consts::SIGABRT as usize,
+    signal_hook::consts::SIGHUP as usize,
+    signal_hook::consts::SIGINT as usize,
+    signal_hook::consts::SIGQUIT as usize,
+    signal_hook::consts::SIGTERM as usize,
+    signal_hook::consts::SIGTRAP as usize,
 ];
 
 pub fn set_stop_signal_handler() -> Result<Arc<AtomicUsize>, std::io::Error> {
@@ -36,12 +36,12 @@ pub fn set_stop_signal_handler() -> Result<Arc<AtomicUsize>, std::io::Error> {
 pub fn signal_to_string(signal: usize) -> &'static str {
     let signal: u32 = TryFrom::try_from(signal).unwrap();
     match signal as i32 {
-        signal_hook::SIGABRT => "SIGABRT",
-        signal_hook::SIGHUP => "SIGHUP",
-        signal_hook::SIGINT => "SIGINT",
-        signal_hook::SIGQUIT => "SIGQUIT",
-        signal_hook::SIGTERM => "SIGTERM",
-        signal_hook::SIGTRAP => "SIGTRAP",
+        signal_hook::consts::SIGABRT => "SIGABRT",
+        signal_hook::consts::SIGHUP => "SIGHUP",
+        signal_hook::consts::SIGINT => "SIGINT",
+        signal_hook::consts::SIGQUIT => "SIGQUIT",
+        signal_hook::consts::SIGTERM => "SIGTERM",
+        signal_hook::consts::SIGTRAP => "SIGTRAP",
         _ => unreachable!("unregistered signal received"),
     }
 }
@@ -80,40 +80,40 @@ mod tests {
         let handler = set_stop_signal_handler().unwrap();
 
         unsafe {
-            libc::raise(signal_hook::SIGINT);
+            libc::raise(signal_hook::consts::SIGINT);
             assert_eq!(
                 handler.load(Ordering::Relaxed),
-                signal_hook::SIGINT as usize
+                signal_hook::consts::SIGINT as usize
             );
 
-            libc::raise(signal_hook::SIGABRT);
+            libc::raise(signal_hook::consts::SIGABRT);
             assert_eq!(
                 handler.load(Ordering::Relaxed),
-                signal_hook::SIGABRT as usize
+                signal_hook::consts::SIGABRT as usize
             );
 
-            libc::raise(signal_hook::SIGHUP);
+            libc::raise(signal_hook::consts::SIGHUP);
             assert_eq!(
                 handler.load(Ordering::Relaxed),
-                signal_hook::SIGHUP as usize
+                signal_hook::consts::SIGHUP as usize
             );
 
-            libc::raise(signal_hook::SIGQUIT);
+            libc::raise(signal_hook::consts::SIGQUIT);
             assert_eq!(
                 handler.load(Ordering::Relaxed),
-                signal_hook::SIGQUIT as usize
+                signal_hook::consts::SIGQUIT as usize
             );
 
-            libc::raise(signal_hook::SIGTERM);
+            libc::raise(signal_hook::consts::SIGTERM);
             assert_eq!(
                 handler.load(Ordering::Relaxed),
-                signal_hook::SIGTERM as usize
+                signal_hook::consts::SIGTERM as usize
             );
 
-            libc::raise(signal_hook::SIGTRAP);
+            libc::raise(signal_hook::consts::SIGTRAP);
             assert_eq!(
                 handler.load(Ordering::Relaxed),
-                signal_hook::SIGTRAP as usize
+                signal_hook::consts::SIGTRAP as usize
             );
         }
     }

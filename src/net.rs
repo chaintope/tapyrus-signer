@@ -275,7 +275,7 @@ impl RedisManager {
                     message: &str,
                     to: &str,
                 ) -> Result<(), ConnectionManagerError<RedisError>> {
-                    let conn = client.get_connection()?;
+                    let mut conn = client.get_connection()?;
                     thread::sleep(Duration::from_millis(500));
 
                     conn.set_write_timeout(Some(Duration::from_secs(5)))?;
@@ -389,7 +389,7 @@ mod test {
 
         match connection_manager.take_error() {
             Ok(e) => {
-                panic!(e.to_string());
+                panic!("{}", e.to_string());
             }
             Err(_e) => {}
         }

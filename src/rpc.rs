@@ -6,6 +6,8 @@ use serde::Deserialize;
 use tapyrus::Address;
 
 use crate::errors::Error;
+use jsonrpc::Client;
+use serde_json::value::RawValue;
 use tapyrus::blockdata::block::Block;
 use tapyrus::consensus::encode::{deserialize, serialize};
 
@@ -35,15 +37,15 @@ pub trait TapyrusApi {
 }
 
 impl Rpc {
-    pub fn new(url: String, user: Option<String>, pass: Option<String>) -> Self {
+    pub fn new(url: &str, user: Option<String>, pass: Option<String>) -> Self {
         // Check that if we have a password, we have a username; other way around is ok
         debug_assert!(pass.is_none() || user.is_some());
         Rpc {
-            client: jsonrpc::client::Client::new(url, user, pass),
+            client: Client::simple_http(url, user, pass).unwrap(),
         }
     }
 
-    fn call<T>(&self, name: &str, params: &[serde_json::Value]) -> Result<T, Error>
+    fn call<T>(&self, name: &str, params: &[Box<RawValue>]) -> Result<T, Error>
     where
         T: serde::de::DeserializeOwned,
     {
@@ -51,7 +53,7 @@ impl Rpc {
 
         trace!("JSON-RPC request: {}", serde_json::to_string(&req).unwrap());
 
-        match self.client.send_request(&req) {
+        match self.client.send_request(req) {
             Ok(resp) => {
                 if log_enabled!(Trace) {
                     trace!(
@@ -86,9 +88,8 @@ impl Rpc {
 impl TapyrusApi for Rpc {
     /// Call getnewblock rpc
     fn getnewblock(&self, address: &Address) -> Result<Block, Error> {
-        let args = [address.to_string().into()];
-        let resp = self.call::<String>("getnewblock", &args);
-
+        let args = serde_json::value::to_raw_value(&serde_json::Value::from(address.to_string()))?;
+        let resp = self.call::<String>("getnewblock", &[args]);
         match resp {
             Ok(v) => {
                 let raw_block = hex::decode(v).expect("Decoding block hex failed");
@@ -99,13 +100,13 @@ impl TapyrusApi for Rpc {
     }
 
     fn testproposedblock(&self, block: &Block) -> Result<bool, Error> {
-        let blockhex = serde_json::Value::from(hex::encode(serialize(block)));
-        self.call::<bool>("testproposedblock", &[blockhex])
+        let block_hex = serde_json::value::to_raw_value(&hex::encode(serialize(block)))?;
+        self.call::<bool>("testproposedblock", &[block_hex])
     }
 
     fn submitblock(&self, block: &Block) -> Result<(), Error> {
-        let blockhex = serde_json::Value::from(hex::encode(serialize(block)));
-        self.call::<()>("submitblock", &[blockhex])
+        let block_hex = serde_json::value::to_raw_value(&hex::encode(serialize(block)))?;
+        self.call::<()>("submitblock", &[block_hex])
     }
 
     fn getblockchaininfo(&self) -> Result<GetBlockchainInfoResult, Error> {
@@ -121,7 +122,7 @@ pub mod tests {
 
     pub fn get_rpc_client() -> Rpc {
         Rpc::new(
-            "http://127.0.0.1:12381".to_string(),
+            "http://127.0.0.1:12381",
             Some("user".to_string()),
             Some("pass".to_string()),
         )
