@@ -1,0 +1,21 @@
+[general]
+round-duration = 60
+round-limit = 15
+log-quiet = false
+log-level = "info"
+skip-waiting-ibd = true
+
+[signer]
+to-address = "<signer address who will receive mining rewards>"
+public-key = "<signer public key>"
+federations-file = "/etc/tapyrus/federations.toml"
+
+[rpc]
+rpc-endpoint-host = "tapyrusd"
+rpc-endpoint-port = 2377
+rpc-endpoint-user = "user"
+rpc-endpoint-pass = "pass"
+
+[redis]
+redis-host = "redis"
+redis-port =  6379

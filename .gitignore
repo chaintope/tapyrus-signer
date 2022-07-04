@@ -6,3 +6,11 @@
 /parts
 /stage
 *.snap
+
+# docker-compose sample
+docker/tapyrus/genesis.*
+docker/tapyrus/tapyrus.conf
+docker/tapyrus/prod-*
+docker/signers/alice/*.toml
+docker/signers/bob/*.toml
+docker/signers/carol/*.toml

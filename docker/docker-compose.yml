@@ -1,0 +1,42 @@
+version: '3'
+services:
+  redis:
+    image: redis:5.0-alpine
+    command: redis-server
+    ports:
+      - '6379:6379'
+    volumes:
+      - 'redis:/var/lib/redis/data'
+  tapyrusd:
+    image: tapyrus/tapyrusd:v0.5.1
+    volumes:
+      - ${PWD}/tapyrus:/var/lib/tapyrus
+      - ${PWD}/tapyrus/tapyrus.conf:/etc/tapyrus/tapyrus.conf
+    ports:
+      - '2377:2377'
+  signer_alice:
+    image: tapyrus/tapyrus-signerd:latest
+    volumes:
+      - ${PWD}/signers/alice:/var/log
+      - ${PWD}/signers/alice:/etc/tapyrus
+    depends_on:
+      - redis
+      - tapyrusd
+  signer_bob:
+    image: tapyrus/tapyrus-signerd:latest
+    volumes:
+      - ${PWD}/signers/bob:/var/log
+      - ${PWD}/signers/bob:/etc/tapyrus
+    depends_on:
+      - redis
+      - tapyrusd
+  signer_carol:
+    image: tapyrus/tapyrus-signerd:latest
+    volumes:
+      - ${PWD}/signers/carol:/var/log
+      - ${PWD}/signers/carol:/etc/tapyrus
+    depends_on:
+      - redis
+      - tapyrusd
+volumes:
+  redis:

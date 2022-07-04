@@ -1,0 +1,9 @@
+[[federation]]
+block-height = 0
+threshold = 2
+aggregated-public-key = "<Generated aggregate public key>"
+node-vss = [
+    "<node vss 1>",
+    "<node vss 2>",
+    "<node vss 3>"
+]
