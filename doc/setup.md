@@ -75,10 +75,10 @@ output <private_key> <public_key>
 
 This generates the private/public key pair based on secp256k1 elliptic curve, where:
 
-- `private_key` is a private key with an extended WIF format[^3].
+- `private_key` is a private key with a WIF format[^3].
 - `public_key` is a public key corresponding to `private_key` with a hex format string.
 
-[^3]: [BIP-178: Version Extended WIF](https://github.com/bitcoin/bips/blob/master/bip-0178.mediawiki)
+[^3]: [Wallet import format](https://en.bitcoin.it/wiki/Wallet_import_format)
 
 Each signer shares their own public key `public_key` to other signers.
 And then, they sort received public keys.
