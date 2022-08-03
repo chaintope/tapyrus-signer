@@ -95,7 +95,7 @@ impl<'a> AggregateCommand {
                 .long("private-key")
                 .required(true)
                 .takes_value(true)
-                .help("private key of this signer with an extend WIF format"),
+                .help("private key of this signer with a WIF format"),
         ])
     }
 }

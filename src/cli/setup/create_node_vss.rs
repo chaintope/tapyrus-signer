@@ -93,7 +93,7 @@ impl<'a> CreateNodeVssCommand {
                 .long("private-key")
                 .required(true)
                 .takes_value(true)
-                .help("private key of this signer with an extend WIF format"),
+                .help("private key of this signer with a WIF format"),
             Arg::with_name("threshold")
                 .long("threshold")
                 .required(true)
