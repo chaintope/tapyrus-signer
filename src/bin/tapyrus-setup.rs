@@ -11,7 +11,9 @@ use tapyrus_signer::cli::setup::traits::Response;
 use tapyrus_signer::errors::Error;
 
 fn main() {
-    let matches = App::new("Setup")
+    let matches = App::new("tapyrus-setup")
+        .about(env!("CARGO_PKG_DESCRIPTION"))
+        .version(env!("CARGO_PKG_VERSION"))
         .subcommand(CreateKeyCommand::args())
         .subcommand(CreateNodeVssCommand::args())
         .subcommand(AggregateCommand::args())
