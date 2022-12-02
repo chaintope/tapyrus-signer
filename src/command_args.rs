@@ -428,8 +428,9 @@ fn read_config(file_path: &str) -> Result<ConfigToml, crate::errors::Error> {
 }
 
 pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
-    App::new("node")
-        .about("Tapyrus signer node")
+    App::new(env!("CARGO_PKG_NAME"))
+        .about(env!("CARGO_PKG_DESCRIPTION"))
+        .version(env!("CARGO_PKG_VERSION"))
         .arg(Arg::with_name(OPTION_NAME_CONFIG)
             .short("c")
             .long("config")
