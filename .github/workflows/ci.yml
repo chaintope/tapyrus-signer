@@ -21,27 +21,33 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt
-      - uses: actions-rs/cargo@v1
+      - name: Cargo fmt
+        uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
-      - uses: actions-rs/cargo@v1
+      - name: Cargo build
+        uses: actions-rs/cargo@v1
         with:
           command: build
           args: ${{ matrix.feature }} --release
-      - uses: actions-rs/cargo@v1
+      - name: Cargo test
+        uses: actions-rs/cargo@v1
         with:
           command: test
           args: --lib ${{ matrix.feature }} --release -v --no-fail-fast -- --nocapture --test
-      - uses: actions-rs/cargo@v1
+      - name: Cargo test doc
+        uses: actions-rs/cargo@v1
         with:
           command: test
           args: --doc ${{ matrix.feature }} --release -v --no-fail-fast -- --nocapture --test
-      - uses: actions-rs/cargo@v1
+      - name: Cargo test tapyrus-signer
+        uses: actions-rs/cargo@v1
         with:
           command: test
           args: --test tapyrus-signer ${{ matrix.feature }} --release -v --no-fail-fast -- --nocapture --test
-      - uses: actions-rs/cargo@v1
+      - name: Cargo test bench
+        uses: actions-rs/cargo@v1
         with:
           command: test
           args: --lib ${{ matrix.feature }} --release -v --no-fail-fast -- --nocapture --bench
