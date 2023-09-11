@@ -6,6 +6,7 @@ use tapyrus_signer::cli::setup::compute_sig::ComputeSigCommand;
 use tapyrus_signer::cli::setup::create_block_vss::CreateBlockVssCommand;
 use tapyrus_signer::cli::setup::create_key::CreateKeyCommand;
 use tapyrus_signer::cli::setup::create_node_vss::CreateNodeVssCommand;
+use tapyrus_signer::cli::setup::federation_change::RegisterFederationChangeCommand;
 use tapyrus_signer::cli::setup::sign::SignCommand;
 use tapyrus_signer::cli::setup::traits::Response;
 use tapyrus_signer::errors::Error;
@@ -20,6 +21,7 @@ fn main() {
         .subcommand(CreateBlockVssCommand::args())
         .subcommand(SignCommand::args())
         .subcommand(ComputeSigCommand::args())
+        .subcommand(RegisterFederationChangeCommand::args())
         .get_matches();
     let result: Result<Box<dyn Response>, Error> = match matches.subcommand_name() {
         Some("createkey") => CreateKeyCommand::execute(
@@ -48,6 +50,11 @@ fn main() {
         Some("computesig") => ComputeSigCommand::execute(
             matches
                 .subcommand_matches("computesig")
+                .expect("invalid args"),
+        ),
+        Some("federation") => ComputeSigCommand::execute(
+            matches
+                .subcommand_matches("federation")
                 .expect("invalid args"),
         ),
         None => return println!("No subcommand was used"),

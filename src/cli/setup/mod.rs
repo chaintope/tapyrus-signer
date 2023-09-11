@@ -13,6 +13,7 @@ pub mod compute_sig;
 pub mod create_block_vss;
 pub mod create_key;
 pub mod create_node_vss;
+pub mod federation_change;
 pub mod sign;
 pub mod traits;
 
