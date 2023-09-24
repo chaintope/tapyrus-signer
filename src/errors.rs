@@ -32,6 +32,8 @@ pub enum Error {
     InvalidAggregatedPublicKey,
     /// xField is not supported by signer.
     UnsupportedXField,
+    /// Error when federation change command is unsuccessful.
+    RegisterFederationError(String),
 }
 
 impl std::fmt::Display for Error {

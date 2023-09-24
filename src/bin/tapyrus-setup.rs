@@ -52,7 +52,7 @@ fn main() {
                 .subcommand_matches("computesig")
                 .expect("invalid args"),
         ),
-        Some("federation") => ComputeSigCommand::execute(
+        Some("federation") => RegisterFederationChangeCommand::execute(
             matches
                 .subcommand_matches("federation")
                 .expect("invalid args"),
