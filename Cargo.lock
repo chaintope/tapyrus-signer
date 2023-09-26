@@ -966,8 +966,8 @@ dependencies = [
 
 [[package]]
 name = "tapyrus"
-version = "0.4.5"
-source = "git+https://github.com/chaintope/rust-tapyrus?tag=v0.4.5#02cda49e6e887425991cfd1d5acf214b0506bbd9"
+version = "0.4.7"
+source = "git+https://github.com/chaintope/rust-tapyrus?tag=v0.4.7#982c5bd63304f09837c3a7c467d9d814093f22e0"
 dependencies = [
  "bitcoin_hashes 0.8.0",
  "rug",

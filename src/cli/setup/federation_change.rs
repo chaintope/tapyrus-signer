@@ -39,8 +39,10 @@ lazy_static! {
     static ref FEDERATION_CHANGE_FILE: PathBuf = {
         #[cfg(not(test))]
         {
-            let home:String = std::env::var("HOME").expect("Failed to get home directory");
-            PathBuf::from(&home).join(".tapyrus_signer").join("federationchange.dat")
+            let home: String = std::env::var("HOME").expect("Failed to get home directory");
+            PathBuf::from(&home)
+                .join(".tapyrus_signer")
+                .join("federationchange.dat")
         }
         #[cfg(test)]
         {
@@ -49,14 +51,12 @@ lazy_static! {
     };
 }
 
-
 //hex encoding of height is 8 bytes
-const HEIGHT_STRING_LEN:usize = 8;
+const HEIGHT_STRING_LEN: usize = 8;
 
 lazy_static! {
     static ref FILE_LOCK: Mutex<()> = Mutex::new(());
 }
-
 
 #[derive(Clone)]
 pub struct RegisterFederationChangeResponse {
@@ -92,7 +92,7 @@ impl RegisterFederationChangeResponse {
     fn new(xfield: XField, height: u32) -> Self {
         RegisterFederationChangeResponse {
             xfield: xfield,
-            height: height
+            height: height,
         }
     }
 }
@@ -105,12 +105,18 @@ impl<'a> RegisterFederationChangeCommand {
     pub fn execute(matches: &ArgMatches) -> Result<Box<dyn Response>, Error> {
         let change: &str = matches
             .value_of("change")
-            .ok_or(Error::RegisterFederationError("register/unregister".to_string()))?;
+            .ok_or(Error::RegisterFederationError(
+                "register/unregister".to_string(),
+            ))?;
 
         let register = match change {
             "register" => true,
             "unregister" => false,
-            _ => return Err(Error::RegisterFederationError("register/unregister".to_string())),
+            _ => {
+                return Err(Error::RegisterFederationError(
+                    "register/unregister".to_string(),
+                ))
+            }
         };
 
         let height: u32 = matches
@@ -119,7 +125,9 @@ impl<'a> RegisterFederationChangeCommand {
             .ok_or(Error::RegisterFederationError("height".to_string()))?;
 
         if height == 0 {
-            return Err(Error::RegisterFederationError(format!("Height must be greater than 0")));
+            return Err(Error::RegisterFederationError(format!(
+                "Height must be greater than 0"
+            )));
         }
 
         let xfield_public_key: XField = match matches.value_of("aggregated-public-key") {
@@ -172,27 +180,36 @@ impl<'a> RegisterFederationChangeCommand {
                         .create(true)
                         .write(true)
                         .open(&*FEDERATION_CHANGE_FILE)
-                        .map_err(|e| Error::RegisterFederationError(format!("Failed to open file: {}", e)))?;
+                        .map_err(|e| {
+                            Error::RegisterFederationError(format!("Failed to open file: {}", e))
+                        })?;
                 }
             }
-
         } else {
             //open if it exists
             let file = File::open(&file_path)?;
             let reader = BufReader::new(file);
             for line in reader.lines() {
                 let line = line?;
-                match line.len(){
+                match line.len() {
                     0 => break,
                     _ => {
                         if line.len() < HEIGHT_STRING_LEN {
-                            return Err(Error::RegisterFederationError(format!("Invalid line: {}", line)));
+                            return Err(Error::RegisterFederationError(format!(
+                                "Invalid line: {}",
+                                line
+                            )));
                         }
                         match RegisterFederationChangeResponse::from_str(&line) {
                             Ok(field) => xfield_changes.push(field),
-                            Err(e) => return Err(Error::RegisterFederationError(format!("Failed to parse line: {}. Error: {}", line, e))),
+                            Err(e) => {
+                                return Err(Error::RegisterFederationError(format!(
+                                    "Failed to parse line: {}. Error: {}",
+                                    line, e
+                                )))
+                            }
                         }
-                    },
+                    }
                 }
             }
         }
@@ -202,7 +219,10 @@ impl<'a> RegisterFederationChangeCommand {
         xfield_changes.sort_by(|a, b| a.height.cmp(&b.height));
 
         //open the file fresh for writing
-        let file = OpenOptions::new().write(true).truncate(true).open(file_path)?;
+        let file = OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(file_path)?;
         let mut writer = std::io::BufWriter::new(file);
 
         for xfield_change in xfield_changes {
@@ -255,7 +275,7 @@ impl<'a> RegisterFederationChangeCommand {
 
 #[cfg(test)]
 
-fn get_file_debug() -> PathBuf{
+fn get_file_debug() -> PathBuf {
     PathBuf::from(&*FEDERATION_CHANGE_FILE)
 }
 
@@ -273,24 +293,33 @@ mod tests {
     #[cfg(not(debug_assertions))]
     const DIR: &str = "release/";
 
-    fn check_file(file_path:PathBuf, content: String) -> Result<(), Error>{
-
+    fn check_file(file_path: PathBuf, content: String) -> Result<(), Error> {
         // Check that the file was created
-        let file = match File::open(&file_path){
+        let file = match File::open(&file_path) {
             Ok(file) => file,
             Err(e) => {
-                panic!("Failed to open file:{} due to err :{}", file_path.to_string_lossy(), e);
-            },
+                panic!(
+                    "Failed to open file:{} due to err :{}",
+                    file_path.to_string_lossy(),
+                    e
+                );
+            }
         };
 
         let reader = BufReader::new(file);
 
         for line in reader.lines() {
-            if line.expect(format!("line not found in file {}", file_path.to_string_lossy()).as_str()).contains(&content) {
+            if line
+                .expect(format!("line not found in file {}", file_path.to_string_lossy()).as_str())
+                .contains(&content)
+            {
                 return Ok(());
             }
         }
-        Err(RegisterFederationError(format!("content not found {}", content)))
+        Err(RegisterFederationError(format!(
+            "content not found {}",
+            content
+        )))
     }
 
     #[test]
@@ -319,7 +348,8 @@ mod tests {
         ]);
         let response = RegisterFederationChangeCommand::execute(&matches);
         assert!(response.is_ok());
-        let res = check_file(get_file_debug(),
+        let res = check_file(
+            get_file_debug(),
             "000000640121033e6e1d4ae3e7e1bc2173e2af1f2f65c6284ea7c6478f2241784c77b0dff98e61"
                 .to_string(),
         );
@@ -429,7 +459,11 @@ mod tests {
         ]);
         let response = RegisterFederationChangeCommand::execute(&matches);
         assert!(response.is_ok());
-        let res = check_file(get_file_debug(), "000003e80121033e6e1d4ae3e7e1bc2173e2af1f2f65c6284ea7c6478f2241784c77b0dff98e61".to_string());
+        let res = check_file(
+            get_file_debug(),
+            "000003e80121033e6e1d4ae3e7e1bc2173e2af1f2f65c6284ea7c6478f2241784c77b0dff98e61"
+                .to_string(),
+        );
         assert!(res.is_ok());
 
         let matches = RegisterFederationChangeCommand::args().get_matches_from(vec![
@@ -457,9 +491,7 @@ mod tests {
         assert!(response.is_ok());
         let res = check_file(get_file_debug(), "000013880240420f00".to_string());
         assert!(res.is_ok());
-
     }
-
 
     #[test]
     fn test_execute_success_register_parallel() {
@@ -488,6 +520,5 @@ mod tests {
 
         assert!(output1.status.success());
         assert!(output2.status.success());
-
     }
 }
