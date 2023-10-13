@@ -25,7 +25,7 @@ impl Federations {
         }
     }
 
-    pub fn get_by_block_height(&self, block_height: u64) -> &Federation {
+    pub fn get_by_block_height(&self, block_height: u32) -> &Federation {
         self.federations
             .iter()
             .filter(|f| f.block_height <= block_height)
@@ -52,7 +52,7 @@ impl Federations {
         }
 
         // Check the block
-        let unique_block_height: HashSet<u64> =
+        let unique_block_height: HashSet<u32> =
             self.federations.iter().map(|i| i.block_height).collect();
         if unique_block_height.len() != self.federations.len() {
             return Err(Error::InvalidFederation(
@@ -95,7 +95,7 @@ pub struct Federation {
     /// If the block height is 100, the aggregated public key of this federation is set at 99 height
     /// block. Then from the next block which height is 100, Tapyrus network would get started to
     /// use new aggreted public key to verify blocks.
-    block_height: u64,
+    block_height: u32,
     /// The threshold which is requirement number of signer's agreements to produce block signatures.
     /// This field must be None when the signer is not a member of the federation.
     threshold: Option<u8>,
@@ -109,7 +109,7 @@ pub struct Federation {
 impl Federation {
     pub fn new(
         public_key: PublicKey,
-        block_height: u64,
+        block_height: u32,
         threshold: Option<u8>,
         nodevss: Option<Vec<Vss>>,
         aggregated_public_key: PublicKey,
@@ -143,7 +143,7 @@ impl Federation {
         signers
     }
 
-    pub fn block_height(&self) -> u64 {
+    pub fn block_height(&self) -> u32 {
         self.block_height
     }
     pub fn threshold(&self) -> Option<u8> {
@@ -291,7 +291,7 @@ pub struct SerFederations {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SerFederation {
     #[serde(rename = "block-height")]
-    block_height: u64,
+    block_height: u32,
     threshold: Option<u8>,
     #[serde(rename = "node-vss")]
     nodevss: Option<Vec<Vss>>,

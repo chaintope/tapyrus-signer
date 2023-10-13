@@ -14,7 +14,7 @@ pub enum NodeState {
     /// federation in past block height.
     Idling {
         /// A height at the block which is the next block of the tip.
-        block_height: u64,
+        block_height: u32,
     },
     Master {
         /// *block_key* is random value for using int the Signature Issuing Protocol.
@@ -40,7 +40,7 @@ pub enum NodeState {
         participants: HashSet<SignerID>,
         /// Set true when the round is done.
         round_is_done: bool,
-        block_height: u64,
+        block_height: u32,
     },
     Member {
         /// *block_key* is random value for using int the Signature Issuing Protocol.
@@ -62,16 +62,16 @@ pub enum NodeState {
         /// are declared by Master node of the round.
         participants: HashSet<SignerID>,
         master_index: usize,
-        block_height: u64,
+        block_height: u32,
     },
     RoundComplete {
         master_index: usize,
-        block_height: u64,
+        block_height: u32,
     },
 }
 
 impl NodeState {
-    pub fn block_height(&self) -> u64 {
+    pub fn block_height(&self) -> u32 {
         match &self {
             NodeState::Idling { block_height } => *block_height,
             NodeState::Master { block_height, .. } => *block_height,
@@ -106,7 +106,7 @@ pub mod builder {
         signatures: BTreeMap<SignerID, (FE, FE)>,
         participants: HashSet<SignerID>,
         round_is_done: bool,
-        block_height: u64,
+        block_height: u32,
     }
 
     impl Builder for Master {
@@ -177,7 +177,7 @@ pub mod builder {
             signatures: BTreeMap<SignerID, (FE, FE)>,
             participants: HashSet<SignerID>,
             round_is_done: bool,
-            block_height: u64,
+            block_height: u32,
         ) -> Self {
             Self {
                 block_key,
@@ -255,7 +255,7 @@ pub mod builder {
             self
         }
 
-        pub fn block_height(&mut self, block_height: u64) -> &mut Self {
+        pub fn block_height(&mut self, block_height: u32) -> &mut Self {
             self.block_height = block_height;
             self
         }
@@ -268,7 +268,7 @@ pub mod builder {
         candidate_block: Option<Block>,
         participants: HashSet<SignerID>,
         master_index: usize,
-        block_height: u64,
+        block_height: u32,
     }
 
     impl Default for Member {
@@ -334,7 +334,7 @@ pub mod builder {
             candidate_block: Option<Block>,
             participants: HashSet<SignerID>,
             master_index: usize,
-            block_height: u64,
+            block_height: u32,
         ) -> Self {
             Self {
                 block_key,
@@ -396,7 +396,7 @@ pub mod builder {
             self
         }
 
-        pub fn block_height(&mut self, block_height: u64) -> &mut Self {
+        pub fn block_height(&mut self, block_height: u32) -> &mut Self {
             self.block_height = block_height;
             self
         }

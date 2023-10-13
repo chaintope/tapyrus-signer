@@ -338,13 +338,13 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
-    fn start_new_round(&mut self, block_height: u64) -> NodeState {
+    fn start_new_round(&mut self, block_height: u32) -> NodeState {
         self.round_interval_timer.restart().unwrap();
         Master::default().block_height(block_height).build()
     }
 
     /// A master node of the round starts a round communication with sending candidateblock message.
-    pub fn start_round_communication(&mut self, block_height: u64) -> NodeState {
+    pub fn start_round_communication(&mut self, block_height: u32) -> NodeState {
         let block = match self.params.rpc.getnewblock(&self.params.address) {
             Ok(block) => block,
             Err(e) => {
@@ -397,7 +397,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         federation.signers().contains(signer_id)
     }
 
-    fn add_aggregated_public_key_if_needed(&self, block_height: u64, mut block: Block) -> Block {
+    fn add_aggregated_public_key_if_needed(&self, block_height: u32, mut block: Block) -> Block {
         let next_block_height = block_height + 1;
         let federation = self
             .params
@@ -561,7 +561,7 @@ where
 fn next_master_index<T>(
     state: &NodeState,
     params: &NodeParameters<T>,
-    target_block_height: u64,
+    target_block_height: u32,
 ) -> usize
 where
     T: TapyrusApi,
