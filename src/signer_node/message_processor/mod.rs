@@ -58,7 +58,7 @@ pub fn create_block_vss<T, C>(
     block: Block,
     params: &NodeParameters<T>,
     conman: &C,
-    block_height: u64,
+    block_height: u32,
 ) -> (Keys, SharedSecret, SharedSecret)
 where
     T: TapyrusApi,

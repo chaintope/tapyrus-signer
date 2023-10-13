@@ -40,17 +40,17 @@ impl<T: TapyrusApi> NodeParameters<T> {
         }
     }
 
-    pub fn get_federation_by_block_height(&self, block_height: u64) -> &Federation {
+    pub fn get_federation_by_block_height(&self, block_height: u32) -> &Federation {
         self.federations.get_by_block_height(block_height)
     }
 
-    pub fn get_signer_id_by_index(&self, block_height: u64, index: usize) -> SignerID {
+    pub fn get_signer_id_by_index(&self, block_height: u32, index: usize) -> SignerID {
         SignerID {
             pubkey: self.pubkey_list(block_height)[index].clone(),
         }
     }
 
-    pub fn sharing_params(&self, block_height: u64) -> Parameters {
+    pub fn sharing_params(&self, block_height: u32) -> Parameters {
         let t = (self.threshold(block_height) - 1 as u8).try_into().unwrap();
         let n: usize = (self.pubkey_list(block_height).len() as u8)
             .try_into()
@@ -69,24 +69,24 @@ impl<T: TapyrusApi> NodeParameters<T> {
         });
     }
 
-    pub fn threshold(&self, block_height: u64) -> u8 {
+    pub fn threshold(&self, block_height: u32) -> u8 {
         let federation = self.get_federation_by_block_height(block_height);
         federation
             .threshold()
             .expect("threshold should not be None")
     }
 
-    pub fn self_node_index(&self, block_height: u64) -> usize {
+    pub fn self_node_index(&self, block_height: u32) -> usize {
         let federation = self.get_federation_by_block_height(block_height);
         federation.node_index()
     }
 
-    pub fn pubkey_list(&self, block_height: u64) -> Vec<PublicKey> {
+    pub fn pubkey_list(&self, block_height: u32) -> Vec<PublicKey> {
         let federation = self.get_federation_by_block_height(block_height);
         federation.signers().iter().map(|s| s.pubkey).collect()
     }
 
-    pub fn aggregated_public_key(&self, block_height: u64) -> PublicKey {
+    pub fn aggregated_public_key(&self, block_height: u32) -> PublicKey {
         let federation = self.get_federation_by_block_height(block_height);
         federation.aggregated_public_key()
     }

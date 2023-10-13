@@ -27,7 +27,7 @@ pub enum Error {
     /// Errors for using incomplete block(like no proof block) as usual block.
     IncompleteBlock,
     /// Errors when the federation is invalid. This error has the block height of the federation gets started and message string.
-    InvalidFederation(Option<u64>, &'static str),
+    InvalidFederation(Option<u32>, &'static str),
     /// Error when the aggregated public key included the candidate block is invalid.
     InvalidAggregatedPublicKey,
     /// xField is not supported by signer.

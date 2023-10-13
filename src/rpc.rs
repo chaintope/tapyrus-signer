@@ -14,7 +14,7 @@ use tapyrus::consensus::encode::{deserialize, serialize};
 #[derive(Debug, Deserialize, Clone)]
 pub struct GetBlockchainInfoResult {
     pub chain: String,
-    pub blocks: u64,
+    pub blocks: u32,
     pub headers: u64,
     pub bestblockhash: String,
     pub mediantime: u64,

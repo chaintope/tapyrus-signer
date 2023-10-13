@@ -68,7 +68,7 @@ where
 
 fn verify_block<T>(
     block: &Block,
-    block_height: u64,
+    block_height: u32,
     params: &NodeParameters<T>,
 ) -> Result<(), Error>
 where
@@ -83,7 +83,7 @@ where
 
 fn verify_aggregated_public_key<T>(
     block: &Block,
-    block_height: u64,
+    block_height: u32,
     params: &NodeParameters<T>,
 ) -> Result<(), Error>
 where
