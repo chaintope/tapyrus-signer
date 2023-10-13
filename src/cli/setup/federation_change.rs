@@ -134,9 +134,17 @@ impl<'a> RegisterFederationChangeCommand {
             Some(key) => match tapyrus::PublicKey::from_str(key) {
                 Ok(public_key) => match public_key.compressed {
                     true => XField::AggregatePublicKey(public_key),
-                    false => return Err(Error::RegisterFederationError(format!("aggregated-public-key was not compressed"))),
+                    false => {
+                        return Err(Error::RegisterFederationError(format!(
+                            "aggregated-public-key was not compressed"
+                        )))
+                    }
+                },
+                Err(_) => {
+                    return Err(Error::RegisterFederationError(format!(
+                        "aggregated-public-key was invalid"
+                    )))
                 }
-                Err(_) => return Err(Error::RegisterFederationError(format!("aggregated-public-key was invalid"))),
             },
             None => XField::None,
         };
@@ -144,7 +152,11 @@ impl<'a> RegisterFederationChangeCommand {
         let xfield_max_block_size: XField = match matches.value_of("max-block-size") {
             Some(s) => match s.parse::<u32>() {
                 Ok(x) => XField::MaxBlockSize(x),
-                Err(_) => return Err(Error::RegisterFederationError(format!("max-block-size was invalid"))),
+                Err(_) => {
+                    return Err(Error::RegisterFederationError(format!(
+                        "max-block-size was invalid"
+                    )))
+                }
             },
             None => XField::None,
         };
