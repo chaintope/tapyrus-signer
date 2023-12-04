@@ -88,7 +88,7 @@ impl<T: TapyrusApi> NodeParameters<T> {
 
     pub fn aggregated_public_key(&self, block_height: u32) -> PublicKey {
         let federation = self.get_federation_by_block_height(block_height);
-        federation.aggregated_public_key()
+        federation.aggregated_public_key().unwrap()
     }
 }
 
