@@ -15,7 +15,7 @@ use curv::elliptic::curves::traits::{ECPoint, ECScalar};
 use curv::{BigInt, FE, GE};
 use std::fmt;
 use std::str::FromStr;
-use tapyrus::blockdata::block::Block;
+use tapyrus::blockdata::block::{Block, XField};
 use tapyrus::consensus::encode::deserialize;
 use tapyrus::{PrivateKey, PublicKey};
 
@@ -61,12 +61,6 @@ impl<'a> SignCommand {
             .and_then(|s| s.parse::<usize>().ok())
             .ok_or(Error::InvalidArgs("threshold".to_string()))?;
 
-        let block: Block = matches
-            .value_of("block")
-            .and_then(|s| hex::decode(s).ok())
-            .and_then(|hex| deserialize::<Block>(&hex).ok())
-            .ok_or(Error::InvalidArgs("block".to_string()))?;
-
         let node_secret_share: FE = matches
             .value_of("node-secret-share")
             .and_then(|s| BigInt::from_str_radix(s, 16).ok())
@@ -104,12 +98,55 @@ impl<'a> SignCommand {
             x_i: node_secret_share,
         };
 
-        let (_, _, local_sig) = Vss::create_local_sig_from_shares(
-            &priv_shared_keys,
-            index,
-            &shared_block_secrets,
-            &block,
-        )?;
+        let signing_block = matches.is_present("block");
+        let block: Option<Block> = if signing_block {
+            matches
+                .value_of("block")
+                .and_then(|s| hex::decode(s).ok())
+                .and_then(|hex| deserialize::<Block>(&hex).ok())
+                .ok_or(Error::InvalidArgs("block".to_string()))?
+                .into()
+        } else {
+            None
+        };
+
+        let mut xfield = XField::None;
+        if block.is_none() {
+            xfield = matches
+                .value_of("xfield")
+                .and_then(|s| hex::decode(s).ok())
+                .and_then(|hex| deserialize::<XField>(&hex).ok())
+                .ok_or(Error::InvalidArgs("xfield".to_string()))?;
+
+            match xfield {
+                XField::None | XField::Unknown(_, _) => {
+                    return Err(Error::InvalidArgs(
+                        "Either xfield or block is expected".to_string(),
+                    ));
+                }
+                _ => (),
+            }
+        }
+
+        let (_, _, local_sig) = if let Some(ref block) = block {
+            Vss::create_local_sig_from_shares_for_block(
+                &priv_shared_keys,
+                index,
+                &shared_block_secrets,
+                &block,
+            )
+        } else if xfield != XField::None {
+            Vss::create_local_sig_from_shares_for_xfield(
+                &priv_shared_keys,
+                index,
+                &shared_block_secrets,
+                &xfield,
+            )
+        } else {
+            return Err(Error::InvalidArgs(
+                "Either xfield or block is expected".to_string(),
+            ));
+        }?;
 
         let secp = tapyrus::secp256k1::Secp256k1::new();
         let public_key = PublicKey::from_private_key(&secp, &private_key);
@@ -130,9 +167,16 @@ impl<'a> SignCommand {
                 .help("the minimum number of signers required to sign block"),
             Arg::with_name("block")
                 .long("block")
-                .required(true)
+                .required(false)
                 .takes_value(true)
+                .conflicts_with("xfield")
                 .help("block to be signed as a hex string format"),
+            Arg::with_name("xfield")
+                .long("xfield")
+                .required(false)
+                .takes_value(true)
+                .conflicts_with("block")
+                .help("xfield change to be signed as a hex string format"),
             Arg::with_name("node-secret-share")
                 .long("node-secret-share")
                 .required(true)
@@ -347,6 +391,113 @@ mod tests {
         assert_eq!(
             format!("{}", response.err().unwrap()),
             "InvalidArgs(\"private-key\")"
+        );
+    }
+
+    #[test]
+    fn test_execute_xfield() {
+        let matches = SignCommand::args().get_matches_from(vec![
+            "sign",
+            "--threshold",
+            "2",
+            "--xfield",
+            "0121025700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
+            "--block-vss",
+            "03b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d03b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d0002a716af61616f37a27feb739d454b4695e8e4bc2b2ba3286c7c9bc96ccf2a1430c00d2070dd82cf532e7ef1042c00fc73e71ec8e2f9a245515c994f6c4bbf04fd6aafd46ec55a077a5577e7c7f5b18d13d251bf11d74f7e77b0be6e5cfe40baa3c5be600ba7cd38c3231973923a8aab0d95c1c64ef647d71f84c5923ab0e7330a76a499b08a457f92a5a58f358829ceb665a83798a09639361954d2f00b31a718a716af61616f37a27feb739d454b4695e8e4bc2b2ba3286c7c9bc96ccf2a14303ff2df8f227d30acd1810efbd3ff038c18e1371d065dbaaea366b092b440f732abec3f793c98b4c6791e95b9cbc7c8561d5b04c20ce127d77546b2795664816198e00cf4a0136b1861e3e8029d5164924117d8b60223b135a18b54580f8773a7d233d9dd447f252c2e915fb414ffddc72483ce9badc0166b6dbb853e5c8b7b6b",
+            "--block-vss",
+            "0313f2a73541e6d55a75a80a6da819885c6ed6e56ecff19f5e928c4ea202ca7c9003b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d000274d1162809397bff8421607bdc49162b3cc60324ddf1240974cec8d94a8e89c69fea398b0ae42d73015b53fa1e423cfbe814092c35866d6a5d663f50cce431ebc5c1609192fff04939e1e3d846e73b818e01eb997897a78b7a34b4779b94807d5d033e6358429e728731edcf18b0e24766e665b2ee2f63b77d7103191a02dba3fcfb2173c35583c1bc20dfc07b38bb5ba977e86b5cf03a545831711508b7561974d1162809397bff8421607bdc49162b3cc60324ddf1240974cec8d94a8e89c66015c674f51bd28cfea4ac05e1bdc30417ebf6d3ca799295a299c0ae331bca44b2f57788129b817f3723b6579c328bad1149428a83d3d9cac1c4eb3edb512aa1e81bbf2ffd3be0c4e3dcac483858f44ad695f9f8c23cdc2d8061895e51c9c9083108f0e17b0445f39f773ca82585dea76f2a7351ea0c841fd60e73466cb60457",
+            "--block-vss",
+            "023cb7d6326e33332d04d026be1a04cdaf084703d8dc75322182d8fb314a03a87703b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d00028fbd54f9b704c6c951c1b1f45bbc9c4559935d5bfe209d75507b70d4087829cf55e451b9e2ff5b91f491d2cd3fdc149d409fa2c4f07f009216cbb26afd496986a1dcb869f5418b1d3a1f9e75c655eade41930318e355844c2fc42018a7b345a466c0d55ce2fbc3584a0d155c4f7aef8ffe4ce60cc29682aa307fc3e5cbfcacfc92523e57c607ba85506a22d95c3789c9e3af172f3bafb01e6c9ef4ba19f9da1a8fbd54f9b704c6c951c1b1f45bbc9c4559935d5bfe209d75507b70d4087829cfaa1bae461d00a46e0b6e2d32c023eb62bf605d3b0f80ff6de9344d9402b692a97451c274ded2a2776a75158c7069b40a2fa61ad3c15921e12ee40c4a724689e67ff0299ad0e4ce45035dbc8fa1bdf287a7f1a9c06c7366b4c3073046ba0c2e5fedae0e8a92a4e97c25813d7ba6217de74ca8bd9c5bbd6a0c5e95722674748f3a",
+            "--node-secret-share",
+            "70f344fe8d0e53cd0341beae344ca68b8f09427a32aa33603c5fde61b66a09dc",
+            "--aggregated-public-key",
+            "03addb2555f37abf8f28f11f498bec7bd1460e7243c1813847c49a7ae326a97d1c",
+            "--private-key",
+            "L2hmApEYQBQo81RLJc5MMwo6ZZywnfVzuQj6uCfxFLaV2Yo2pVyq",
+        ]);
+        let response = SignCommand::execute(&matches);
+        assert!(response.is_ok());
+    }
+
+    #[test]
+    fn test_invalid_xfield() {
+        let matches = SignCommand::args().get_matches_from(vec![
+            "sign",
+            "--threshold",
+            "2",
+            "--xfield",
+            "x",
+            "--block-vss",
+            "03b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d03b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d0002a716af61616f37a27feb739d454b4695e8e4bc2b2ba3286c7c9bc96ccf2a1430c00d2070dd82cf532e7ef1042c00fc73e71ec8e2f9a245515c994f6c4bbf04fd6aafd46ec55a077a5577e7c7f5b18d13d251bf11d74f7e77b0be6e5cfe40baa3c5be600ba7cd38c3231973923a8aab0d95c1c64ef647d71f84c5923ab0e7330a76a499b08a457f92a5a58f358829ceb665a83798a09639361954d2f00b31a718a716af61616f37a27feb739d454b4695e8e4bc2b2ba3286c7c9bc96ccf2a14303ff2df8f227d30acd1810efbd3ff038c18e1371d065dbaaea366b092b440f732abec3f793c98b4c6791e95b9cbc7c8561d5b04c20ce127d77546b2795664816198e00cf4a0136b1861e3e8029d5164924117d8b60223b135a18b54580f8773a7d233d9dd447f252c2e915fb414ffddc72483ce9badc0166b6dbb853e5c8b7b6b",
+            "--block-vss",
+            "0313f2a73541e6d55a75a80a6da819885c6ed6e56ecff19f5e928c4ea202ca7c9003b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d000274d1162809397bff8421607bdc49162b3cc60324ddf1240974cec8d94a8e89c69fea398b0ae42d73015b53fa1e423cfbe814092c35866d6a5d663f50cce431ebc5c1609192fff04939e1e3d846e73b818e01eb997897a78b7a34b4779b94807d5d033e6358429e728731edcf18b0e24766e665b2ee2f63b77d7103191a02dba3fcfb2173c35583c1bc20dfc07b38bb5ba977e86b5cf03a545831711508b7561974d1162809397bff8421607bdc49162b3cc60324ddf1240974cec8d94a8e89c66015c674f51bd28cfea4ac05e1bdc30417ebf6d3ca799295a299c0ae331bca44b2f57788129b817f3723b6579c328bad1149428a83d3d9cac1c4eb3edb512aa1e81bbf2ffd3be0c4e3dcac483858f44ad695f9f8c23cdc2d8061895e51c9c9083108f0e17b0445f39f773ca82585dea76f2a7351ea0c841fd60e73466cb60457",
+            "--block-vss",
+            "023cb7d6326e33332d04d026be1a04cdaf084703d8dc75322182d8fb314a03a87703b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d00028fbd54f9b704c6c951c1b1f45bbc9c4559935d5bfe209d75507b70d4087829cf55e451b9e2ff5b91f491d2cd3fdc149d409fa2c4f07f009216cbb26afd496986a1dcb869f5418b1d3a1f9e75c655eade41930318e355844c2fc42018a7b345a466c0d55ce2fbc3584a0d155c4f7aef8ffe4ce60cc29682aa307fc3e5cbfcacfc92523e57c607ba85506a22d95c3789c9e3af172f3bafb01e6c9ef4ba19f9da1a8fbd54f9b704c6c951c1b1f45bbc9c4559935d5bfe209d75507b70d4087829cfaa1bae461d00a46e0b6e2d32c023eb62bf605d3b0f80ff6de9344d9402b692a97451c274ded2a2776a75158c7069b40a2fa61ad3c15921e12ee40c4a724689e67ff0299ad0e4ce45035dbc8fa1bdf287a7f1a9c06c7366b4c3073046ba0c2e5fedae0e8a92a4e97c25813d7ba6217de74ca8bd9c5bbd6a0c5e95722674748f3a",
+            "--node-secret-share",
+            "70f344fe8d0e53cd0341beae344ca68b8f09427a32aa33603c5fde61b66a09dc",
+            "--aggregated-public-key",
+            "03addb2555f37abf8f28f11f498bec7bd1460e7243c1813847c49a7ae326a97d1c",
+            "--private-key",
+            "L2hmApEYQBQo81RLJc5MMwo6ZZywnfVzuQj6uCfxFLaV2Yo2pVyq",
+        ]);
+        let response = SignCommand::execute(&matches);
+        assert_eq!(
+            format!("{}", response.err().unwrap()),
+            "InvalidArgs(\"xfield\")"
+        );
+    }
+
+    #[test]
+    fn test_invalid_xfield_none() {
+        let matches = SignCommand::args().get_matches_from(vec![
+            "sign",
+            "--threshold",
+            "2",
+            "--xfield",
+            "00",
+            "--block-vss",
+            "03b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d03b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d0002a716af61616f37a27feb739d454b4695e8e4bc2b2ba3286c7c9bc96ccf2a1430c00d2070dd82cf532e7ef1042c00fc73e71ec8e2f9a245515c994f6c4bbf04fd6aafd46ec55a077a5577e7c7f5b18d13d251bf11d74f7e77b0be6e5cfe40baa3c5be600ba7cd38c3231973923a8aab0d95c1c64ef647d71f84c5923ab0e7330a76a499b08a457f92a5a58f358829ceb665a83798a09639361954d2f00b31a718a716af61616f37a27feb739d454b4695e8e4bc2b2ba3286c7c9bc96ccf2a14303ff2df8f227d30acd1810efbd3ff038c18e1371d065dbaaea366b092b440f732abec3f793c98b4c6791e95b9cbc7c8561d5b04c20ce127d77546b2795664816198e00cf4a0136b1861e3e8029d5164924117d8b60223b135a18b54580f8773a7d233d9dd447f252c2e915fb414ffddc72483ce9badc0166b6dbb853e5c8b7b6b",
+            "--block-vss",
+            "0313f2a73541e6d55a75a80a6da819885c6ed6e56ecff19f5e928c4ea202ca7c9003b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d000274d1162809397bff8421607bdc49162b3cc60324ddf1240974cec8d94a8e89c69fea398b0ae42d73015b53fa1e423cfbe814092c35866d6a5d663f50cce431ebc5c1609192fff04939e1e3d846e73b818e01eb997897a78b7a34b4779b94807d5d033e6358429e728731edcf18b0e24766e665b2ee2f63b77d7103191a02dba3fcfb2173c35583c1bc20dfc07b38bb5ba977e86b5cf03a545831711508b7561974d1162809397bff8421607bdc49162b3cc60324ddf1240974cec8d94a8e89c66015c674f51bd28cfea4ac05e1bdc30417ebf6d3ca799295a299c0ae331bca44b2f57788129b817f3723b6579c328bad1149428a83d3d9cac1c4eb3edb512aa1e81bbf2ffd3be0c4e3dcac483858f44ad695f9f8c23cdc2d8061895e51c9c9083108f0e17b0445f39f773ca82585dea76f2a7351ea0c841fd60e73466cb60457",
+            "--block-vss",
+            "023cb7d6326e33332d04d026be1a04cdaf084703d8dc75322182d8fb314a03a87703b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d00028fbd54f9b704c6c951c1b1f45bbc9c4559935d5bfe209d75507b70d4087829cf55e451b9e2ff5b91f491d2cd3fdc149d409fa2c4f07f009216cbb26afd496986a1dcb869f5418b1d3a1f9e75c655eade41930318e355844c2fc42018a7b345a466c0d55ce2fbc3584a0d155c4f7aef8ffe4ce60cc29682aa307fc3e5cbfcacfc92523e57c607ba85506a22d95c3789c9e3af172f3bafb01e6c9ef4ba19f9da1a8fbd54f9b704c6c951c1b1f45bbc9c4559935d5bfe209d75507b70d4087829cfaa1bae461d00a46e0b6e2d32c023eb62bf605d3b0f80ff6de9344d9402b692a97451c274ded2a2776a75158c7069b40a2fa61ad3c15921e12ee40c4a724689e67ff0299ad0e4ce45035dbc8fa1bdf287a7f1a9c06c7366b4c3073046ba0c2e5fedae0e8a92a4e97c25813d7ba6217de74ca8bd9c5bbd6a0c5e95722674748f3a",
+            "--node-secret-share",
+            "70f344fe8d0e53cd0341beae344ca68b8f09427a32aa33603c5fde61b66a09dc",
+            "--aggregated-public-key",
+            "03addb2555f37abf8f28f11f498bec7bd1460e7243c1813847c49a7ae326a97d1c",
+            "--private-key",
+            "L2hmApEYQBQo81RLJc5MMwo6ZZywnfVzuQj6uCfxFLaV2Yo2pVyq",
+        ]);
+        let response = SignCommand::execute(&matches);
+        assert_eq!(
+            format!("{}", response.err().unwrap()),
+            "InvalidArgs(\"Either xfield or block is expected\")"
+        );
+    }
+
+    #[test]
+    fn test_no_block_no_xfield() {
+        let matches = SignCommand::args().get_matches_from(vec![
+            "sign",
+            "--threshold",
+            "2",
+            "--block-vss",
+            "03b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d03b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d0002a716af61616f37a27feb739d454b4695e8e4bc2b2ba3286c7c9bc96ccf2a1430c00d2070dd82cf532e7ef1042c00fc73e71ec8e2f9a245515c994f6c4bbf04fd6aafd46ec55a077a5577e7c7f5b18d13d251bf11d74f7e77b0be6e5cfe40baa3c5be600ba7cd38c3231973923a8aab0d95c1c64ef647d71f84c5923ab0e7330a76a499b08a457f92a5a58f358829ceb665a83798a09639361954d2f00b31a718a716af61616f37a27feb739d454b4695e8e4bc2b2ba3286c7c9bc96ccf2a14303ff2df8f227d30acd1810efbd3ff038c18e1371d065dbaaea366b092b440f732abec3f793c98b4c6791e95b9cbc7c8561d5b04c20ce127d77546b2795664816198e00cf4a0136b1861e3e8029d5164924117d8b60223b135a18b54580f8773a7d233d9dd447f252c2e915fb414ffddc72483ce9badc0166b6dbb853e5c8b7b6b",
+            "--block-vss",
+            "0313f2a73541e6d55a75a80a6da819885c6ed6e56ecff19f5e928c4ea202ca7c9003b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d000274d1162809397bff8421607bdc49162b3cc60324ddf1240974cec8d94a8e89c69fea398b0ae42d73015b53fa1e423cfbe814092c35866d6a5d663f50cce431ebc5c1609192fff04939e1e3d846e73b818e01eb997897a78b7a34b4779b94807d5d033e6358429e728731edcf18b0e24766e665b2ee2f63b77d7103191a02dba3fcfb2173c35583c1bc20dfc07b38bb5ba977e86b5cf03a545831711508b7561974d1162809397bff8421607bdc49162b3cc60324ddf1240974cec8d94a8e89c66015c674f51bd28cfea4ac05e1bdc30417ebf6d3ca799295a299c0ae331bca44b2f57788129b817f3723b6579c328bad1149428a83d3d9cac1c4eb3edb512aa1e81bbf2ffd3be0c4e3dcac483858f44ad695f9f8c23cdc2d8061895e51c9c9083108f0e17b0445f39f773ca82585dea76f2a7351ea0c841fd60e73466cb60457",
+            "--block-vss",
+            "023cb7d6326e33332d04d026be1a04cdaf084703d8dc75322182d8fb314a03a87703b8ad9e3271a20d5eb2b622e455fcffa5c9c90e38b192772b2e1b58f6b442e78d00028fbd54f9b704c6c951c1b1f45bbc9c4559935d5bfe209d75507b70d4087829cf55e451b9e2ff5b91f491d2cd3fdc149d409fa2c4f07f009216cbb26afd496986a1dcb869f5418b1d3a1f9e75c655eade41930318e355844c2fc42018a7b345a466c0d55ce2fbc3584a0d155c4f7aef8ffe4ce60cc29682aa307fc3e5cbfcacfc92523e57c607ba85506a22d95c3789c9e3af172f3bafb01e6c9ef4ba19f9da1a8fbd54f9b704c6c951c1b1f45bbc9c4559935d5bfe209d75507b70d4087829cfaa1bae461d00a46e0b6e2d32c023eb62bf605d3b0f80ff6de9344d9402b692a97451c274ded2a2776a75158c7069b40a2fa61ad3c15921e12ee40c4a724689e67ff0299ad0e4ce45035dbc8fa1bdf287a7f1a9c06c7366b4c3073046ba0c2e5fedae0e8a92a4e97c25813d7ba6217de74ca8bd9c5bbd6a0c5e95722674748f3a",
+            "--node-secret-share",
+            "70f344fe8d0e53cd0341beae344ca68b8f09427a32aa33603c5fde61b66a09dc",
+            "--aggregated-public-key",
+            "03addb2555f37abf8f28f11f498bec7bd1460e7243c1813847c49a7ae326a97d1c",
+            "--private-key",
+            "L2hmApEYQBQo81RLJc5MMwo6ZZywnfVzuQj6uCfxFLaV2Yo2pVyq",
+        ]);
+        let response = SignCommand::execute(&matches);
+        assert_eq!(
+            format!("{}", response.err().unwrap()),
+            "InvalidArgs(\"xfield\")"
         );
     }
 }

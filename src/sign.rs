@@ -5,6 +5,7 @@ use curv::arithmetic::traits::*;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::traits::*;
 use curv::{BigInt, FE, GE};
+use tapyrus::XFieldHash;
 
 use crate::errors::Error;
 use crate::signer_node::SharedSecretMap;
@@ -73,6 +74,15 @@ impl Sign {
         eph_shared_keys: &SharedKeys,
         priv_shared_keys: &SharedKeys,
         message: BlockSigHash,
+    ) -> LocalSig {
+        let local_sig = LocalSig::compute(&message[..], &eph_shared_keys, &priv_shared_keys);
+        local_sig
+    }
+
+    pub fn sign_xfield(
+        eph_shared_keys: &SharedKeys,
+        priv_shared_keys: &SharedKeys,
+        message: XFieldHash,
     ) -> LocalSig {
         let local_sig = LocalSig::compute(&message[..], &eph_shared_keys, &priv_shared_keys);
         local_sig

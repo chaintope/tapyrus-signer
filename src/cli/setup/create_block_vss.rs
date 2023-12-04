@@ -109,7 +109,7 @@ impl<'a> CreateBlockVssCommand {
                 .long("threshold")
                 .required(true)
                 .takes_value(true)
-                .help("the minimum number of signers required to sign block"),
+                .help("the minimum number of signers required to sign block/xfield change"),
         ])
     }
 }

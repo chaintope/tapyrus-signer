@@ -22,7 +22,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::io;
 use std::str::FromStr;
-use tapyrus::blockdata::block::Block;
+use tapyrus::blockdata::block::{Block, XField};
 use tapyrus::consensus::encode::{self, *};
 use tapyrus::util::prime::jacobi;
 use tapyrus::{PrivateKey, PublicKey};
@@ -119,6 +119,32 @@ impl Vss {
     }
 
     pub fn create_local_sig_from_shares(
+        _priv_shared_keys: &SharedKeys,
+        index: usize,
+        shared_block_secrets: &BidirectionalSharedSecretMap,
+        local_sig_for_positive: &LocalSig,
+        local_sig_for_negative: &LocalSig,
+    ) -> Result<(bool, SharedKeys, LocalSig), Error> {
+        let shared_keys_for_positive =
+            Sign::verify_vss_and_construct_key(&shared_block_secrets.for_positive(), &index)?;
+
+        let shared_keys_for_negative =
+            Sign::verify_vss_and_construct_key(&shared_block_secrets.for_negative(), &index)?;
+
+        let y = shared_keys_for_positive
+            .y
+            .y_coor()
+            .expect("can not get y_coor");
+        let is_positive = jacobi(&Converter::to_vec(&y)) == 1;
+        let (shared_keys, local_sig) = if is_positive {
+            (shared_keys_for_positive, local_sig_for_positive)
+        } else {
+            (shared_keys_for_negative, local_sig_for_negative)
+        };
+        Ok((is_positive, shared_keys, local_sig.clone()))
+    }
+
+    pub fn create_local_sig_from_shares_for_block(
         priv_shared_keys: &SharedKeys,
         index: usize,
         shared_block_secrets: &BidirectionalSharedSecretMap,
@@ -139,22 +165,47 @@ impl Vss {
             &priv_shared_keys,
             block.header.signature_hash(),
         );
+        Self::create_local_sig_from_shares(
+            priv_shared_keys,
+            index,
+            shared_block_secrets,
+            &local_sig_for_positive,
+            &local_sig_for_negative,
+        )
+    }
 
-        let y = shared_keys_for_positive
-            .y
-            .y_coor()
-            .expect("can not get y_coor");
-        let is_positive = jacobi(&Converter::to_vec(&y)) == 1;
-        let (shared_keys, local_sig) = if is_positive {
-            (shared_keys_for_positive, local_sig_for_positive)
-        } else {
-            (shared_keys_for_negative, local_sig_for_negative)
-        };
-        Ok((is_positive, shared_keys, local_sig))
+    pub fn create_local_sig_from_shares_for_xfield(
+        priv_shared_keys: &SharedKeys,
+        index: usize,
+        shared_block_secrets: &BidirectionalSharedSecretMap,
+        xfield: &XField,
+    ) -> Result<(bool, SharedKeys, LocalSig), Error> {
+        let shared_keys_for_positive =
+            Sign::verify_vss_and_construct_key(&shared_block_secrets.for_positive(), &index)?;
+        let local_sig_for_positive = Sign::sign_xfield(
+            &shared_keys_for_positive,
+            &priv_shared_keys,
+            xfield.signature_hash()?,
+        );
+
+        let shared_keys_for_negative =
+            Sign::verify_vss_and_construct_key(&shared_block_secrets.for_negative(), &index)?;
+        let local_sig_for_negative = Sign::sign_xfield(
+            &shared_keys_for_negative,
+            &priv_shared_keys,
+            xfield.signature_hash()?,
+        );
+        Self::create_local_sig_from_shares(
+            priv_shared_keys,
+            index,
+            shared_block_secrets,
+            &local_sig_for_positive,
+            &local_sig_for_negative,
+        )
     }
 
     pub fn aggregate_and_verify_signature(
-        block: &Block,
+        hash: &[u8],
         signatures: BTreeMap<SignerID, (FE, FE)>,
         pubkey_list: &Vec<PublicKey>,
         shared_secrets: &SharedSecretMap,
@@ -189,7 +240,6 @@ impl Vss {
             block_shared_keys.unwrap().2,
         );
         let public_key = priv_shared_keys.y;
-        let hash = block.header.signature_hash();
         signature.verify(&hash[..], &public_key)?;
         Ok(signature)
     }
@@ -544,9 +594,13 @@ mod tests {
             })
             .collect();
 
-        let (is_positive, key, local_sig) =
-            Vss::create_local_sig_from_shares(&priv_shared_keys, 1, &shared_block_secrets, &block)
-                .expect("error occurred in Vss::create_local_sig_from_shares");
+        let (is_positive, key, local_sig) = Vss::create_local_sig_from_shares_for_block(
+            &priv_shared_keys,
+            1,
+            &shared_block_secrets,
+            &block,
+        )
+        .expect("error occurred in Vss::create_local_sig_from_shares");
 
         let expected_localsig = to_local_sig(&v["expected_localsig"]).unwrap();
         let expected_block_shared_keys =
@@ -556,5 +610,88 @@ mod tests {
         assert_eq!(local_sig.gamma_i, expected_localsig.gamma_i);
         assert_eq!(key.x_i, expected_block_shared_keys.1);
         assert_eq!(key.y, expected_block_shared_keys.2);
+    }
+
+    #[test]
+    fn test_create_local_sig_from_shares_xfield1() {
+        let contents = load_test_vector("./tests/resources/vss.json").unwrap();
+        let v: Value =
+            serde_json::from_value(contents["create_local_sig_from_shares_successfully"].clone())
+                .unwrap();
+        let priv_shared_keys: SharedKeys =
+            serde_json::from_value(v["priv_shared_key"].clone()).unwrap();
+        let xfield: XField = XField::AggregatePublicKey(
+            PublicKey::from_str(
+                "025700236c2890233592fcef262f4520d22af9160e3d9705855140eb2aa06c35d3",
+            )
+            .unwrap(),
+        );
+        let shared_block_secrets = v["shared_block_secrets"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(k, value)| {
+                (
+                    to_signer_id(k),
+                    (to_shared_secret(&value[0]), to_shared_secret(&value[1])),
+                )
+            })
+            .collect();
+
+        let (is_positive, key, local_sig) = Vss::create_local_sig_from_shares_for_xfield(
+            &priv_shared_keys,
+            1,
+            &shared_block_secrets,
+            &xfield,
+        )
+        .expect("error occurred in Vss::create_local_sig_from_shares");
+
+        let expected_localsig = to_local_sig(&v["expected_localsig"]).unwrap();
+        let expected_block_shared_keys =
+            to_block_shared_keys(&v["expected_block_shared_keys"]).unwrap();
+
+        assert_eq!(false, is_positive);
+        assert_eq!(key.x_i, expected_block_shared_keys.1);
+        assert_eq!(key.y, expected_block_shared_keys.2);
+        //TODO : check signature
+    }
+
+    #[test]
+    fn test_create_local_sig_from_shares_xfield2() {
+        let contents = load_test_vector("./tests/resources/vss.json").unwrap();
+        let v: Value =
+            serde_json::from_value(contents["create_local_sig_from_shares_successfully"].clone())
+                .unwrap();
+        let priv_shared_keys: SharedKeys =
+            serde_json::from_value(v["priv_shared_key"].clone()).unwrap();
+        let xfield: XField = XField::MaxBlockSize(100);
+        let shared_block_secrets = v["shared_block_secrets"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(k, value)| {
+                (
+                    to_signer_id(k),
+                    (to_shared_secret(&value[0]), to_shared_secret(&value[1])),
+                )
+            })
+            .collect();
+
+        let (is_positive, key, local_sig) = Vss::create_local_sig_from_shares_for_xfield(
+            &priv_shared_keys,
+            1,
+            &shared_block_secrets,
+            &xfield,
+        )
+        .expect("error occurred in Vss::create_local_sig_from_shares");
+
+        let expected_localsig = to_local_sig(&v["expected_localsig"]).unwrap();
+        let expected_block_shared_keys =
+            to_block_shared_keys(&v["expected_block_shared_keys"]).unwrap();
+
+        assert_eq!(false, is_positive);
+        assert_eq!(key.x_i, expected_block_shared_keys.1);
+        assert_eq!(key.y, expected_block_shared_keys.2);
+        //TODO : check signature
     }
 }
