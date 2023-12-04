@@ -265,5 +265,4 @@ mod tests {
         let path = Path::new("tests/resources/federations_has_max_block_size.toml");
         load_federations(&pubkey, path);
     }
-
 }

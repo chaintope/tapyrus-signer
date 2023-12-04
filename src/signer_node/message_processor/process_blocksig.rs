@@ -37,7 +37,7 @@ where
         let mut builder = DumpBuilder::default();
         let federation = params.get_federation_by_block_height(block_height);
         let node_vss = federation.nodevss();
-        let aggregated_public_key = federation.aggregated_public_key();
+        let aggregated_public_key = federation.aggregated_public_key().unwrap();
         builder
             .received(Received {
                 sender: sender_id.clone(),
