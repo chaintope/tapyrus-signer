@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 http = "0.1.17"
-tapyrus = { git = "https://github.com/chaintope/rust-tapyrus", tag = "v0.4.5", features = ["use-serde", "rand"] }
+tapyrus = { version = "0.4.8", features = ["use-serde", "rand"] }
 secp256k1 = "0.15.3"
 log = "0.4.6"
 env_logger = "0.9.0"
