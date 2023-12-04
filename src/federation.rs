@@ -438,7 +438,7 @@ pub struct SerFederation {
 mod tests {
     use crate::crypto::multi_party_schnorr::Signature;
     use crate::errors::Error;
-    use crate::federation:: {Federation, Federations};
+    use crate::federation::{Federation, Federations};
     use crate::hex::FromHex;
     use crate::net::SignerID;
     use crate::tapyrus::blockdata::block::XField;
@@ -568,7 +568,7 @@ mod tests {
         }
 
         let federations =
-        Federations::new(vec![valid_federation(), valid_federation_maxblocksize()]);
+            Federations::new(vec![valid_federation(), valid_federation_maxblocksize()]);
         match federations.validate() {
             Err(Error::InvalidFederation(None, m)) => {
                 assert_eq!(m, "The federations include block height duplication. The block height in all federations should be unique.")
