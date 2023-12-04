@@ -92,7 +92,7 @@ where
     let next_block_height = block_height + 1;
     let federation = params.get_federation_by_block_height(next_block_height);
     if let Some(public_key) = block.header.aggregated_public_key() {
-        if public_key == federation.aggregated_public_key()
+        if public_key == federation.aggregated_public_key().unwrap()
             && next_block_height == federation.block_height()
         {
             Ok(())
@@ -310,14 +310,18 @@ mod tests {
             0,
             Some(3),
             Some(node_vss(0)),
-            TEST_KEYS.aggregated(),
+            XField::AggregatePublicKey(TEST_KEYS.aggregated()),
+            None,
+            None,
         );
         let federation100 = Federation::new(
             TEST_KEYS.pubkeys()[4],
             100,
             Some(3),
             Some(node_vss(1)),
-            TEST_KEYS.aggregated(),
+            XField::AggregatePublicKey(TEST_KEYS.aggregated()),
+            None,
+            None,
         );
         let another_key = PublicKey::from_str(
             "030acd6af981c498ebf2ffd9a341d2a96bde5832c150e7d300fa3583eee0f964fe",
@@ -328,7 +332,9 @@ mod tests {
             200,
             Some(4),
             Some(node_vss(2)),
-            another_key,
+            XField::AggregatePublicKey(another_key),
+            None,
+            None,
         );
         let federations = Federations::new(vec![
             federation0.clone(),

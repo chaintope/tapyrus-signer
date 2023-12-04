@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn test_load_federations() {
         let pubkey = PublicKey::from_str(
-            "02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506",
+            "0315d137054b688717f7fe4bd22a1c886de7a07bf3beb041092fb79688306df3c9",
         )
         .unwrap();
 
@@ -229,11 +229,11 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "federations_file: Invalid Federation at 0 height. message: The nodevss has wrong vss which has wrong number of commitments."
+        expected = "federations_file: Invalid Federation at 20 height. message: The nodevss has wrong vss which has wrong number of commitments."
     )]
     fn test_load_federations_has_invalid_federation() {
         let pubkey = PublicKey::from_str(
-            "02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506",
+            "0315d137054b688717f7fe4bd22a1c886de7a07bf3beb041092fb79688306df3c9",
         )
         .unwrap();
 
@@ -243,7 +243,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "federations_file: Invalid TOML format. missing field `aggregated-public-key` for key `federation` at line 12 column 1"
+        expected = "federations_file: Invalid Federation at 100 height. message: No xfield in federation. Aggregated pubkey or max block size is expected"
     )]
     fn test_load_federations_invalid_toml_format() {
         let pubkey = PublicKey::from_str(
@@ -254,4 +254,16 @@ mod tests {
         let path = Path::new("tests/resources/federations_invalid_toml_format.toml");
         load_federations(&pubkey, path);
     }
+
+    #[test]
+    fn test_load_federations_has_max_block_size() {
+        let pubkey = PublicKey::from_str(
+            "0302f5584e30d2ee32e772d04ff8ee1efc90a7a91ac5b7c4025da7a42a67d06a25",
+        )
+        .unwrap();
+
+        let path = Path::new("tests/resources/federations_has_max_block_size.toml");
+        load_federations(&pubkey, path);
+    }
+
 }

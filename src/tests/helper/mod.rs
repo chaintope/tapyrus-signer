@@ -47,7 +47,7 @@ pub mod test_vectors {
     use crate::tests::helper::node_parameters_builder::NodeParametersBuilder;
     use crate::tests::helper::rpc::MockRpc;
 
-    use tapyrus::blockdata::block::Block;
+    use tapyrus::blockdata::block::{Block, XField};
     use tapyrus::consensus::encode::deserialize;
     use tapyrus::{PrivateKey, PublicKey};
 
@@ -156,13 +156,31 @@ pub mod test_vectors {
         let threshold = value["threshold"].as_u64().unwrap();
         let aggregated_public_key = to_public_key(&value["aggregated_public_key"]);
         let public_key = to_public_key(&value["public_key"]);
-        let federations = vec![Federation::new(
-            public_key,
-            0,
-            Some(threshold as u8),
-            Some(node_vss.clone()),
-            aggregated_public_key,
-        )];
+        let mut federations = vec![];
+        if value["aggregated_public_key"] != "" {
+            let aggregated_public_key = to_public_key(&value["aggregated_public_key"]);
+            federations = vec![Federation::new(
+                public_key,
+                0,
+                Some(threshold as u8),
+                Some(node_vss.clone()),
+                XField::AggregatePublicKey(aggregated_public_key),
+                None,
+                None,
+            )];
+        } else if value["max_block_size"] != "" {
+            let max_block_size = value["max_block_size"].as_u64().unwrap() as u32;
+            federations = vec![Federation::new(
+                public_key,
+                0,
+                Some(threshold as u8),
+                Some(node_vss.clone()),
+                XField::MaxBlockSize(max_block_size),
+                None,
+                None,
+            )];
+        }
+
         let federations = Federations::new(federations);
         NodeParametersBuilder::new()
             .rpc(rpc)

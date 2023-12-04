@@ -617,7 +617,7 @@ mod tests {
     use std::thread;
     use std::thread::JoinHandle;
     use std::time::Duration;
-    use tapyrus::blockdata::block::Block;
+    use tapyrus::blockdata::block::{Block, XField};
     use tapyrus::consensus::encode::deserialize;
     use tapyrus::PublicKey;
 
@@ -722,7 +722,9 @@ mod tests {
             0,
             threshold,
             Some(node_vss(0)),
-            aggregated_public_key,
+            XField::AggregatePublicKey(aggregated_public_key),
+            None,
+            None,
         )]));
 
         let mut params = NodeParameters::new(to_address, public_key, rpc, 0, 10, true, federations);

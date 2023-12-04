@@ -4,6 +4,7 @@ use crate::tests::helper::address;
 use crate::tests::helper::keys::TEST_KEYS;
 use crate::tests::helper::node_vss::node_vss;
 use crate::tests::helper::rpc::MockRpc;
+use tapyrus::blockdata::block::XField;
 use tapyrus::{Address, PublicKey};
 
 pub struct NodeParametersBuilder {
@@ -31,7 +32,9 @@ impl NodeParametersBuilder {
                 0,
                 Some(2),
                 Some(node_vss(0)),
-                TEST_KEYS.aggregated(),
+                XField::AggregatePublicKey(TEST_KEYS.aggregated()),
+                None,
+                None,
             )]),
         }
     }
