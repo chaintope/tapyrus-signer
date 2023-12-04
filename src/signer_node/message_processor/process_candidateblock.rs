@@ -4,8 +4,8 @@ use crate::rpc::TapyrusApi;
 use crate::signer_node::message_processor::create_block_vss;
 use crate::signer_node::node_state::builder::{Builder, Member};
 use crate::signer_node::utils::sender_index;
-use crate::signer_node::{NodeParameters, NodeState};
-use tapyrus::blockdata::block::{Block, XField};
+use crate::signer_node::{Federation, NodeParameters, NodeState};
+use tapyrus::blockdata::block::Block;
 
 pub fn process_candidateblock<T, C>(
     sender_id: &SignerID,
@@ -74,38 +74,10 @@ fn verify_block<T>(
 where
     T: TapyrusApi,
 {
-    match block.header.xfield {
-        XField::Unknown(_, _) => return Err(Error::UnsupportedXField),
-        _ => {}
-    }
-    verify_aggregated_public_key(block, block_height, params)
-}
+    let xfield = block.header.xfield.clone();
+    let expected_federation = params.get_federation_change_for_block_height(block_height + 1);
 
-fn verify_aggregated_public_key<T>(
-    block: &Block,
-    block_height: u32,
-    params: &NodeParameters<T>,
-) -> Result<(), Error>
-where
-    T: TapyrusApi,
-{
-    let next_block_height = block_height + 1;
-    let federation = params.get_federation_by_block_height(next_block_height);
-    if let Some(public_key) = block.header.aggregated_public_key() {
-        if public_key == federation.aggregated_public_key().unwrap()
-            && next_block_height == federation.block_height()
-        {
-            Ok(())
-        } else {
-            Err(Error::InvalidAggregatedPublicKey)
-        }
-    } else {
-        if next_block_height == federation.block_height() {
-            Err(Error::InvalidAggregatedPublicKey)
-        } else {
-            Ok(())
-        }
-    }
+    Federation::match_xfield_with_federation(block_height, xfield, expected_federation)
 }
 
 #[cfg(test)]
@@ -123,6 +95,7 @@ mod tests {
     use crate::tests::helper::node_vss::node_vss;
     use crate::tests::helper::rpc::MockRpc;
     use std::str::FromStr;
+    use tapyrus::blockdata::block::XField;
     use tapyrus::consensus::encode::deserialize;
     use tapyrus::PublicKey;
 
@@ -303,6 +276,8 @@ mod tests {
         let raw_block = hex::decode(TEST_BLOCK_WITHOUT_PUBKEY).unwrap();
         deserialize(&raw_block).unwrap()
     }
+
+    //TODO : create correct signatures for these
     #[test]
     fn test_verify_aggregated_public_key() {
         let federation0 = Federation::new(
@@ -320,7 +295,7 @@ mod tests {
             Some(3),
             Some(node_vss(1)),
             XField::AggregatePublicKey(TEST_KEYS.aggregated()),
-            None,
+            Some(TEST_KEYS.aggregated()),
             None,
         );
         let another_key = PublicKey::from_str(
@@ -333,7 +308,7 @@ mod tests {
             Some(4),
             Some(node_vss(2)),
             XField::AggregatePublicKey(another_key),
-            None,
+            Some(TEST_KEYS.aggregated()),
             None,
         );
         let federations = Federations::new(vec![
@@ -348,18 +323,43 @@ mod tests {
             .build();
 
         let block = test_block_with_public_key();
-        assert!(verify_aggregated_public_key(&block, 99, &params).is_ok());
+        //this block is valid but fails as the signature in federations is None
+        match verify_block(&block, 99, &params) {
+            Err(Error::UnauthorizedFederationChange(..)) => {
+                assert!(true, "Error UnauthorizedFederationChange")
+            }
+            Ok(()) => assert!(false, "No error"),
+            _ => assert!(false, "Different error type expected"),
+        }
 
         let block = test_block_with_public_key();
-        assert!(verify_aggregated_public_key(&block, 100, &params).is_err());
+        match verify_block(&block, 100, &params) {
+            Err(Error::XfieldFederationMismatch(..)) => {
+                assert!(true, "Error XfieldFederationMismatch")
+            }
+            Ok(()) => assert!(false, "No error"),
+            _ => assert!(false, "Different error type expected"),
+        }
 
         let block = test_block_with_public_key();
-        assert!(verify_aggregated_public_key(&block, 199, &params).is_err());
+        match verify_block(&block, 199, &params) {
+            Err(Error::XfieldFederationMismatch(..)) => {
+                assert!(true, "Error XfieldFederationMismatch")
+            }
+            Ok(()) => assert!(false, "No error"),
+            _ => assert!(false, "Different error type expected"),
+        }
 
         let block = test_block_without_public_key();
-        assert!(verify_aggregated_public_key(&block, 99, &params).is_err());
+        match verify_block(&block, 99, &params) {
+            Err(Error::XfieldFederationMismatch(..)) => {
+                assert!(true, "Error XfieldFederationMismatch")
+            }
+            Ok(()) => assert!(false, "No error"),
+            _ => assert!(false, "Different error type expected"),
+        }
 
         let block = test_block_without_public_key();
-        assert!(verify_aggregated_public_key(&block, 100, &params).is_ok());
+        assert!(verify_block(&block, 100, &params).is_ok())
     }
 }

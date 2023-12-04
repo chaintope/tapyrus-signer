@@ -2,7 +2,7 @@ use crate::errors::Error;
 use crate::rpc::{GetBlockchainInfoResult, TapyrusApi};
 use std::cell::RefCell;
 use std::collections::VecDeque;
-use tapyrus::blockdata::block::Block;
+use tapyrus::blockdata::block::{Block, XField};
 use tapyrus::Address;
 
 /// Mock for Rpc
@@ -114,6 +114,20 @@ impl TapyrusApi for MockRpc {
         let result = list.pop_back().expect(&format!(
             "Unexpected RPC call method=getnewblock, args(address={:?})",
             address
+        ));
+        Ok(result)
+    }
+
+    fn getnewblockwithxfield(
+        &self,
+        address: &Address,
+        required_age: &u32,
+        xfield: &XField,
+    ) -> Result<Block, Error> {
+        let mut list = self.getnewblock_results.borrow_mut();
+        let result = list.pop_back().expect(&format!(
+            "Unexpected RPC call method=getnewblock, args(address={:?}, )required_age={:?}, xfield={:?})",
+            address, required_age, xfield
         ));
         Ok(result)
     }

@@ -37,6 +37,13 @@ impl Federations {
             .expect("Federations should not be empty.")
     }
 
+    pub fn get_federation_change_for_block_height(&self, block_height: u32) -> Option<&Federation> {
+        self.federations
+            .iter()
+            .filter(|f| f.block_height == block_height)
+            .last()
+    }
+
     pub fn last(&self) -> &Federation {
         self.federations
             .last()
@@ -78,16 +85,60 @@ impl Federations {
     pub fn from_pubkey_and_toml(pubkey: &PublicKey, toml: &str) -> Result<Self, Error> {
         let ser: SerFederations = toml::from_str(toml)?;
 
-        let vec: Vec<Federation> = ser
+        let mut vec: Vec<Federation> = ser
             .federation
             .into_iter()
             .map(|i| Federation::from(*pubkey, i))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let r = Federations::new(vec);
-        r.validate()?;
+        vec.sort_by_key(|f| f.block_height);
+        vec = Self::fill_missing_unchanged_federation_parameters(vec)?;
 
+        let r = Federations::new(vec);
         Ok(r)
+    }
+
+    ///  The federation parameters which are not repeated in the toml with maxblocksize
+    /// but are unchanged from the previous federation
+    fn fill_missing_unchanged_federation_parameters(
+        mut vec: Vec<Federation>,
+    ) -> Result<Vec<Federation>, Error> {
+        let mut last_fed_index = 0;
+        for i in 1..vec.len() {
+            match vec[i].validate() {
+                Ok(()) => (),
+                Err(e) => return Err(e),
+            }
+
+            let last_fed_data = {
+                let last_fed = vec[last_fed_index].clone();
+                (
+                    last_fed.aggregated_public_key(),
+                    last_fed.threshold,
+                    last_fed.nodevss.clone(),
+                )
+            };
+
+            let fed = &mut vec[i];
+
+            if fed.block_height > 0 {
+                fed.verification_key = last_fed_data.0;
+                match fed.verify_signature() {
+                    Ok(()) => (),
+                    Err(e) => return Err(e),
+                }
+
+                if fed.max_block_size().is_some() {
+                    fed.threshold = last_fed_data.1;
+                    fed.nodevss = last_fed_data.2;
+                }
+
+                if fed.aggregated_public_key().is_some() {
+                    last_fed_index = i;
+                }
+            }
+        }
+        Ok(vec)
     }
 }
 
@@ -169,6 +220,74 @@ impl Federation {
             None,
             sig,
         ))
+    }
+
+    pub fn to_ser(self) -> Result<SerFederation, Error> {
+        let nodevss = self.nodevss.clone();
+        let signature: String = Sign::format_signature(&self.signature.clone().unwrap());
+
+        let federation = match self.xfield {
+            XField::AggregatePublicKey(_) => SerFederation {
+                block_height: self.block_height,
+                threshold: self.threshold,
+                nodevss: nodevss,
+                signature: Some(signature),
+                aggregated_public_key: self.aggregated_public_key(),
+                max_block_size: None,
+            },
+            XField::MaxBlockSize(_) => SerFederation {
+                block_height: self.block_height,
+                threshold: self.threshold,
+                nodevss: nodevss,
+                signature: Some(signature),
+                max_block_size: self.max_block_size(),
+                aggregated_public_key: None,
+            },
+            _ => SerFederation {
+                block_height: self.block_height,
+                threshold: self.threshold,
+                nodevss: nodevss,
+                signature: Some(signature),
+                max_block_size: None,
+                aggregated_public_key: None,
+            },
+        };
+        Ok(federation)
+    }
+
+    pub fn from_pubkey(
+        pubkey: PublicKey,
+        block_height: u32,
+        threshold: u8,
+        nodevss: Vec<Vss>,
+        signature: Option<Signature>,
+    ) -> Self {
+        Self::new(
+            pubkey,
+            block_height,
+            Some(threshold),
+            Some(nodevss),
+            XField::AggregatePublicKey(pubkey),
+            None,
+            signature,
+        )
+    }
+
+    pub fn from_maxblocksize(
+        pubkey: PublicKey,
+        block_height: u32,
+        maxblocksize: u32,
+        signature: Option<Signature>,
+    ) -> Self {
+        Self::new(
+            pubkey,
+            block_height,
+            None,
+            None,
+            XField::MaxBlockSize(maxblocksize),
+            None,
+            signature,
+        )
     }
 
     pub fn node_index(&self) -> usize {
@@ -259,12 +378,35 @@ impl Federation {
     }
 
     pub fn validate(&self) -> Result<(), Error> {
+        if self.xfield == XField::None {
+            return Err(Error::InvalidFederation(
+                Some(self.block_height),
+                "Either aggregated pubkey or max block size is mandatory in a federation.",
+            ));
+        }
+
+        if self.aggregated_public_key().is_some() && self.max_block_size().is_some() {
+            return Err(Error::InvalidFederation(
+                Some(self.block_height),
+                "Both aggregated pubkey and max block size cannot be given in one federation.",
+            ));
+        }
+
+        if self.block_height > 0 && self.signature.is_none() {
+            return Err(Error::InvalidFederation(
+                Some(self.block_height),
+                "Signature is expected in federation at this height.",
+            ));
+        }
+
         // Skip validation if the signer of the node is not a member of the federation.
         if self.threshold.is_none() && self.nodevss.is_none() {
             return Ok(());
         }
 
-        if self.threshold.is_none() || self.nodevss.is_none() {
+        if (self.threshold.is_none() || self.nodevss.is_none())
+            && self.aggregated_public_key().is_some()
+        {
             return Err(Error::InvalidFederation(
                 Some(self.block_height),
                 "The threshold and the nodevss must be set if the signer of the node is a member of the federation. If it is not a member of federation, you must set neither the threshold nor the nodevss.",
@@ -324,72 +466,70 @@ impl Federation {
         self.threshold.is_some() && self.nodevss.is_some()
     }
 
-    pub fn from_pubkey(
-        pubkey: PublicKey,
-        block_height: u32,
-        threshold: u8,
-        nodevss: Vec<Vss>,
-        signature: Option<Signature>,
-    ) -> Self {
-        Self::new(
-            pubkey,
-            block_height,
-            Some(threshold),
-            Some(nodevss),
-            XField::AggregatePublicKey(pubkey),
-            None,
-            signature,
-        )
+    pub fn verify_signature(&self) -> Result<(), Error> {
+        if let Some(signature) = &self.signature {
+            let hash = self.xfield.signature_hash().unwrap();
+            let verification_key = self.verification_key.unwrap();
+            let bytes: Vec<u8> = verification_key.key.serialize_uncompressed().to_vec();
+            let point = GE::from_bytes(&bytes[1..]).expect("failed to convert pubkey to point");
+            signature.verify(&hash[..], &point)
+        } else {
+            Err(Error::UnauthorizedFederationChange(self.block_height))
+        }
     }
 
-    pub fn from_maxblocksize(
-        pubkey: PublicKey,
+    pub fn match_xfield_with_federation(
         block_height: u32,
-        maxblocksize: u32,
-        signature: Option<Signature>,
-    ) -> Self {
-        Self::new(
-            pubkey,
-            block_height,
-            None,
-            None,
-            XField::MaxBlockSize(maxblocksize),
-            None,
-            signature,
-        )
-    }
+        xfield: XField,
+        expected_federation: Option<&Federation>,
+    ) -> Result<(), Error> {
+        match (xfield, expected_federation) {
+            (XField::None, None) => Ok(()),
 
-    pub fn to_ser(self) -> Result<SerFederation, Error> {
-        let nodevss = self.nodevss.clone();
-        let signature: String = Sign::format_signature(&self.signature.clone().unwrap());
+            // block should not have unknown xfield
+            (XField::Unknown(c, _), _) => Err(Error::UnsupportedXField(format!(
+                "Xfield type {} in the block is not supported",
+                c
+            ))),
 
-        let federation = match self.xfield {
-            XField::AggregatePublicKey(_) => SerFederation {
-                block_height: self.block_height,
-                threshold: self.threshold,
-                nodevss: nodevss,
-                signature: Some(signature),
-                aggregated_public_key: self.aggregated_public_key(),
-                max_block_size: None,
-            },
-            XField::MaxBlockSize(_) => SerFederation {
-                block_height: self.block_height,
-                threshold: self.threshold,
-                nodevss: nodevss,
-                signature: Some(signature),
-                max_block_size: self.max_block_size(),
-                aggregated_public_key: None,
-            },
-            _ => SerFederation {
-                block_height: self.block_height,
-                threshold: self.threshold,
-                nodevss: nodevss,
-                signature: Some(signature),
-                max_block_size: None,
-                aggregated_public_key: None,
-            },
-        };
-        Ok(federation)
+            // when there is no xfield in the block: verify that there is no change in federarions
+            (XField::None, Some(_)) => {
+                log::warn!(
+                    "{}",
+                    "Xfield in block was None. Does not match the expected federation"
+                );
+                Err(Error::XfieldFederationMismatch(Some(block_height), "Xfield in block was None. Does not match the expected xfield from federations file"))
+            }
+
+            (_, None) => {
+                log::warn!("{}", "Xfield was present in block. But was not expected acdcording to federations file");
+                Err(Error::XfieldFederationMismatch(Some(block_height), "Xfield was present in block. But was not expected acdcording to federations file"))
+            }
+
+            // when there is an xfield in the block: verify that it matches the configuration in federarions
+            (ref xfield, Some(federation)) => {
+                if federation.xfield() == xfield {
+                    if block_height > 1 {
+                        // first federation and genesis block do not have signature
+                        match federation.verify_signature() {
+                            Ok(_) => Ok(()),
+                            Err(e) => Err(e),
+                        }
+                    } else {
+                        Ok(())
+                    }
+                } else {
+                    log::warn!(
+                        "{}",
+                        "Xfield in block does not match the expected xfield from federations file"
+                    );
+                    Err(Error::XfieldFederationMismatch(
+                        Some(block_height),
+                        "Xfield in block does not match the expected xfield from federations file",
+                    ))
+                }
+            }
+        }
     }
 }
 
@@ -438,7 +578,7 @@ pub struct SerFederation {
 mod tests {
     use crate::crypto::multi_party_schnorr::Signature;
     use crate::errors::Error;
-    use crate::federation::{Federation, Federations};
+    use crate::federation::{self, Federation, Federations, Vss};
     use crate::hex::FromHex;
     use crate::net::SignerID;
     use crate::tapyrus::blockdata::block::XField;
@@ -650,6 +790,16 @@ mod tests {
         let mut federation = valid_federation();
         federation.threshold = None;
         assert!(federation.validate().is_err());
+
+        // Error if the federation has no xfield
+        let mut federation = valid_federation_maxblocksize();
+        federation.xfield = XField::None;
+        assert!(federation.validate().is_err());
+
+        // Error if the federation has no signature
+        let mut federation = valid_federation_maxblocksize();
+        federation.signature = None;
+        assert!(federation.validate().is_err());
     }
 
     #[test]
@@ -791,6 +941,283 @@ mod tests {
                 )
             }
             _ => assert!(false, "it should error"),
+        }
+    }
+
+    #[test]
+    fn test_federation_with_maxblock_size_from_toml() {
+        let pubkey = PublicKey::from_str(
+            "021c36ce51f73f01395af9f7955db0c99f8e34009ea1565679b851f19cba37a5da",
+        )
+        .unwrap();
+
+        // valid toml
+        let mut toml = r#"
+        [[federation]]
+        block-height = 0
+        threshold = 2
+        aggregated-public-key = "02459adb8a8f052be94874aef7d4c3d3ddb71fcdaa869b1d515a92d63cb29c2806"
+        node-vss = [
+            "021c36ce51f73f01395af9f7955db0c99f8e34009ea1565679b851f19cba37a5da021c36ce51f73f01395af9f7955db0c99f8e34009ea1565679b851f19cba37a5da00021c36ce51f73f01395af9f7955db0c99f8e34009ea1565679b851f19cba37a5da7650c845ad480abe1a31a7d40815b7003b2cab562d22645980fd62b5fcaca5f6ce5946d3a138e4aef068730a987a2eb57bbfe02a83933a9f1865eed6b92814c08dc180ae7c0f0075c7645cb8cecf472069aa6cc10b8a1edc2623d4152fa3743be73faa937a3ee41f556ac4b37b79282af663e3bc4a361221f2911d947a06a8361c36ce51f73f01395af9f7955db0c99f8e34009ea1565679b851f19cba37a5da7650c845ad480abe1a31a7d40815b7003b2cab562d22645980fd62b5fcaca5f6ce5946d3a138e4aef068730a987a2eb57bbfe02a83933a9f1865eed6b92814c08dc180ae7c0f0075c7645cb8cecf472069aa6cc10b8a1edc2623d4152fa3743be73faa937a3ee41f556ac4b37b79282af663e3bc4a361221f2911d947a06a836",
+            "0302f5584e30d2ee32e772d04ff8ee1efc90a7a91ac5b7c4025da7a42a67d06a25021c36ce51f73f01395af9f7955db0c99f8e34009ea1565679b851f19cba37a5da000202f5584e30d2ee32e772d04ff8ee1efc90a7a91ac5b7c4025da7a42a67d06a25ca08028df6f430f739d1c387a7b837ccad852e61a90c961c0a44f942ad127ec39a991401abf2e71cb8a0455c9b82542724eb2493f43558cd35a8a80eeeebf30b7531d698c1de7f199f8be4bdd265ef8f8950e2c8ba255718e2e847472d6411a5fa80b0328e8d55b146e52bd32bf6e5b7148d3bd1436cf8a86ff3d5c25d457c5c02f5584e30d2ee32e772d04ff8ee1efc90a7a91ac5b7c4025da7a42a67d06a25ca08028df6f430f739d1c387a7b837ccad852e61a90c961c0a44f942ad127ec39a991401abf2e71cb8a0455c9b82542724eb2493f43558cd35a8a80eeeebf30b7531d698c1de7f199f8be4bdd265ef8f8950e2c8ba255718e2e847472d6411a5fa80b0328e8d55b146e52bd32bf6e5b7148d3bd1436cf8a86ff3d5c25d457c5c",
+            "0315d137054b688717f7fe4bd22a1c886de7a07bf3beb041092fb79688306df3c9021c36ce51f73f01395af9f7955db0c99f8e34009ea1565679b851f19cba37a5da000215d137054b688717f7fe4bd22a1c886de7a07bf3beb041092fb79688306df3c90081da2716d12495f6e83bbfde76a914fc6cfe72d1b229130295a83d7b8352f105ce821aefb02ed9bbada8355d3179ca4a8a392260db9c5d34e44006395256317b9b4bb48a435b9aa5d36fddab8d7bd764e27e0dfeeec273d3a635d2d53707a55c14102eb04e3d6928149560ed26c8cd0923317dee7aa1941b5a822fabfcd41115d137054b688717f7fe4bd22a1c886de7a07bf3beb041092fb79688306df3c90081da2716d12495f6e83bbfde76a914fc6cfe72d1b229130295a83d7b8352f105ce821aefb02ed9bbada8355d3179ca4a8a392260db9c5d34e44006395256317b9b4bb48a435b9aa5d36fddab8d7bd764e27e0dfeeec273d3a635d2d53707a55c14102eb04e3d6928149560ed26c8cd0923317dee7aa1941b5a822fabfcd411"
+        ]
+        [[federation]]
+        block-height = 20
+        aggregated-public-key = "0376c3265e7d81839c1b2312b95697d47cc5b3ab3369a92a5af52ef1c945792f50"
+        signature ="90c90936d44e75bf25f8a6d1c21020a8dc7ee7f4d62a3d7ae278d9ff6a74901f687eee4236a64805414a43c344d12882061518be61014e76027cf6b8fd845aa0"
+        "#;
+
+        let mut federations: Federations =
+            Federations::from_pubkey_and_toml(&pubkey, toml).unwrap();
+        assert_eq!(federations.len(), 2);
+
+        // valid federation (signature is ignored)
+        toml = r#"
+        [[federation]]
+        block-height = 0
+        aggregated-public-key = "0303a8d919266c95407e8aa247b058d510e6286ddb9ba73c7a283edc67bb11ed1e"
+        signature = "16b63d6f3b5a88762d4477b843b857a3bf86677c7044db22a9aada2eb17d0641dde06d981f17045b11c8db7b47846ceca4825f286756440ea158e0b2dba86028"
+        "#;
+        federations = Federations::from_pubkey_and_toml(&pubkey, toml).unwrap();
+        assert_eq!(federations.len(), 1);
+
+        // valid federation
+        toml = r#"
+        [[federation]]
+        block-height = 0
+        aggregated-public-key = "030d856ac9f5871c3785a2d76e3a5d9eca6fcce70f4de63339671dfb9d1f33edb0"
+        [[federation]]
+        block-height = 30
+        aggregated-public-key = "0303a8d919266c95407e8aa247b058d510e6286ddb9ba73c7a283edc67bb11ed1e"
+        signature = "16b63d6f3b5a88762d4477b843b857a3bf86677c7044db22a9aada2eb17d0641dde06d981f17045b11c8db7b47846ceca4825f286756440ea158e0b2dba86028"
+        "#;
+        match Federations::from_pubkey_and_toml(&pubkey, toml) {
+            Err(Error::InvalidSig) => assert!(true),
+            _ => assert!(false, "it should error"),
+        }
+
+        // valid toml
+        toml = r#"
+        [[federation]]
+        block-height = 0
+        aggregated-public-key = "02459adb8a8f052be94874aef7d4c3d3ddb71fcdaa869b1d515a92d63cb29c2806"
+        [[federation]]
+        block-height = 40
+        aggregated-public-key = "0376c3265e7d81839c1b2312b95697d47cc5b3ab3369a92a5af52ef1c945792f50"
+        signature = "90c90936d44e75bf25f8a6d1c21020a8dc7ee7f4d62a3d7ae278d9ff6a74901f687eee4236a64805414a43c344d12882061518be61014e76027cf6b8fd845aa0"
+        [[federation]]
+        block-height = 50
+        max-block-size = 400000
+        signature = "82cf50e3c68f972790780dceddfb573e3f36953bbab5497ac8acdcf02a6d496dcff5a14692d9f2f8e7d3d55d93de4fb471a1ed9ec726389c8ca5378ada5e5adc"
+        "#;
+
+        federations = Federations::from_pubkey_and_toml(&pubkey, toml).unwrap();
+        assert_eq!(federations.len(), 3);
+
+        // invalid toml - no signature
+        toml = r#"
+        [[federation]]
+        block-height = 0
+        threshold = 3
+        aggregated-public-key = "02459adb8a8f052be94874aef7d4c3d3ddb71fcdaa869b1d515a92d63cb29c2806"
+        [[federation]]
+        block-height = 20
+        aggregated-public-key = "0376c3265e7d81839c1b2312b95697d47cc5b3ab3369a92a5af52ef1c945792f50"
+        signature = "90c90936d44e75bf25f8a6d1c21020a8dc7ee7f4d62a3d7ae278d9ff6a74901f687eee4236a64805414a43c344d12882061518be61014e76027cf6b8fd845aa0"
+        [[federation]]
+        block-height = 30
+        max-block-size = 1000000
+        signature = ""
+        "#;
+
+        match Federations::from_pubkey_and_toml(&pubkey, toml) {
+            Err(Error::InvalidSig) => assert!(true),
+            _ => assert!(false, "it should error"),
+        }
+
+        // invalid toml - invalid signature
+        toml = r#"
+        [[federation]]
+        block-height = 0
+        threshold = 3
+        aggregated-public-key = "030d856ac9f5871c3785a2d76e3a5d9eca6fcce70f4de63339671dfb9d1f33edb0"
+        [[federation]]
+        block-height = 20
+        aggregated-public-key = "0303a8d919266c95407e8aa247b058d510e6286ddb9ba73c7a283edc67bb11ed1e"
+        signature = "16b63d6f3b5a88762d4477b843b857a3bf86677c7044db22a9aada2eb17d0641dde06d981f17045b11c8db7b47846ceca4825f286756440ea158e0b2dba86028"
+        [[federation]]
+        block-height = 30
+        max-block-size = 1000000
+        signature = "qw"
+        "#;
+
+        match Federations::from_pubkey_and_toml(&pubkey, toml) {
+            Err(Error::InvalidSig) => assert!(true),
+            _ => assert!(false, "it should error"),
+        }
+
+        // invalid toml - invalid signature failing in decode
+        toml = r#"
+        [[federation]]
+        block-height = 0
+        threshold = 3
+        aggregated-public-key = "030d856ac9f5871c3785a2d76e3a5d9eca6fcce70f4de63339671dfb9d1f33edb0"
+        [[federation]]
+        block-height = 20
+        aggregated-public-key = "0303a8d919266c95407e8aa247b058d510e6286ddb9ba73c7a283edc67bb11ed1e"
+        signature = "0000000000000000000000b843b857a3bf86677c7044db22a9aada2eb17d0641dde06d981f17045b11c8db7b47846ceca48250086756440ea158e0b2dba86028"
+        "#;
+
+        match Federations::from_pubkey_and_toml(&pubkey, toml) {
+            Err(Error::InvalidSig) => assert!(true),
+            _ => assert!(false, "it should error"),
+        }
+
+        // invalid toml - invalid signature failing in verify
+        toml = r#"
+        [[federation]]
+        block-height = 0
+        threshold = 3
+        aggregated-public-key = "030d856ac9f5871c3785a2d76e3a5d9eca6fcce70f4de63339671dfb9d1f33edb0"
+        [[federation]]
+        block-height = 20
+        aggregated-public-key = "0303a8d919266c95407e8aa247b058d510e6286ddb9ba73c7a283edc67bb11ed1e"
+        signature = "16b63d6f3b5a88762d4477b843b857a3bf86677c7044db22a9aada2eb17d0641dde06d981f17045b11c8db7b47846ceca4825f286756440ea158e0b2dba86000"
+        "#;
+
+        match Federations::from_pubkey_and_toml(&pubkey, toml) {
+            Err(Error::InvalidSig) => assert!(true),
+            _ => assert!(false, "it should error"),
+        }
+    }
+
+    #[test]
+    fn test_from_ser_federation() {
+        let signerid = PublicKey::from_str(
+            "039af53a49a365576de41a2e70cc148353d7d1f4cad45f888fd8bc6d2c94a97657",
+        )
+        .unwrap();
+
+        let nodevss = [
+            "0302f5584e30d2ee32e772d04ff8ee1efc90a7a91ac5b7c4025da7a42a67d06a25039af53a49a365576de41a2e70cc148353d7d1f4cad45f888fd8bc6d2c94a97657000202f5584e30d2ee32e772d04ff8ee1efc90a7a91ac5b7c4025da7a42a67d06a25ca08028df6f430f739d1c387a7b837ccad852e61a90c961c0a44f942ad127ec33ecf34027b4922b3145e69a6006ca3414a7d6cb3ba888c4eadc546cd640f60b930f5d90d1bffafd82e57409e72d5170bd65317e5b87e17d61818546c95d5f35e274a56637a729723492efa1264f1bcd28721c54638217cc3b4ab98354ab9f12902f5584e30d2ee32e772d04ff8ee1efc90a7a91ac5b7c4025da7a42a67d06a25ca08028df6f430f739d1c387a7b837ccad852e61a90c961c0a44f942ad127ec33ecf34027b4922b3145e69a6006ca3414a7d6cb3ba888c4eadc546cd640f60b930f5d90d1bffafd82e57409e72d5170bd65317e5b87e17d61818546c95d5f35e274a56637a729723492efa1264f1bcd28721c54638217cc3b4ab98354ab9f129",
+            "0315d137054b688717f7fe4bd22a1c886de7a07bf3beb041092fb79688306df3c9039af53a49a365576de41a2e70cc148353d7d1f4cad45f888fd8bc6d2c94a97657000215d137054b688717f7fe4bd22a1c886de7a07bf3beb041092fb79688306df3c90081da2716d12495f6e83bbfde76a914fc6cfe72d1b229130295a83d7b8352f1f960f10435a23ea5c590bb1e2271e130fe67d582926c534aa1331d1b84ce127df4ae07160b3ef4bfdcb0035aea945ceb4b2323975fd90789d20637fdac29479dff355f1d89cfcca0c8c1403aa38ee34642e4ad3fe4d0d0019a5504fd22447beb15d137054b688717f7fe4bd22a1c886de7a07bf3beb041092fb79688306df3c90081da2716d12495f6e83bbfde76a914fc6cfe72d1b229130295a83d7b8352f1f960f10435a23ea5c590bb1e2271e130fe67d582926c534aa1331d1b84ce127df4ae07160b3ef4bfdcb0035aea945ceb4b2323975fd90789d20637fdac29479dff355f1d89cfcca0c8c1403aa38ee34642e4ad3fe4d0d0019a5504fd22447beb",
+            "039af53a49a365576de41a2e70cc148353d7d1f4cad45f888fd8bc6d2c94a97657039af53a49a365576de41a2e70cc148353d7d1f4cad45f888fd8bc6d2c94a9765700029af53a49a365576de41a2e70cc148353d7d1f4cad45f888fd8bc6d2c94a976579fc4ac8cde7d898910cb47345069cfc6c086e767b8e90276551762478dfe20fb0af6b91228e3e520a02c8e96904cc6ea13e7e5752d2c25fc260586561934b8024613acba6b7f33498353f3ff136bad71648278b5ef245f9f04cf10657728e028158d3afbda2cd624fa35a8f580dce714441f372f6d631668e8e824999e76da399af53a49a365576de41a2e70cc148353d7d1f4cad45f888fd8bc6d2c94a976579fc4ac8cde7d898910cb47345069cfc6c086e767b8e90276551762478dfe20fb0af6b91228e3e520a02c8e96904cc6ea13e7e5752d2c25fc260586561934b8024613acba6b7f33498353f3ff136bad71648278b5ef245f9f04cf10657728e028158d3afbda2cd624fa35a8f580dce714441f372f6d631668e8e824999e76da39"
+        ];
+
+        let ser_fed_0 = SerFederation {
+            block_height: 0,
+            threshold: None,
+            nodevss: None,
+            aggregated_public_key: Some(
+                PublicKey::from_str(
+                    "02459adb8a8f052be94874aef7d4c3d3ddb71fcdaa869b1d515a92d63cb29c2806",
+                )
+                .unwrap(),
+            ),
+            max_block_size: None,
+            signature: None,
+        };
+        let ser_fed_pubkey = SerFederation {
+            block_height : 10,
+            threshold : Some(2),
+            nodevss : Some( vec![ Vss::from_str(nodevss[0]).unwrap(), Vss::from_str(nodevss[1]).unwrap(), Vss::from_str(nodevss[2]).unwrap()]),
+            aggregated_public_key : Some(PublicKey::from_str("0376c3265e7d81839c1b2312b95697d47cc5b3ab3369a92a5af52ef1c945792f50").unwrap()),
+            max_block_size : None,
+            signature : Some("90c90936d44e75bf25f8a6d1c21020a8dc7ee7f4d62a3d7ae278d9ff6a74901f687eee4236a64805414a43c344d12882061518be61014e76027cf6b8fd845aa0".to_string())
+        };
+        let ser_fed_maxblocksize = SerFederation {
+            block_height : 20,
+            threshold : None,
+            nodevss : None,
+            aggregated_public_key : None,
+            max_block_size : Some(400000),
+            signature : Some("82cf50e3c68f972790780dceddfb573e3f36953bbab5497ac8acdcf02a6d496dcff5a14692d9f2f8e7d3d55d93de4fb471a1ed9ec726389c8ca5378ada5e5adc".to_string())
+        };
+
+        let fed1 = match Federation::from(signerid, ser_fed_0) {
+            Ok(fed) => {
+                assert_eq!(fed.block_height, 0);
+                assert_eq!(fed.threshold, None);
+                assert_eq!(fed.nodevss, None);
+                assert_eq!(
+                    fed.xfield,
+                    XField::AggregatePublicKey(
+                        PublicKey::from_str(
+                            "02459adb8a8f052be94874aef7d4c3d3ddb71fcdaa869b1d515a92d63cb29c2806"
+                        )
+                        .unwrap()
+                    )
+                );
+                fed
+            }
+            Err(e) => return assert!(false, "Failed in from ser_federation : {}", e.to_string()),
+        };
+        let fed2 = match Federation::from(signerid, ser_fed_pubkey) {
+            Ok(fed) => {
+                assert_eq!(fed.block_height, 10);
+                assert_eq!(fed.threshold, Some(2));
+                assert_eq!(
+                    fed.xfield,
+                    XField::AggregatePublicKey(
+                        PublicKey::from_str(
+                            "0376c3265e7d81839c1b2312b95697d47cc5b3ab3369a92a5af52ef1c945792f50"
+                        )
+                        .unwrap()
+                    )
+                );
+                fed
+            }
+            Err(e) => return assert!(false, "Failed in from ser_federation : {}", e.to_string()),
+        };
+        let fed3 = match Federation::from(signerid, ser_fed_maxblocksize) {
+            Ok(fed) => {
+                assert_eq!(fed.block_height, 20);
+                assert_eq!(fed.threshold, None);
+                assert_eq!(fed.nodevss, None);
+                assert_eq!(fed.xfield, XField::MaxBlockSize(400000));
+                fed
+            }
+            Err(e) => return assert!(false, "Failed in from ser_federation : {}", e.to_string()),
+        };
+
+        let vec_fed = vec![fed1, fed2, fed3];
+
+        match Federations::fill_missing_unchanged_federation_parameters(vec_fed) {
+            Ok(federations) => {
+                assert_eq!(federations[0].verification_key, None);
+                assert_eq!(federations[0].threshold, None);
+                assert_eq!(federations[0].nodevss, None);
+
+                assert_eq!(
+                    federations[1].verification_key,
+                    Some(
+                        PublicKey::from_str(
+                            "02459adb8a8f052be94874aef7d4c3d3ddb71fcdaa869b1d515a92d63cb29c2806"
+                        )
+                        .unwrap()
+                    )
+                );
+                assert_eq!(
+                    federations[2].verification_key,
+                    Some(
+                        PublicKey::from_str(
+                            "0376c3265e7d81839c1b2312b95697d47cc5b3ab3369a92a5af52ef1c945792f50"
+                        )
+                        .unwrap()
+                    )
+                );
+
+                assert_eq!(federations[1].threshold, federations[2].threshold);
+                assert_eq!(federations[1].nodevss, federations[2].nodevss);
+
+                assert_ne!(federations[1].xfield, federations[2].xfield);
+            }
+            Err(e) => assert!(
+                false,
+                "Failed in fill_missing_unchanged_federation_parameters : {}",
+                e.to_string()
+            ),
         }
     }
 }
