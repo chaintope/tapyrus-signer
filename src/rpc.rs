@@ -3,12 +3,13 @@
 use log::Level::Trace;
 use log::{log_enabled, trace};
 use serde::Deserialize;
-use tapyrus::Address;
+use std::collections::HashMap;
+use tapyrus::{Address, PublicKey};
 
 use crate::errors::Error;
 use jsonrpc::Client;
 use serde_json::value::RawValue;
-use tapyrus::blockdata::block::Block;
+use tapyrus::blockdata::block::{Block, XField};
 use tapyrus::consensus::encode::{deserialize, serialize};
 
 #[derive(Debug, Deserialize, Clone)]
@@ -19,6 +20,8 @@ pub struct GetBlockchainInfoResult {
     pub bestblockhash: String,
     pub mediantime: u64,
     pub initialblockdownload: bool,
+    pub aggregatePubkeys: Vec<HashMap<PublicKey, u32>>,
+    pub maxBlockSizes: Vec<HashMap<u32, u32>>,
 }
 
 pub struct Rpc {
@@ -28,6 +31,13 @@ pub struct Rpc {
 pub trait TapyrusApi {
     /// Get or Create candidate block.
     fn getnewblock(&self, address: &Address) -> Result<Block, Error>;
+    /// Get or Create candidate block with xfield change.
+    fn getnewblockwithxfield(
+        &self,
+        address: &Address,
+        required_age: &u32,
+        xfield: &XField,
+    ) -> Result<Block, Error>;
     /// Validate to candidateblock
     fn testproposedblock(&self, block: &Block) -> Result<bool, Error>;
     /// Broadcast new block include enough proof.
@@ -83,13 +93,9 @@ impl Rpc {
             Err(e) => Err(e),
         }
     }
-}
 
-impl TapyrusApi for Rpc {
-    /// Call getnewblock rpc
-    fn getnewblock(&self, address: &Address) -> Result<Block, Error> {
-        let args = serde_json::value::to_raw_value(&serde_json::Value::from(address.to_string()))?;
-        let resp = self.call::<String>("getnewblock", &[args]);
+    fn getnewblock_raw(&self, raw_args: &Vec<Box<RawValue>>) -> Result<Block, Error> {
+        let resp = self.call::<String>("getnewblock", &raw_args);
         match resp {
             Ok(v) => {
                 let raw_block = hex::decode(v).expect("Decoding block hex failed");
@@ -97,6 +103,45 @@ impl TapyrusApi for Rpc {
             }
             Err(e) => Err(e),
         }
+    }
+}
+
+fn to_rpc_string(xfield: &XField) -> String {
+    match xfield {
+        XField::None => String::new(),
+        XField::AggregatePublicKey(pubkey) => {
+            format!("{}:{}", xfield.field_type(), pubkey)
+        }
+        XField::MaxBlockSize(size) => format!("{}:{}", xfield.field_type(), size),
+        XField::Unknown(_, _) => String::new(),
+    }
+}
+
+impl TapyrusApi for Rpc {
+    /// Call getnewblock rpc
+    fn getnewblock(&self, address: &Address) -> Result<Block, Error> {
+        let arg = serde_json::Value::from(address.to_string());
+        let raw_args = vec![serde_json::value::to_raw_value(&arg).unwrap()];
+        self.getnewblock_raw(&raw_args)
+    }
+
+    fn getnewblockwithxfield(
+        &self,
+        address: &Address,
+        required_age: &u32,
+        xfield: &XField,
+    ) -> Result<Block, Error> {
+        let args = vec![
+            serde_json::Value::from(address.to_string()),
+            serde_json::Value::from(*required_age),
+            serde_json::Value::from(to_rpc_string(&xfield)),
+        ];
+
+        let raw_args: Vec<_> = args
+            .into_iter()
+            .map(|value| serde_json::value::to_raw_value(&value).unwrap())
+            .collect();
+        self.getnewblock_raw(&raw_args)
     }
 
     fn testproposedblock(&self, block: &Block) -> Result<bool, Error> {
@@ -135,6 +180,17 @@ pub mod tests {
         let secp = Secp256k1::new();
         let address = Address::p2pkh(&private_key.public_key(&secp), private_key.network);
         rpc.getnewblock(&address)
+    }
+
+    pub fn call_getnewblockwithxfield(xfield: XField) -> Result<Block, Error> {
+        let rpc = get_rpc_client();
+
+        let private_key = TEST_KEYS.key[4];
+        let secp = Secp256k1::new();
+        let address = Address::p2pkh(&private_key.public_key(&secp), private_key.network);
+        let required_age = 0;
+        let xfield = xfield.clone();
+        rpc.getnewblockwithxfield(&address, &required_age, &xfield)
     }
 
     use std::sync::{Arc, Mutex};
@@ -186,6 +242,15 @@ pub mod tests {
             self.result()
         }
 
+        fn getnewblockwithxfield(
+            &self,
+            _address: &Address,
+            _required_age: &u32,
+            _xfield_str: &XField,
+        ) -> Result<Block, Error> {
+            self.result()
+        }
+
         fn testproposedblock(&self, _block: &Block) -> Result<bool, Error> {
             let _block = self.result()?;
             Ok(true)
@@ -204,6 +269,8 @@ pub mod tests {
                 bestblockhash: "xxx".to_string(),
                 mediantime: 0,
                 initialblockdownload: false,
+                aggregatePubkeys: vec![],
+                maxBlockSizes: vec![],
             })
         }
     }

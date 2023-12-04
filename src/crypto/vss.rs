@@ -185,7 +185,7 @@ impl Vss {
         let local_sig_for_positive = Sign::sign_xfield(
             &shared_keys_for_positive,
             &priv_shared_keys,
-            xfield.signature_hash()?,
+            xfield.signature_hash().unwrap(),
         );
 
         let shared_keys_for_negative =
@@ -193,7 +193,7 @@ impl Vss {
         let local_sig_for_negative = Sign::sign_xfield(
             &shared_keys_for_negative,
             &priv_shared_keys,
-            xfield.signature_hash()?,
+            xfield.signature_hash().unwrap(),
         );
         Self::create_local_sig_from_shares(
             priv_shared_keys,
