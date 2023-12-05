@@ -578,7 +578,7 @@ pub struct SerFederation {
 mod tests {
     use crate::crypto::multi_party_schnorr::Signature;
     use crate::errors::Error;
-    use crate::federation::{self, Federation, Federations, Vss};
+    use crate::federation::{Federation, Federations, Vss};
     use crate::hex::FromHex;
     use crate::net::SignerID;
     use crate::tapyrus::blockdata::block::XField;

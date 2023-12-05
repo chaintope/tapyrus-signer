@@ -20,8 +20,8 @@ pub struct GetBlockchainInfoResult {
     pub bestblockhash: String,
     pub mediantime: u64,
     pub initialblockdownload: bool,
-    pub aggregatePubkeys: Vec<HashMap<PublicKey, u32>>,
-    pub maxBlockSizes: Vec<HashMap<u32, u32>>,
+    pub aggregate_pubkeys: Vec<HashMap<PublicKey, u32>>,
+    pub max_block_sizes: Vec<HashMap<u32, u32>>,
 }
 
 pub struct Rpc {
@@ -269,8 +269,8 @@ pub mod tests {
                 bestblockhash: "xxx".to_string(),
                 mediantime: 0,
                 initialblockdownload: false,
-                aggregatePubkeys: vec![],
-                maxBlockSizes: vec![],
+                aggregate_pubkeys: vec![],
+                max_block_sizes: vec![],
             })
         }
     }

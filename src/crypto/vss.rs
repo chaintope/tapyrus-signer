@@ -638,7 +638,7 @@ mod tests {
             })
             .collect();
 
-        let (is_positive, key, local_sig) = Vss::create_local_sig_from_shares_for_xfield(
+        let (is_positive, key, _local_sig) = Vss::create_local_sig_from_shares_for_xfield(
             &priv_shared_keys,
             1,
             &shared_block_secrets,
@@ -646,7 +646,7 @@ mod tests {
         )
         .expect("error occurred in Vss::create_local_sig_from_shares");
 
-        let expected_localsig = to_local_sig(&v["expected_localsig"]).unwrap();
+        let _expected_localsig = to_local_sig(&v["expected_localsig"]).unwrap();
         let expected_block_shared_keys =
             to_block_shared_keys(&v["expected_block_shared_keys"]).unwrap();
 
@@ -677,7 +677,7 @@ mod tests {
             })
             .collect();
 
-        let (is_positive, key, local_sig) = Vss::create_local_sig_from_shares_for_xfield(
+        let (is_positive, key, _local_sig) = Vss::create_local_sig_from_shares_for_xfield(
             &priv_shared_keys,
             1,
             &shared_block_secrets,
@@ -685,7 +685,7 @@ mod tests {
         )
         .expect("error occurred in Vss::create_local_sig_from_shares");
 
-        let expected_localsig = to_local_sig(&v["expected_localsig"]).unwrap();
+        let _expected_localsig = to_local_sig(&v["expected_localsig"]).unwrap();
         let expected_block_shared_keys =
             to_block_shared_keys(&v["expected_block_shared_keys"]).unwrap();
 
