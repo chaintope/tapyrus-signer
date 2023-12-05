@@ -490,8 +490,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                 Ok(GetBlockchainInfoResult {
                     blocks: block_height,
                     bestblockhash: block_hash,
-                    aggregatePubkeys: aggregatedpubkeys,
-                    maxBlockSizes: maxblocksizes,
+                    aggregate_pubkeys: aggregatedpubkeys,
+                    max_block_sizes: maxblocksizes,
                     ..
                 }) => (
                     block_height + 1,
@@ -974,14 +974,14 @@ mod tests {
         impl TapyrusApi for MockRpc {
             fn getnewblockwithxfield(
                 &self,
-                address: &Address,
-                required_age: &u32,
-                xfield: &tapyrus::blockdata::block::XField,
+                _address: &Address,
+                _required_age: &u32,
+                _xfield: &tapyrus::blockdata::block::XField,
             ) -> Result<Block, Error> {
                 unimplemented!()
             }
 
-            fn getnewblock(&self, address: &Address) -> Result<Block, Error> {
+            fn getnewblock(&self, _address: &Address) -> Result<Block, Error> {
                 unimplemented!()
             }
 
@@ -1004,7 +1004,7 @@ mod tests {
 
         #[test]
         fn test_wait_for_ibd_finish() {
-            let json = serde_json::from_str("{\"chain\": \"test\", \"blocks\": 26826, \"headers\": 26826, \"bestblockhash\": \"7303687fb5d80781bd9fece466e76d97a94613d409d127030ff7f34081a899f7\", \"mediantime\": 1568103315, \"verificationprogress\": 1, \"initialblockdownload\": false, \"size_on_disk\": 11669126,  \"pruned\": false,  \"bip9_softforks\": {    \"csv\": {      \"status\": \"failed\",      \"startTime\": 1456790400, \"timeout\": 1493596800, \"since\": 2016 }, \"segwit\": { \"status\": \"failed\", \"startTime\": 1462060800, \"timeout\": 1493596800, \"since\": 2016 }},  \"aggregatePubkeys\": [], \"maxBlockSizes\": [], \"warnings\": \"\"}").unwrap();
+            let json = serde_json::from_str("{\"chain\": \"test\", \"blocks\": 26826, \"headers\": 26826, \"bestblockhash\": \"7303687fb5d80781bd9fece466e76d97a94613d409d127030ff7f34081a899f7\", \"mediantime\": 1568103315, \"verificationprogress\": 1, \"initialblockdownload\": false, \"size_on_disk\": 11669126,  \"pruned\": false,  \"bip9_softforks\": {    \"csv\": {      \"status\": \"failed\",      \"startTime\": 1456790400, \"timeout\": 1493596800, \"since\": 2016 }, \"segwit\": { \"status\": \"failed\", \"startTime\": 1462060800, \"timeout\": 1493596800, \"since\": 2016 }},  \"aggregate_pubkeys\": [], \"max_block_sizes\": [], \"warnings\": \"\"}").unwrap();
             let mut result1 = serde_json::from_value::<GetBlockchainInfoResult>(json).unwrap();
             result1.initialblockdownload = true;
             let mut result2 = result1.clone();
