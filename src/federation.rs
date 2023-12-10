@@ -109,7 +109,7 @@ pub struct Federation {
     /// The federation parameter
     /// aggregated public key / max block size
     xfield: XField,
-    // pubkey for signature verification
+    /// pubkey for signature verification
     pub verification_key: Option<PublicKey>,
     /// federation signature
     pub signature: Option<Signature>,
