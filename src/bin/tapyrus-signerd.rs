@@ -216,6 +216,19 @@ mod tests {
     }
 
     #[test]
+    fn test_load_federations_threshold_change() {
+        let pubkey = PublicKey::from_str(
+            "0315d137054b688717f7fe4bd22a1c886de7a07bf3beb041092fb79688306df3c9",
+        )
+        .unwrap();
+
+        let path = Path::new("tests/resources/federations_threshold_change.toml");
+        let federations = load_federations(&pubkey, path);
+
+        assert_eq!(federations.len(), 2);
+    }
+
+    #[test]
     #[should_panic(expected = "Can't open federations_file. path: \"/foo/bar/no_exist_file.toml\"")]
     fn test_load_federations_invalid_file_path() {
         let pubkey = PublicKey::from_str(
