@@ -215,12 +215,8 @@ impl<'a> ComputeSigCommand {
 
         let hash = if let Some(ref block) = block {
             block.header.signature_hash().to_vec()
-        } else if xfield != XField::None {
-            xfield.signature_hash().unwrap().to_vec()
         } else {
-            return Err(Error::InvalidArgs(
-                "Either xfield or block is expected".to_string(),
-            ));
+            xfield.signature_hash().unwrap().to_vec()
         };
 
         let signature = Vss::aggregate_and_verify_signature(
