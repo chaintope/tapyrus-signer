@@ -5,6 +5,7 @@ pub mod node_parameters;
 pub mod node_state;
 pub mod utils;
 
+use crate::federation::Federation;
 pub use crate::signer_node::node_parameters::NodeParameters;
 pub use crate::signer_node::node_state::NodeState;
 
@@ -24,11 +25,12 @@ use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::FE;
 use redis::ControlFlow;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::time::Duration;
 use tapyrus::blockdata::block::Block;
 use tapyrus::blockdata::block::XField;
+use tapyrus::PublicKey;
 
 /// Round interval.
 pub static ROUND_INTERVAL_DEFAULT_SECS: u64 = 60;
@@ -345,22 +347,40 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     /// A master node of the round starts a round communication with sending candidateblock message.
     pub fn start_round_communication(&mut self, block_height: u32) -> NodeState {
-        let block = match self.params.rpc.getnewblock(&self.params.address) {
-            Ok(block) => block,
+        let pending_federation_change = self
+            .params
+            .get_federation_change_for_block_height(block_height + 1); // block_height + 1 so that xfield expected in the next block is added in this block.
+
+        let block = match pending_federation_change {
+            Some(x) => match self.params.rpc.getnewblockwithxfield(
+                &self.params.address,
+                &0,
+                &x.clone().xfield(),
+            ) {
+                Ok(block) => block,
+                Err(e) => {
+                    log::error!("RPC getnewblockwithxfield failed. reason={:?}", e);
+                    return Master::default().block_height(block_height).build();
+                }
+            },
+            None => match self.params.rpc.getnewblock(&self.params.address) {
+                Ok(block) => block,
+                Err(e) => {
+                    log::error!("RPC getnewblock failed. reason={:?}", e);
+                    return Master::default().block_height(block_height).build();
+                }
+            },
+        };
+
+        match self.verify_block(&block) {
+            Ok(_) => {} // If the block is valid, continue with the rest of your code
             Err(e) => {
-                log::error!("RPC getnewblock failed. reason={:?}", e);
-                //Behave as master without block.
+                log::error!("Invalid block. reason={:?}", e);
                 return Master::default().block_height(block_height).build();
             }
         };
 
-        if let Err(e) = self.verify_block(&block) {
-            log::error!("Invalid block. reason={:?}", e);
-            //Behave as master without block.
-            return Master::default().block_height(block_height).build();
-        }
-
-        let block = self.add_aggregated_public_key_if_needed(block_height, block);
+        //let block = self.add_aggregated_public_key_if_needed(block_height, block);
         log::info!(
             "Broadcast candidate block. block hash for signing: {:?}",
             block.header.signature_hash()
@@ -395,21 +415,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         let block_height = self.current_state.block_height();
         let federation = self.params.get_federation_by_block_height(block_height);
         federation.signers().contains(signer_id)
-    }
-
-    fn add_aggregated_public_key_if_needed(&self, block_height: u32, mut block: Block) -> Block {
-        let next_block_height = block_height + 1;
-        let federation = self
-            .params
-            .get_federation_by_block_height(next_block_height);
-        if federation.block_height() == next_block_height {
-            let aggregated_public_key = self.params.aggregated_public_key(next_block_height);
-            // block.add_aggregated_public_key(aggregated_public_key)
-            block.header.xfield = XField::AggregatePublicKey(aggregated_public_key);
-            block
-        } else {
-            block
-        }
     }
 
     pub fn process_round_message(
@@ -480,31 +485,60 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         self.round_limit_timer.restart().unwrap();
 
         // Get a block height at next of the tip block.
-        let block_height = match self.params.rpc.getblockchaininfo() {
-            Ok(GetBlockchainInfoResult {
-                blocks: block_height,
-                ..
-            }) => block_height + 1,
-            _ => match self.current_state {
-                NodeState::Idling { block_height } => block_height + 1,
-                NodeState::RoundComplete { block_height, .. } => block_height + 1,
-                // The case, which the node state is Member or Master, means that previous round
-                // was failure. If it was success, the state should be RoundComplete. So, the block
-                // height is not incremented here.
-                NodeState::Member { block_height, .. } => block_height,
-                NodeState::Master { block_height, .. } => block_height,
-                NodeState::Joining => {
-                    panic!("Couldn't start the node because of an RPC connection error.")
-                }
-            },
-        };
+        let (block_height, block_hash, aggregatedpubkeys, maxblocksizes) =
+            match self.params.rpc.getblockchaininfo() {
+                Ok(GetBlockchainInfoResult {
+                    blocks: block_height,
+                    bestblockhash: block_hash,
+                    aggregate_pubkeys: aggregatedpubkeys,
+                    max_block_sizes: maxblocksizes,
+                    ..
+                }) => (
+                    block_height + 1,
+                    block_hash,
+                    aggregatedpubkeys,
+                    maxblocksizes,
+                ),
+                _ => (
+                    match self.current_state {
+                        NodeState::Idling { block_height } => block_height + 1,
+                        NodeState::RoundComplete { block_height, .. } => block_height + 1,
+                        // The case, which the node state is Member or Master, means that previous round
+                        // was failure. If it was success, the state should be RoundComplete. So, the block
+                        // height is not incremented here.
+                        NodeState::Member { block_height, .. } => block_height,
+                        NodeState::Master { block_height, .. } => block_height,
+                        NodeState::Joining => {
+                            panic!("Couldn't start the node because of an RPC connection error.")
+                        }
+                    },
+                    "".to_string(),
+                    vec![],
+                    vec![],
+                ),
+            };
+
+        // we get the expected federation at block_height  for logging
+        let expected_xfield_change = self
+            .params
+            .get_federation_change_for_block_height(block_height);
+
+        if expected_xfield_change.is_some() {
+            log_xfield_from_blockchaininfo(
+                expected_xfield_change.unwrap(),
+                aggregatedpubkeys,
+                maxblocksizes,
+                block_hash,
+                block_height,
+            );
+        }
 
         let federation = self.params.get_federation_by_block_height(block_height);
         if !federation.is_member() {
             log::info!(
-            "Start next round: self_index=None, master_index=None. Idling because the node is not a member of the current federation when the block height is {}.",
-            block_height,
-        );
+                "Start next round: self_index=None, master_index=None. Idling because the node is not a member of the current federation when the block height is {}.",
+                block_height,
+            );
             self.current_state = NodeState::Idling { block_height };
             return;
         }
@@ -529,10 +563,77 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     }
 
     fn verify_block(&self, block: &Block) -> Result<(), Error> {
-        // master node accepts the block that has None xfield type.
-        match block.header.xfield {
-            XField::None => Ok(()),
-            _ => Err(Error::UnsupportedXField),
+        // master node accepts the block that has xfield change matching its federation.toml
+        let block_height = self.current_state.block_height();
+        let xfield = block.header.xfield.clone();
+        let expected_federation = self
+            .params
+            .get_federation_change_for_block_height(block_height + 1);
+
+        Federation::match_xfield_with_federation(block_height, xfield, expected_federation)
+    }
+}
+
+fn log_xfield_from_blockchaininfo(
+    expected_xfield_change: &Federation,
+    aggregatedpubkeys: Vec<HashMap<PublicKey, u32>>,
+    maxblocksizes: Vec<HashMap<u32, u32>>,
+    block_hash: String,
+    block_height: u32,
+) {
+    let xfield_aggregatepubkey = aggregatedpubkeys
+        .iter()
+        .flat_map(|map| map.iter())
+        .find(|&(_, &height)| height == block_height)
+        .map(|(&data, _)| data);
+
+    let xfield_maxblocksize = maxblocksizes
+        .iter()
+        .flat_map(|map| map.iter())
+        .find(|&(_, &height)| height == block_height)
+        .map(|(&data, _)| data);
+
+    match expected_xfield_change.xfield() {
+        XField::None => {
+            if xfield_maxblocksize.is_some() || xfield_aggregatepubkey.is_some() {
+                log::warn!("Xfield was not expected in block {} at height {} according to federations.toml.", block_hash, block_height);
+            }
+        }
+        XField::Unknown(_, _) => {
+            log::warn!(
+                "Unknown Xfield at height {} in federations.toml.",
+                block_height
+            );
+        }
+        XField::AggregatePublicKey(key) => {
+            if xfield_aggregatepubkey.is_some() && *key == xfield_aggregatepubkey.unwrap() {
+                log::info!(
+                    "Xfield Aggregated pubkey was set in block {} at height {} as expected.",
+                    block_hash,
+                    block_height
+                )
+            } else {
+                log::warn!(
+                    "Xfield Aggregated pubkey was set in block {} at height {} was NOT expected.",
+                    block_hash,
+                    block_height
+                )
+            }
+        }
+        XField::MaxBlockSize(size) => {
+            if xfield_maxblocksize.is_some() && *size == xfield_maxblocksize.unwrap() {
+                log::info!(
+                    "Xfield Max block size was set in block {} at height {} as expected.",
+                    block_hash,
+                    block_height
+                )
+            } else {
+                log::warn!(
+                    "Xfield Max block size was set in block {} at height {} was NOT expected.",
+                    block_hash,
+                    block_height
+                )
+            }
         }
     }
 }
@@ -871,9 +972,19 @@ mod tests {
         }
 
         impl TapyrusApi for MockRpc {
+            fn getnewblockwithxfield(
+                &self,
+                _address: &Address,
+                _required_age: &u32,
+                _xfield: &tapyrus::blockdata::block::XField,
+            ) -> Result<Block, Error> {
+                unimplemented!()
+            }
+
             fn getnewblock(&self, _address: &Address) -> Result<Block, Error> {
                 unimplemented!()
             }
+
             fn testproposedblock(&self, _block: &Block) -> Result<bool, Error> {
                 unimplemented!()
             }
@@ -893,7 +1004,7 @@ mod tests {
 
         #[test]
         fn test_wait_for_ibd_finish() {
-            let json = serde_json::from_str("{\"chain\": \"test\", \"blocks\": 26826, \"headers\": 26826, \"bestblockhash\": \"7303687fb5d80781bd9fece466e76d97a94613d409d127030ff7f34081a899f7\", \"mediantime\": 1568103315, \"verificationprogress\": 1, \"initialblockdownload\": false, \"size_on_disk\": 11669126,  \"pruned\": false,  \"bip9_softforks\": {    \"csv\": {      \"status\": \"failed\",      \"startTime\": 1456790400, \"timeout\": 1493596800, \"since\": 2016 }, \"segwit\": { \"status\": \"failed\", \"startTime\": 1462060800, \"timeout\": 1493596800, \"since\": 2016 }},  \"warnings\": \"\"}").unwrap();
+            let json = serde_json::from_str("{\"chain\": \"test\", \"blocks\": 26826, \"headers\": 26826, \"bestblockhash\": \"7303687fb5d80781bd9fece466e76d97a94613d409d127030ff7f34081a899f7\", \"mediantime\": 1568103315, \"verificationprogress\": 1, \"initialblockdownload\": false, \"size_on_disk\": 11669126,  \"pruned\": false,  \"bip9_softforks\": {    \"csv\": {      \"status\": \"failed\",      \"startTime\": 1456790400, \"timeout\": 1493596800, \"since\": 2016 }, \"segwit\": { \"status\": \"failed\", \"startTime\": 1462060800, \"timeout\": 1493596800, \"since\": 2016 }},  \"aggregate_pubkeys\": [], \"max_block_sizes\": [], \"warnings\": \"\"}").unwrap();
             let mut result1 = serde_json::from_value::<GetBlockchainInfoResult>(json).unwrap();
             result1.initialblockdownload = true;
             let mut result2 = result1.clone();

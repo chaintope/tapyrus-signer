@@ -185,7 +185,7 @@ impl Vss {
         let local_sig_for_positive = Sign::sign_xfield(
             &shared_keys_for_positive,
             &priv_shared_keys,
-            xfield.signature_hash()?,
+            xfield.signature_hash().unwrap(),
         );
 
         let shared_keys_for_negative =
@@ -193,7 +193,7 @@ impl Vss {
         let local_sig_for_negative = Sign::sign_xfield(
             &shared_keys_for_negative,
             &priv_shared_keys,
-            xfield.signature_hash()?,
+            xfield.signature_hash().unwrap(),
         );
         Self::create_local_sig_from_shares(
             priv_shared_keys,
@@ -638,7 +638,7 @@ mod tests {
             })
             .collect();
 
-        let (is_positive, key, local_sig) = Vss::create_local_sig_from_shares_for_xfield(
+        let (is_positive, key, _local_sig) = Vss::create_local_sig_from_shares_for_xfield(
             &priv_shared_keys,
             1,
             &shared_block_secrets,
@@ -646,7 +646,7 @@ mod tests {
         )
         .expect("error occurred in Vss::create_local_sig_from_shares");
 
-        let expected_localsig = to_local_sig(&v["expected_localsig"]).unwrap();
+        let _expected_localsig = to_local_sig(&v["expected_localsig"]).unwrap();
         let expected_block_shared_keys =
             to_block_shared_keys(&v["expected_block_shared_keys"]).unwrap();
 
@@ -677,7 +677,7 @@ mod tests {
             })
             .collect();
 
-        let (is_positive, key, local_sig) = Vss::create_local_sig_from_shares_for_xfield(
+        let (is_positive, key, _local_sig) = Vss::create_local_sig_from_shares_for_xfield(
             &priv_shared_keys,
             1,
             &shared_block_secrets,
@@ -685,7 +685,7 @@ mod tests {
         )
         .expect("error occurred in Vss::create_local_sig_from_shares");
 
-        let expected_localsig = to_local_sig(&v["expected_localsig"]).unwrap();
+        let _expected_localsig = to_local_sig(&v["expected_localsig"]).unwrap();
         let expected_block_shared_keys =
             to_block_shared_keys(&v["expected_block_shared_keys"]).unwrap();
 
