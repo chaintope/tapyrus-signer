@@ -820,9 +820,9 @@ dependencies = [
 
 [[package]]
 name = "rustc-serialize"
-version = "0.3.24"
+version = "0.3.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
+checksum = "fe834bc780604f4674073badbad26d7219cadfb4a2275802db12cbae17498401"
 
 [[package]]
 name = "ryu"
@@ -966,8 +966,9 @@ dependencies = [
 
 [[package]]
 name = "tapyrus"
-version = "0.4.5"
-source = "git+https://github.com/chaintope/rust-tapyrus?tag=v0.4.5#02cda49e6e887425991cfd1d5acf214b0506bbd9"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1869b2bde899d49cbc7b5e041768051e560ddc6acc4d7755d6d94b4a470cfc93"
 dependencies = [
  "bitcoin_hashes 0.8.0",
  "rug",
@@ -997,6 +998,7 @@ dependencies = [
  "log",
  "redis",
  "regex",
+ "rustc-serialize",
  "secp256k1 0.15.5",
  "serde",
  "serde_derive",
