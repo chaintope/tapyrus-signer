@@ -31,7 +31,9 @@ pub enum Error {
     /// Error when the aggregated public key included the candidate block is invalid.
     InvalidAggregatedPublicKey,
     /// xField is not supported by signer.
-    UnsupportedXField,
+    UnsupportedXField(String),
+    UnauthorizedFederationChange(u32),
+    XfieldFederationMismatch(Option<u32>, &'static str),
 }
 
 impl std::fmt::Display for Error {
