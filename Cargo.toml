@@ -29,7 +29,7 @@ libc = "0.2.66"
 daemonize = "0.4.1"
 lazy_static = "1.4.0"
 derive_builder = "0.9.0"
-gmp-mpfr-sys = "1.4.8"
+gmp-mpfr-sys = { version = "1.4.8", features = ["c-no-tests"] }
 regex = "1.5.6"
 generic-array = "0.12.4"
 rustc-serialize = {version = "0.3.25"}
