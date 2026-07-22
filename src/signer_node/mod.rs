@@ -5,7 +5,7 @@ pub mod node_parameters;
 pub mod node_state;
 pub mod utils;
 
-use crate::federation::Federation;
+use crate::federation::{Federation, Federations};
 pub use crate::signer_node::node_parameters::NodeParameters;
 pub use crate::signer_node::node_state::NodeState;
 
@@ -42,6 +42,10 @@ pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     params: NodeParameters<T>,
     current_state: NodeState,
     stop_signal: Option<Receiver<u32>>,
+    /// Delivers a freshly reloaded `Federations` whenever `federations.toml` is edited on disk
+    /// while the node is running (see `federation_watcher`). Applied between message-processing
+    /// iterations of the main loop, never mid-round.
+    federations_reload_signal: Option<Receiver<Federations>>,
     /// ## Round Limit Timer
     /// If the round duration is over, notify it and go through next round.
     /// The round limit consists from round_interval and round_limit.
@@ -124,6 +128,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             params,
             current_state: NodeState::Joining,
             stop_signal: None,
+            federations_reload_signal: None,
             round_limit_timer: RoundTimeOutObserver::new("round_limit_timer", timer_limit),
             round_interval_timer: RoundTimeOutObserver::new("round_interval_timer", round_interval),
         }
@@ -131,6 +136,10 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
 
     pub fn stop_handler(&mut self, receiver: Receiver<u32>) {
         self.stop_signal = Some(receiver);
+    }
+
+    pub fn federations_reload_handler(&mut self, receiver: Receiver<Federations>) {
+        self.federations_reload_signal = Some(receiver);
     }
 
     pub fn start(&mut self) {
@@ -174,6 +183,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     None => {}
                 }
 
+                self.handle_federations_reload();
+
                 self.handle_round_interval_timer();
 
                 // After process when received message. Get message from receiver,
@@ -216,6 +227,25 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             None => {
                 // Stop signal receiver is not set. Do nothing.
                 None
+            }
+        }
+    }
+
+    /// Check if `federation_watcher` delivered a freshly reloaded `Federations`.
+    /// If so, apply it. This runs between message-processing iterations of the main loop, so it
+    /// never lands mid-way through handling a single round message.
+    fn handle_federations_reload(&mut self) {
+        if let Some(ref r) = self.federations_reload_signal {
+            match r.try_recv() {
+                Ok(federations) => {
+                    log::info!("Reloaded federations.toml, applying new federations.");
+                    self.params.set_federations(federations);
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    log::warn!("federations reload channel disconnected.");
+                    self.federations_reload_signal = None;
+                }
             }
         }
     }
