@@ -126,6 +126,7 @@ This is required. This specifies the signer's public key, who hosted the node.
 The public key format is compressed hex string.
 * `federations-file`
 This is required. This specifies the path to the TOML file of the federations of the chain.
+This file is watched while `tapyrus-signerd` is running, so edits (e.g. appending a new federation/xfield change) are picked up automatically without a restart. See [federation.md](./federation.md#live-reload-of-federationstoml) for details, including the atomic-write requirement.
 
 ### [rpc] section
 

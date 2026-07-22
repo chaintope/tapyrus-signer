@@ -44,6 +44,12 @@ impl<T: TapyrusApi> NodeParameters<T> {
         self.federations.get_by_block_height(block_height)
     }
 
+    /// Replace the loaded federations, e.g. after a live reload of `federations.toml`
+    /// picked up a newly-appended entry.
+    pub fn set_federations(&mut self, federations: Federations) {
+        self.federations = federations;
+    }
+
     pub fn get_signer_id_by_index(&self, block_height: u32, index: usize) -> SignerID {
         SignerID {
             pubkey: self.pubkey_list(block_height)[index].clone(),
