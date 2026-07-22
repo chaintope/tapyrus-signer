@@ -269,7 +269,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_federations_ihas_max_block_size() {
+    fn test_load_federations_has_max_block_size() {
         let pubkey = PublicKey::from_str(
             "0302f5584e30d2ee32e772d04ff8ee1efc90a7a91ac5b7c4025da7a42a67d06a25",
         )

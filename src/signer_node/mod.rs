@@ -380,7 +380,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             }
         };
 
-        //let block = self.add_aggregated_public_key_if_needed(block_height, block);
         log::info!(
             "Broadcast candidate block. block hash for signing: {:?}",
             block.header.signature_hash()
@@ -1004,7 +1003,7 @@ mod tests {
 
         #[test]
         fn test_wait_for_ibd_finish() {
-            let json = serde_json::from_str("{\"chain\": \"test\", \"blocks\": 26826, \"headers\": 26826, \"bestblockhash\": \"7303687fb5d80781bd9fece466e76d97a94613d409d127030ff7f34081a899f7\", \"mediantime\": 1568103315, \"verificationprogress\": 1, \"initialblockdownload\": false, \"size_on_disk\": 11669126,  \"pruned\": false,  \"bip9_softforks\": {    \"csv\": {      \"status\": \"failed\",      \"startTime\": 1456790400, \"timeout\": 1493596800, \"since\": 2016 }, \"segwit\": { \"status\": \"failed\", \"startTime\": 1462060800, \"timeout\": 1493596800, \"since\": 2016 }},  \"aggregate_pubkeys\": [], \"max_block_sizes\": [], \"warnings\": \"\"}").unwrap();
+            let json = serde_json::from_str("{\"chain\": \"test\", \"blocks\": 26826, \"headers\": 26826, \"bestblockhash\": \"7303687fb5d80781bd9fece466e76d97a94613d409d127030ff7f34081a899f7\", \"mediantime\": 1568103315, \"verificationprogress\": 1, \"initialblockdownload\": false, \"size_on_disk\": 11669126,  \"pruned\": false,  \"bip9_softforks\": {    \"csv\": {      \"status\": \"failed\",      \"startTime\": 1456790400, \"timeout\": 1493596800, \"since\": 2016 }, \"segwit\": { \"status\": \"failed\", \"startTime\": 1462060800, \"timeout\": 1493596800, \"since\": 2016 }},  \"aggregatePubkeys\": [], \"maxBlockSizes\": [], \"warnings\": \"\"}").unwrap();
             let mut result1 = serde_json::from_value::<GetBlockchainInfoResult>(json).unwrap();
             result1.initialblockdownload = true;
             let mut result2 = result1.clone();

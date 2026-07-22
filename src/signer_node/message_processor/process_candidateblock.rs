@@ -362,4 +362,51 @@ mod tests {
         let block = test_block_without_public_key();
         assert!(verify_block(&block, 100, &params).is_ok())
     }
+
+    /// Regression test for an off-by-one in `Federation::match_xfield_with_federation`'s
+    /// signature-check skip logic: only the genesis federation (block-height 0) is exempt from
+    /// requiring a signature, but the check used to compare the *candidate block's own height*
+    /// against `1` instead of `0`, so a federation change taking effect at block-height 2 (i.e.
+    /// embedded in the very first candidate block ever produced, height 1) would incorrectly
+    /// skip signature verification entirely.
+    #[test]
+    fn test_verify_aggregated_public_key_skips_signature_check_only_at_genesis() {
+        let federation0 = Federation::new(
+            TEST_KEYS.pubkeys()[4],
+            0,
+            Some(3),
+            Some(node_vss(0)),
+            XField::AggregatePublicKey(TEST_KEYS.aggregated()),
+            None,
+            None,
+        );
+        // A federation change taking effect at height 2 (the earliest a real change can occur),
+        // deliberately left unsigned so a missed signature check would wrongly return Ok.
+        let federation2 = Federation::new(
+            TEST_KEYS.pubkeys()[4],
+            2,
+            Some(3),
+            Some(node_vss(1)),
+            XField::AggregatePublicKey(TEST_KEYS.aggregated()),
+            Some(TEST_KEYS.aggregated()),
+            None,
+        );
+        let federations = Federations::new(vec![federation0, federation2]);
+        let params = NodeParametersBuilder::new()
+            .public_key(TEST_KEYS.pubkeys()[2])
+            .rpc(MockRpc::new())
+            .federations(federations)
+            .build();
+
+        // Candidate block at height 1 announces the federation change taking effect at height 2.
+        let block = test_block_with_public_key();
+        match verify_block(&block, 1, &params) {
+            Err(Error::UnauthorizedFederationChange(..)) => {}
+            Ok(()) => assert!(
+                false,
+                "signature check was skipped for a non-genesis federation change"
+            ),
+            _ => assert!(false, "Different error type expected"),
+        }
+    }
 }

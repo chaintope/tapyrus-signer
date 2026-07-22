@@ -95,6 +95,7 @@ impl Federations {
         vec = Self::fill_missing_unchanged_federation_parameters(vec)?;
 
         let r = Federations::new(vec);
+        r.validate()?;
         Ok(r)
     }
 
@@ -103,15 +104,16 @@ impl Federations {
     fn fill_missing_unchanged_federation_parameters(
         mut vec: Vec<Federation>,
     ) -> Result<Vec<Federation>, Error> {
+        if let Some(first) = vec.get(0) {
+            first.validate()?;
+        }
+
         let mut last_fed_index = 0;
         for i in 1..vec.len() {
-            match vec[i].validate() {
-                Ok(()) => (),
-                Err(e) => return Err(e),
-            }
+            vec[i].validate()?;
 
             let last_fed_data = {
-                let last_fed = vec[last_fed_index].clone();
+                let last_fed = &vec[last_fed_index];
                 (
                     last_fed.aggregated_public_key(),
                     last_fed.threshold,
@@ -123,10 +125,7 @@ impl Federations {
 
             if fed.block_height > 0 {
                 fed.verification_key = last_fed_data.0;
-                match fed.verify_signature() {
-                    Ok(()) => (),
-                    Err(e) => return Err(e),
-                }
+                fed.verify_signature()?;
 
                 if fed.max_block_size().is_some() {
                     fed.threshold = last_fed_data.1;
@@ -492,7 +491,7 @@ impl Federation {
                 c
             ))),
 
-            // when there is no xfield in the block: verify that there is no change in federarions
+            // when there is no xfield in the block: verify that there is no change in federations
             (XField::None, Some(_)) => {
                 log::warn!(
                     "{}",
@@ -502,19 +501,19 @@ impl Federation {
             }
 
             (_, None) => {
-                log::warn!("{}", "Xfield was present in block. But was not expected acdcording to federations file");
-                Err(Error::XfieldFederationMismatch(Some(block_height), "Xfield was present in block. But was not expected acdcording to federations file"))
+                log::warn!("{}", "Xfield was present in block. But was not expected according to federations file");
+                Err(Error::XfieldFederationMismatch(Some(block_height), "Xfield was present in block. But was not expected according to federations file"))
             }
 
-            // when there is an xfield in the block: verify that it matches the configuration in federarions
+            // when there is an xfield in the block: verify that it matches the configuration in federations
             (ref xfield, Some(federation)) => {
                 if federation.xfield() == xfield {
-                    if block_height > 1 {
-                        // first federation and genesis block do not have signature
-                        match federation.verify_signature() {
-                            Ok(_) => Ok(()),
-                            Err(e) => Err(e),
-                        }
+                    // Only the genesis federation (block-height 0) is exempt from carrying a
+                    // signature (Federation::validate() enforces this). `expected_federation` is
+                    // looked up at `block_height + 1`, so it is never the genesis entry here;
+                    // this check must therefore hold for every candidate height >= 1.
+                    if block_height > 0 {
+                        federation.verify_signature()
                     } else {
                         Ok(())
                     }
@@ -883,7 +882,6 @@ mod tests {
         let toml = r#"
         [[federation]]
         block-height = 0
-        threshold = 3
         aggregated-public-key = "030d856ac9f5871c3785a2d76e3a5d9eca6fcce70f4de63339671dfb9d1f33edb0"
         node-vss = [
           "02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b7250602472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b725060003472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506bb360eeb9d77cc606471ca455eb68331fbbdab6d009da456bef3920a61222f5835f7638e641b55dba9c5711ba47d50b8e1eefcf06d42c71708ae28dd1a038b02651456363420d02dc28ef180b66e781413133effde76d7eb7a57cffe41de3e6537325720efa3c4a847f84e72830280f2ff37758c69ade23f45d9e8c2f28f7b92a984669067dd13ecd9789da097d76f3b9c9b179f9948025db5e2ae00522f55515126b42d8c99f0b72c28ad5bf95ee38f4154f37df7d4a621b68db4f9f5c8070b472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b7250644c9f1146288339f9b8e35baa1497cce04425492ff625ba9410c6df49eddccd739e10be2c059db79d50c629fe78a929d8458d064261aaa873a478ccb3b0c18f7df28e9bf75c9e4f8101b4bfb007c538499945ed651aea6122164ee9dcff02405b41ced6471dc0099a740921e10ba7d539e69153b25b2bb97257fa8dd5f0109aa52e94a550998d573aebced1eb10aaafbae5cbfb6413eed0c17f88204f2e4b13c7746199720b3bee5c3d50b9ca9e3c32e905d7058a3cb9ec899bf428ba2e0d9c7",
@@ -918,7 +916,6 @@ mod tests {
         let toml = r#"
         [[federation]]
         block-height = 0
-        threshold = 3
         aggregated-public-key = "030d856ac9f5871c3785a2d76e3a5d9eca6fcce70f4de63339671dfb9d1f33edb0"
         node-vss = [
           "02472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b7250602472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b725060002472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b72506bb360eeb9d77cc606471ca455eb68331fbbdab6d009da456bef3920a61222f58df14e215a3883ff8c8def6bdce4d9d80282749b8056ec72373a246b3de5aa120b336d88a9b977a2f2ff5f26a1633f70f2d776363c495a02617bb7a88a2fea285a0a0e33e16dd90acb06b22fc70086f7eb12cdfeb7eb622d8a455de1f448fd30a472012cf49fca573ca1f63deafe59df842f0bbe77e9ac7e67b211bb074b7250644c9f1146288339f9b8e35baa1497cce04425492ff625ba9410c6df49eddccd761c1af39b4fcbe4e3a240848bc90f41681ec105286684d4832efdc5b96a0e027286d9f7d22ad52194da7d522e5586ce268c7fde21220aca78e21d1d1a5d69f2468fff1b0f8a3a142cf0e1c7d29cbe3e509c437cd680ab21715cb5c1844d2eff8",
@@ -1019,7 +1016,6 @@ mod tests {
         toml = r#"
         [[federation]]
         block-height = 0
-        threshold = 3
         aggregated-public-key = "02459adb8a8f052be94874aef7d4c3d3ddb71fcdaa869b1d515a92d63cb29c2806"
         [[federation]]
         block-height = 20
@@ -1040,7 +1036,6 @@ mod tests {
         toml = r#"
         [[federation]]
         block-height = 0
-        threshold = 3
         aggregated-public-key = "030d856ac9f5871c3785a2d76e3a5d9eca6fcce70f4de63339671dfb9d1f33edb0"
         [[federation]]
         block-height = 20
@@ -1061,7 +1056,6 @@ mod tests {
         toml = r#"
         [[federation]]
         block-height = 0
-        threshold = 3
         aggregated-public-key = "030d856ac9f5871c3785a2d76e3a5d9eca6fcce70f4de63339671dfb9d1f33edb0"
         [[federation]]
         block-height = 20
@@ -1078,7 +1072,6 @@ mod tests {
         toml = r#"
         [[federation]]
         block-height = 0
-        threshold = 3
         aggregated-public-key = "030d856ac9f5871c3785a2d76e3a5d9eca6fcce70f4de63339671dfb9d1f33edb0"
         [[federation]]
         block-height = 20
