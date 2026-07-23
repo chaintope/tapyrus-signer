@@ -43,8 +43,9 @@ pub struct SignerNode<T: TapyrusApi, C: ConnectionManager> {
     current_state: NodeState,
     stop_signal: Option<Receiver<u32>>,
     /// Delivers a freshly reloaded `Federations` whenever `federations.toml` is edited on disk
-    /// while the node is running (see `federation_watcher`). Applied between message-processing
-    /// iterations of the main loop, never mid-round.
+    /// while the node is running (see `federation_watcher`). Only drained and applied at the
+    /// top of `start_next_round`, so a swap can never land in the middle of an already-started
+    /// round.
     federations_reload_signal: Option<Receiver<Federations>>,
     /// ## Round Limit Timer
     /// If the round duration is over, notify it and go through next round.
@@ -183,8 +184,6 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
                     None => {}
                 }
 
-                self.handle_federations_reload();
-
                 self.handle_round_interval_timer();
 
                 // After process when received message. Get message from receiver,
@@ -231,22 +230,33 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
         }
     }
 
-    /// Check if `federation_watcher` delivered a freshly reloaded `Federations`.
-    /// If so, apply it. This runs between message-processing iterations of the main loop, so it
-    /// never lands mid-way through handling a single round message.
-    fn handle_federations_reload(&mut self) {
+    /// Applies the most recent reload of `federations.toml` delivered by `federation_watcher`,
+    /// if any is pending. Only called from `start_next_round`, at the very top, before that
+    /// round reads any federation parameter for its own block height - never mid-round. If
+    /// several edits landed in the channel while a round was in flight, they are drained and
+    /// only the most recent one is applied; the earlier ones are stale by the time this runs.
+    fn apply_pending_federations_reload(&mut self) {
+        let mut latest = None;
+        let mut disconnected = false;
         if let Some(ref r) = self.federations_reload_signal {
-            match r.try_recv() {
-                Ok(federations) => {
-                    log::info!("Reloaded federations.toml, applying new federations.");
-                    self.params.set_federations(federations);
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => {}
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    log::warn!("federations reload channel disconnected.");
-                    self.federations_reload_signal = None;
+            loop {
+                match r.try_recv() {
+                    Ok(federations) => latest = Some(federations),
+                    Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        disconnected = true;
+                        break;
+                    }
                 }
             }
+        }
+        if disconnected {
+            log::warn!("federations reload channel disconnected.");
+            self.federations_reload_signal = None;
+        }
+        if let Some(federations) = latest {
+            log::info!("Reloaded federations.toml, applying new federations.");
+            self.params.set_federations(federations);
         }
     }
 
@@ -512,6 +522,8 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
     /// Start next round.
     /// decide master of next round according to Round-robin.
     fn start_next_round(&mut self) {
+        self.apply_pending_federations_reload();
+
         self.round_limit_timer.restart().unwrap();
 
         // Get a block height at next of the tip block.
