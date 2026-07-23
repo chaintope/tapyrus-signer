@@ -83,6 +83,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys, Signature};
     use crate::federation::{Federation, Federations};
     use crate::net::{Message, MessageType, SignerID};
     use crate::signer_node::node_state::builder::{Builder, Master, Member};
@@ -94,6 +95,8 @@ mod tests {
     use crate::tests::helper::node_state_builder::BuilderForTest;
     use crate::tests::helper::node_vss::node_vss;
     use crate::tests::helper::rpc::MockRpc;
+    use curv::elliptic::curves::traits::{ECPoint, ECScalar};
+    use curv::{BigInt, FE};
     use std::str::FromStr;
     use tapyrus::blockdata::block::XField;
     use tapyrus::consensus::encode::deserialize;
@@ -277,7 +280,6 @@ mod tests {
         deserialize(&raw_block).unwrap()
     }
 
-    //TODO : create correct signatures for these
     #[test]
     fn test_verify_aggregated_public_key() {
         let federation0 = Federation::new(
@@ -408,5 +410,76 @@ mod tests {
             ),
             _ => assert!(false, "Different error type expected"),
         }
+    }
+
+    /// Builds a single-party Schnorr keypair usable with `crypto::multi_party_schnorr::Signature`,
+    /// from a fixed private scalar so the test is deterministic.
+    fn shared_keys_from_hex(private_scalar_hex: &str) -> SharedKeys {
+        let x: FE = ECScalar::from(&BigInt::from_str_radix(private_scalar_hex, 16).unwrap());
+        SharedKeys {
+            y: &ECPoint::generator() * &x,
+            x_i: x,
+        }
+    }
+
+    fn public_key_of(shared_keys: &SharedKeys) -> PublicKey {
+        let compressed: [u8; 33] = shared_keys.y.get_element().serialize();
+        PublicKey::from_slice(&compressed).unwrap()
+    }
+
+    /// Happy-path test: a candidate block carrying a federation change with a genuinely valid
+    /// signature (computed with the same Schnorr signing/verification code the daemon uses, not
+    /// a hand-typed placeholder) must be accepted by `verify_block`. Every other test around
+    /// `match_xfield_with_federation` exercises a rejection path only.
+    #[test]
+    fn test_verify_block_accepts_correctly_signed_federation_change() {
+        let signing_keys = shared_keys_from_hex(
+            "e91316f9f31a4c9b2d3e1b62f26a2a4b8b9d63af5c92c14d1b3f0e5d6c7a8b9",
+        );
+        let signing_pubkey = public_key_of(&signing_keys);
+
+        let new_max_block_size = XField::MaxBlockSize(2_000_000);
+        let hash = new_max_block_size.signature_hash().unwrap();
+
+        let ephemeral_keys = shared_keys_from_hex(
+            "c9f6e6c56f560a6bfb2e8f0f6a2c92a02cba9160bb61ec5b6e64b0f0c9c1a2b",
+        );
+        let local_sig = LocalSig::compute(&hash[..], &ephemeral_keys, &signing_keys);
+        let signature = Signature {
+            sigma: local_sig.gamma_i,
+            v: ephemeral_keys.y,
+        };
+        // The fixture itself must be a genuinely valid signature before relying on it below.
+        assert!(signature.verify(&hash[..], &signing_keys.y).is_ok());
+
+        let federation0 = Federation::new(
+            TEST_KEYS.pubkeys()[4],
+            0,
+            None,
+            None,
+            XField::AggregatePublicKey(signing_pubkey),
+            None,
+            None,
+        );
+        let federation100 = Federation::new(
+            TEST_KEYS.pubkeys()[4],
+            100,
+            None,
+            None,
+            new_max_block_size.clone(),
+            Some(signing_pubkey),
+            Some(signature),
+        );
+        let federations = Federations::new(vec![federation0, federation100]);
+        let params = NodeParametersBuilder::new()
+            .public_key(TEST_KEYS.pubkeys()[2])
+            .rpc(MockRpc::new())
+            .federations(federations)
+            .build();
+
+        let mut block = test_block_without_public_key();
+        block.header.xfield = new_max_block_size;
+
+        assert!(verify_block(&block, 99, &params).is_ok());
     }
 }
