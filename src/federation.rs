@@ -34,7 +34,11 @@ impl Federations {
             .iter()
             .filter(|f| f.block_height <= block_height)
             .last()
-            .expect("Federations should not be empty.")
+            .expect(
+                "No federation entry at or below this block height; Federations::validate() \
+                 should have rejected a list missing a block-height-0 floor entry before this \
+                 was ever called.",
+            )
     }
 
     pub fn get_federation_change_for_block_height(&self, block_height: u32) -> Option<&Federation> {
@@ -69,6 +73,18 @@ impl Federations {
             return Err(Error::InvalidFederation(
                 None,
                 "The federations include block height duplication. The block height in all federations should be unique.",
+            ));
+        }
+
+        // self.federations is sorted ascending by block_height (see `new`), so this is the
+        // lowest height known. Without a floor entry at height 0, `get_by_block_height` can be
+        // asked about a height below every known entry and have nothing to return - this
+        // guarantees that never happens, whether the list came from the initial load or a live
+        // reload.
+        if self.federations[0].block_height != 0 {
+            return Err(Error::InvalidFederation(
+                Some(self.federations[0].block_height),
+                "The federations must include an entry at block-height 0 to cover every block height from genesis onward.",
             ));
         }
 
@@ -690,10 +706,27 @@ mod tests {
         federation
     }
 
+    /// `Federations::validate()` requires a floor entry at block-height 0; `valid_federation()`
+    /// is deliberately at height 10 (a non-genesis change) for the other tests in this module.
+    fn valid_federation_at_height_0() -> Federation {
+        let mut federation = valid_federation();
+        federation.block_height = 0;
+        federation
+    }
+
     #[test]
     fn test_federations_validate() {
-        let federations = Federations::new(vec![valid_federation()]);
+        let federations = Federations::new(vec![valid_federation_at_height_0()]);
         assert!(federations.validate().is_ok());
+
+        let federations = Federations::new(vec![valid_federation()]);
+        match federations.validate() {
+            Err(Error::InvalidFederation(Some(10), m)) => assert_eq!(
+                m,
+                "The federations must include an entry at block-height 0 to cover every block height from genesis onward."
+            ),
+            _ => assert!(false, "it should error"),
+        }
 
         let federations = Federations::new(vec![]);
         match federations.validate() {

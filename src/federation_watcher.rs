@@ -7,9 +7,10 @@
 //! only decides *when the daemon notices a new entry exists*.
 
 use crate::federation::Federations;
-use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+use notify::RecursiveMode;
+use notify_debouncer_mini::{new_debouncer, DebounceEventResult};
 use std::path::PathBuf;
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 use tapyrus::PublicKey;
 
@@ -22,8 +23,13 @@ const DEBOUNCE: Duration = Duration::from_millis(300);
 /// `Federations::from_pubkey_and_toml` (the same validated load path used at startup). A
 /// successfully parsed `Federations` is sent on the returned channel; a malformed edit is logged
 /// and otherwise ignored, so a bad edit never crashes an already-running signer.
+///
+/// This call blocks until the underlying OS watch is actually registered (and an initial reload
+/// of `path` has been attempted), so there is no gap between `spawn` returning and the watch
+/// being live - an edit made immediately after this call returns is never missed.
 pub fn spawn(path: PathBuf, pubkey: PublicKey) -> Receiver<Federations> {
     let (federations_tx, federations_rx) = channel();
+    let (ready_tx, ready_rx) = channel::<()>();
 
     std::thread::spawn(move || {
         let watch_dir = match path.parent() {
@@ -41,15 +47,21 @@ pub fn spawn(path: PathBuf, pubkey: PublicKey) -> Receiver<Federations> {
             }
         };
 
-        let (fs_tx, fs_rx) = channel();
-        let mut fs_watcher = match watcher(fs_tx, DEBOUNCE) {
-            Ok(w) => w,
+        let (fs_tx, fs_rx) = channel::<DebounceEventResult>();
+        // The debouncer coalesces raw filesystem events per-path over `DEBOUNCE` and must be
+        // kept alive for as long as we want to keep watching (dropping it stops the watch), so
+        // it lives as a local binding for the rest of this thread.
+        let mut debouncer = match new_debouncer(DEBOUNCE, fs_tx) {
+            Ok(d) => d,
             Err(e) => {
                 log::error!("federation_watcher: failed to create watcher: {:?}", e);
                 return;
             }
         };
-        if let Err(e) = fs_watcher.watch(&watch_dir, RecursiveMode::NonRecursive) {
+        if let Err(e) = debouncer
+            .watcher()
+            .watch(&watch_dir, RecursiveMode::NonRecursive)
+        {
             log::error!(
                 "federation_watcher: failed to watch {:?}: {:?}",
                 watch_dir,
@@ -64,31 +76,47 @@ pub fn spawn(path: PathBuf, pubkey: PublicKey) -> Receiver<Federations> {
             file_name
         );
 
+        // Close the gap between the initial load in `main` and the watch becoming live: pick up
+        // whatever is on disk right now before waiting for the first filesystem event.
+        reload(&path, &pubkey, &federations_tx);
+        let _ = ready_tx.send(());
+
         loop {
             match fs_rx.recv() {
-                Ok(DebouncedEvent::Create(p))
-                | Ok(DebouncedEvent::Write(p))
-                | Ok(DebouncedEvent::Rename(_, p))
-                    if p.file_name() == Some(file_name.as_os_str()) =>
-                {
-                    reload(&path, &pubkey, &federations_tx);
+                Ok(Ok(events)) => {
+                    let touched_our_file = events
+                        .iter()
+                        .any(|e| e.path.file_name() == Some(file_name.as_os_str()));
+                    if touched_our_file && !reload(&path, &pubkey, &federations_tx) {
+                        log::warn!(
+                            "federation_watcher: signer node is no longer listening, stopping"
+                        );
+                        return;
+                    }
                 }
-                Ok(_) => {}
-                Err(e) => {
+                Ok(Err(e)) => {
                     log::error!("federation_watcher: watch error: {:?}", e);
+                }
+                Err(_) => {
+                    // The debouncer's sender was dropped, which only happens if `debouncer`
+                    // itself were dropped - it isn't, since it lives in this same scope.
+                    return;
                 }
             }
         }
     });
 
+    // Block until the watch is registered (and the initial reload attempted) so callers never
+    // race an edit against the watcher's own setup.
+    let _ = ready_rx.recv();
     federations_rx
 }
 
-fn reload(
-    path: &PathBuf,
-    pubkey: &PublicKey,
-    federations_tx: &std::sync::mpsc::Sender<Federations>,
-) {
+/// Re-reads and re-validates `path`, sending a successful result on `federations_tx`.
+/// Returns `false` only when the receiving end has gone away (the signer node has shut down),
+/// signalling the caller to stop watching; a malformed file is logged and otherwise ignored,
+/// still returning `true` so the watcher keeps running.
+fn reload(path: &PathBuf, pubkey: &PublicKey, federations_tx: &Sender<Federations>) -> bool {
     let toml = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
@@ -97,7 +125,7 @@ fn reload(
                 path,
                 e
             );
-            return;
+            return true;
         }
     };
 
@@ -108,9 +136,7 @@ fn reload(
                 path,
                 federations.len()
             );
-            if federations_tx.send(federations).is_err() {
-                log::error!("federation_watcher: signer node is no longer listening, stopping");
-            }
+            federations_tx.send(federations).is_ok()
         }
         Err(e) => {
             log::error!(
@@ -118,6 +144,7 @@ fn reload(
                 path,
                 e
             );
+            true
         }
     }
 }
@@ -171,6 +198,13 @@ mod tests {
         "#;
     // An explicitly empty federation list, rejected by `Federations::validate()`.
     const EMPTY_TOML: &str = "federation = []";
+    // No entry at block-height 0: without a floor entry, a later get_by_block_height lookup for
+    // any height below 100 would have nothing to return. Rejected by `Federations::validate()`.
+    const NO_GENESIS_FLOOR_TOML: &str = r#"
+        [[federation]]
+        block-height = 100
+        aggregated-public-key = "02459adb8a8f052be94874aef7d4c3d3ddb71fcdaa869b1d515a92d63cb29c2806"
+        "#;
 
     /// Creates a fresh scratch directory under the OS temp dir, unique per test invocation.
     fn scratch_dir(name: &str) -> PathBuf {
@@ -192,6 +226,14 @@ mod tests {
         std::fs::rename(&tmp, path).unwrap();
     }
 
+    /// `spawn` always attempts an eager reload of whatever is on disk before returning (closing
+    /// the gap between the initial load in `main` and the watch becoming live). Every test below
+    /// must consume that first message before exercising the edit it actually cares about.
+    fn recv_eager_reload(rx: &Receiver<Federations>) -> Federations {
+        rx.recv_timeout(Duration::from_secs(2))
+            .expect("expected the eager reload spawn() performs before returning")
+    }
+
     #[test]
     fn test_reload_on_valid_edit() {
         let dir = scratch_dir("valid_edit");
@@ -200,9 +242,8 @@ mod tests {
 
         let pubkey = PublicKey::from_str(PUBKEY).unwrap();
         let rx = spawn(path.clone(), pubkey);
+        assert_eq!(recv_eager_reload(&rx).len(), 1);
 
-        // Give the watcher time to register before the write it should observe.
-        std::thread::sleep(Duration::from_millis(200));
         write_atomically(&path, GENESIS_PLUS_CHANGE_TOML);
 
         let federations = rx
@@ -223,8 +264,8 @@ mod tests {
 
         let pubkey = PublicKey::from_str(PUBKEY).unwrap();
         let rx = spawn(path.clone(), pubkey);
+        recv_eager_reload(&rx);
 
-        std::thread::sleep(Duration::from_millis(200));
         write_atomically(&path, invalid_toml);
 
         match rx.recv_timeout(Duration::from_secs(2)) {
@@ -264,6 +305,11 @@ mod tests {
         assert_edit_ignored("empty_list", EMPTY_TOML);
     }
 
+    #[test]
+    fn test_missing_genesis_floor_is_ignored() {
+        assert_edit_ignored("no_genesis_floor", NO_GENESIS_FLOOR_TOML);
+    }
+
     /// A bad edit must not wedge the watcher: a later, valid edit should still be picked up.
     #[test]
     fn test_recovers_after_invalid_edit_then_valid_edit() {
@@ -273,8 +319,8 @@ mod tests {
 
         let pubkey = PublicKey::from_str(PUBKEY).unwrap();
         let rx = spawn(path.clone(), pubkey);
+        recv_eager_reload(&rx);
 
-        std::thread::sleep(Duration::from_millis(200));
         write_atomically(&path, MALFORMED_TOML);
         match rx.recv_timeout(Duration::from_secs(2)) {
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
