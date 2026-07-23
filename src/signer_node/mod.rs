@@ -355,7 +355,7 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             Some(x) => match self.params.rpc.getnewblockwithxfield(
                 &self.params.address,
                 &0,
-                &x.clone().xfield(),
+                x.xfield(),
             ) {
                 Ok(block) => block,
                 Err(e) => {

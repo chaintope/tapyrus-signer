@@ -467,10 +467,20 @@ impl Federation {
 
     pub fn verify_signature(&self) -> Result<(), Error> {
         if let Some(signature) = &self.signature {
-            let hash = self.xfield.signature_hash().unwrap();
-            let verification_key = self.verification_key.unwrap();
+            let hash = self.xfield.signature_hash()?;
+            let verification_key = self.verification_key.ok_or_else(|| {
+                Error::InvalidFederation(
+                    Some(self.block_height),
+                    "verification_key is not set; cannot verify federation change signature.",
+                )
+            })?;
             let bytes: Vec<u8> = verification_key.key.serialize_uncompressed().to_vec();
-            let point = GE::from_bytes(&bytes[1..]).expect("failed to convert pubkey to point");
+            let point = GE::from_bytes(&bytes[1..]).map_err(|_| {
+                Error::InvalidFederation(
+                    Some(self.block_height),
+                    "verification_key could not be converted to a curve point.",
+                )
+            })?;
             signature.verify(&hash[..], &point)
         } else {
             Err(Error::UnauthorizedFederationChange(self.block_height))
@@ -493,15 +503,12 @@ impl Federation {
 
             // when there is no xfield in the block: verify that there is no change in federations
             (XField::None, Some(_)) => {
-                log::warn!(
-                    "{}",
-                    "Xfield in block was None. Does not match the expected federation"
-                );
+                log::warn!("Xfield in block was None. Does not match the expected federation");
                 Err(Error::XfieldFederationMismatch(Some(block_height), "Xfield in block was None. Does not match the expected xfield from federations file"))
             }
 
             (_, None) => {
-                log::warn!("{}", "Xfield was present in block. But was not expected according to federations file");
+                log::warn!("Xfield was present in block. But was not expected according to federations file");
                 Err(Error::XfieldFederationMismatch(Some(block_height), "Xfield was present in block. But was not expected according to federations file"))
             }
 
@@ -519,7 +526,6 @@ impl Federation {
                     }
                 } else {
                     log::warn!(
-                        "{}",
                         "Xfield in block does not match the expected xfield from federations file"
                     );
                     Err(Error::XfieldFederationMismatch(
@@ -1082,6 +1088,37 @@ mod tests {
         match Federations::from_pubkey_and_toml(&pubkey, toml) {
             Err(Error::InvalidSig) => assert!(true),
             _ => assert!(false, "it should error"),
+        }
+    }
+
+    /// A genesis entry that only sets max-block-size (no aggregated-public-key) leaves the next
+    /// entry with no verification_key to check its signature against. This must surface as a
+    /// clean, diagnosable Error::InvalidFederation at load time, not a panic from `.unwrap()`
+    /// on a None verification_key deep inside `verify_signature()`.
+    #[test]
+    fn test_federation_with_no_verification_key_errors_instead_of_panicking() {
+        let pubkey = PublicKey::from_str(
+            "021c36ce51f73f01395af9f7955db0c99f8e34009ea1565679b851f19cba37a5da",
+        )
+        .unwrap();
+
+        let toml = r#"
+        [[federation]]
+        block-height = 0
+        max-block-size = 1000000
+        [[federation]]
+        block-height = 20
+        aggregated-public-key = "0303a8d919266c95407e8aa247b058d510e6286ddb9ba73c7a283edc67bb11ed1e"
+        signature = "16b63d6f3b5a88762d4477b843b857a3bf86677c7044db22a9aada2eb17d0641dde06d981f17045b11c8db7b47846ceca4825f286756440ea158e0b2dba86028"
+        "#;
+
+        match Federations::from_pubkey_and_toml(&pubkey, toml) {
+            Err(Error::InvalidFederation(Some(20), _)) => {}
+            other => assert!(
+                false,
+                "expected a clean InvalidFederation error, got {:?}",
+                other
+            ),
         }
     }
 

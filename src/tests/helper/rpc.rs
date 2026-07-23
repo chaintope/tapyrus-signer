@@ -126,7 +126,7 @@ impl TapyrusApi for MockRpc {
     ) -> Result<Block, Error> {
         let mut list = self.getnewblock_results.borrow_mut();
         let result = list.pop_back().expect(&format!(
-            "Unexpected RPC call method=getnewblock, args(address={:?}, )required_age={:?}, xfield={:?})",
+            "Unexpected RPC call method=getnewblockwithxfield, args(address={:?}, required_age={:?}, xfield={:?})",
             address, required_age, xfield
         ));
         Ok(result)
