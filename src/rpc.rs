@@ -20,9 +20,9 @@ pub struct GetBlockchainInfoResult {
     pub bestblockhash: String,
     pub mediantime: u64,
     pub initialblockdownload: bool,
-    #[serde(rename = "aggregatePubkeys")]
+    #[serde(rename = "aggregatePubkeys", default)]
     pub aggregate_pubkeys: Vec<HashMap<PublicKey, u32>>,
-    #[serde(rename = "maxBlockSizes")]
+    #[serde(rename = "maxBlockSizes", default)]
     pub max_block_sizes: Vec<HashMap<u32, u32>>,
 }
 

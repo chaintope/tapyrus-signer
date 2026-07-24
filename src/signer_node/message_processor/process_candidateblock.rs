@@ -433,17 +433,15 @@ mod tests {
     /// `match_xfield_with_federation` exercises a rejection path only.
     #[test]
     fn test_verify_block_accepts_correctly_signed_federation_change() {
-        let signing_keys = shared_keys_from_hex(
-            "e91316f9f31a4c9b2d3e1b62f26a2a4b8b9d63af5c92c14d1b3f0e5d6c7a8b9",
-        );
+        let signing_keys =
+            shared_keys_from_hex("e91316f9f31a4c9b2d3e1b62f26a2a4b8b9d63af5c92c14d1b3f0e5d6c7a8b9");
         let signing_pubkey = public_key_of(&signing_keys);
 
         let new_max_block_size = XField::MaxBlockSize(2_000_000);
         let hash = new_max_block_size.signature_hash().unwrap();
 
-        let ephemeral_keys = shared_keys_from_hex(
-            "c9f6e6c56f560a6bfb2e8f0f6a2c92a02cba9160bb61ec5b6e64b0f0c9c1a2b",
-        );
+        let ephemeral_keys =
+            shared_keys_from_hex("c9f6e6c56f560a6bfb2e8f0f6a2c92a02cba9160bb61ec5b6e64b0f0c9c1a2b");
         let local_sig = LocalSig::compute(&hash[..], &ephemeral_keys, &signing_keys);
         let signature = Signature {
             sigma: local_sig.gamma_i,

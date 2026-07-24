@@ -351,29 +351,30 @@ impl<T: TapyrusApi, C: ConnectionManager> SignerNode<T, C> {
             .params
             .get_federation_change_for_block_height(block_height + 1); // block_height + 1 so that xfield expected in the next block is added in this block.
 
-        let block = match pending_federation_change {
-            Some(x) => match self.params.rpc.getnewblockwithxfield(
-                &self.params.address,
-                &0,
-                x.xfield(),
-            ) {
-                Ok(block) => block,
-                Err(e) => {
-                    log::error!("RPC getnewblockwithxfield failed. reason={:?}", e);
-                    return Master::default().block_height(block_height).build();
-                }
-            },
-            None => match self.params.rpc.getnewblock(&self.params.address) {
-                Ok(block) => block,
-                Err(e) => {
-                    log::error!("RPC getnewblock failed. reason={:?}", e);
-                    return Master::default().block_height(block_height).build();
-                }
-            },
-        };
+        let block =
+            match pending_federation_change {
+                Some(x) => match self.params.rpc.getnewblockwithxfield(
+                    &self.params.address,
+                    &0,
+                    x.xfield(),
+                ) {
+                    Ok(block) => block,
+                    Err(e) => {
+                        log::error!("RPC getnewblockwithxfield failed. reason={:?}", e);
+                        return Master::default().block_height(block_height).build();
+                    }
+                },
+                None => match self.params.rpc.getnewblock(&self.params.address) {
+                    Ok(block) => block,
+                    Err(e) => {
+                        log::error!("RPC getnewblock failed. reason={:?}", e);
+                        return Master::default().block_height(block_height).build();
+                    }
+                },
+            };
 
         match self.verify_block(&block) {
-            Ok(_) => {} // If the block is valid, continue with the rest of your code
+            Ok(_) => {}
             Err(e) => {
                 log::error!("Invalid block. reason={:?}", e);
                 return Master::default().block_height(block_height).build();

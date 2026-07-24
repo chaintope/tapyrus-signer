@@ -64,7 +64,7 @@ Federation changes or cancellations must be made before the previous block is ge
 The round master sends the new XField to Tapyrus Core one round before the new Federation is applied.
 When starting the previous round, the round master sets a new XField in the block header and broadcast it to other members of the Federation.
 Each member of the round, upon receiving the candidateblock message, compares that the XField in the candidateblock to the one expected in their federations file and verifies the signature. If the verification is successful the signer signs the block.
-If the verification failed, each member SHOULD ignored all messages during that round so that no blocks are generated in that round.
+If the verification failed, each member SHOULD ignore all messages during that round so that no blocks are generated in that round.
 The block with XField becomes valid only if the number of signatures exceeds the threshold t among the existing signers of the Federation.
 
 ### Aggregate public key
