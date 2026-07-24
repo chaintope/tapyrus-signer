@@ -90,6 +90,11 @@ impl<T: TapyrusApi> NodeParameters<T> {
         let federation = self.get_federation_by_block_height(block_height);
         federation.aggregated_public_key().unwrap()
     }
+
+    pub fn get_federation_change_for_block_height(&self, block_height: u32) -> Option<&Federation> {
+        self.federations
+            .get_federation_change_for_block_height(block_height)
+    }
 }
 
 #[cfg(test)]

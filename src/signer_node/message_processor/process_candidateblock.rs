@@ -4,8 +4,8 @@ use crate::rpc::TapyrusApi;
 use crate::signer_node::message_processor::create_block_vss;
 use crate::signer_node::node_state::builder::{Builder, Member};
 use crate::signer_node::utils::sender_index;
-use crate::signer_node::{NodeParameters, NodeState};
-use tapyrus::blockdata::block::{Block, XField};
+use crate::signer_node::{Federation, NodeParameters, NodeState};
+use tapyrus::blockdata::block::Block;
 
 pub fn process_candidateblock<T, C>(
     sender_id: &SignerID,
@@ -74,43 +74,16 @@ fn verify_block<T>(
 where
     T: TapyrusApi,
 {
-    match block.header.xfield {
-        XField::Unknown(_, _) => return Err(Error::UnsupportedXField),
-        _ => {}
-    }
-    verify_aggregated_public_key(block, block_height, params)
-}
+    let xfield = block.header.xfield.clone();
+    let expected_federation = params.get_federation_change_for_block_height(block_height + 1);
 
-fn verify_aggregated_public_key<T>(
-    block: &Block,
-    block_height: u32,
-    params: &NodeParameters<T>,
-) -> Result<(), Error>
-where
-    T: TapyrusApi,
-{
-    let next_block_height = block_height + 1;
-    let federation = params.get_federation_by_block_height(next_block_height);
-    if let Some(public_key) = block.header.aggregated_public_key() {
-        if public_key == federation.aggregated_public_key().unwrap()
-            && next_block_height == federation.block_height()
-        {
-            Ok(())
-        } else {
-            Err(Error::InvalidAggregatedPublicKey)
-        }
-    } else {
-        if next_block_height == federation.block_height() {
-            Err(Error::InvalidAggregatedPublicKey)
-        } else {
-            Ok(())
-        }
-    }
+    Federation::match_xfield_with_federation(block_height, xfield, expected_federation)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::crypto::multi_party_schnorr::{LocalSig, SharedKeys, Signature};
     use crate::federation::{Federation, Federations};
     use crate::net::{Message, MessageType, SignerID};
     use crate::signer_node::node_state::builder::{Builder, Master, Member};
@@ -122,7 +95,10 @@ mod tests {
     use crate::tests::helper::node_state_builder::BuilderForTest;
     use crate::tests::helper::node_vss::node_vss;
     use crate::tests::helper::rpc::MockRpc;
+    use curv::elliptic::curves::traits::{ECPoint, ECScalar};
+    use curv::{BigInt, FE};
     use std::str::FromStr;
+    use tapyrus::blockdata::block::XField;
     use tapyrus::consensus::encode::deserialize;
     use tapyrus::PublicKey;
 
@@ -303,6 +279,7 @@ mod tests {
         let raw_block = hex::decode(TEST_BLOCK_WITHOUT_PUBKEY).unwrap();
         deserialize(&raw_block).unwrap()
     }
+
     #[test]
     fn test_verify_aggregated_public_key() {
         let federation0 = Federation::new(
@@ -320,7 +297,7 @@ mod tests {
             Some(3),
             Some(node_vss(1)),
             XField::AggregatePublicKey(TEST_KEYS.aggregated()),
-            None,
+            Some(TEST_KEYS.aggregated()),
             None,
         );
         let another_key = PublicKey::from_str(
@@ -333,7 +310,7 @@ mod tests {
             Some(4),
             Some(node_vss(2)),
             XField::AggregatePublicKey(another_key),
-            None,
+            Some(TEST_KEYS.aggregated()),
             None,
         );
         let federations = Federations::new(vec![
@@ -348,18 +325,159 @@ mod tests {
             .build();
 
         let block = test_block_with_public_key();
-        assert!(verify_aggregated_public_key(&block, 99, &params).is_ok());
+        //this block is valid but fails as the signature in federations is None
+        match verify_block(&block, 99, &params) {
+            Err(Error::UnauthorizedFederationChange(..)) => {
+                assert!(true, "Error UnauthorizedFederationChange")
+            }
+            Ok(()) => assert!(false, "No error"),
+            _ => assert!(false, "Different error type expected"),
+        }
 
         let block = test_block_with_public_key();
-        assert!(verify_aggregated_public_key(&block, 100, &params).is_err());
+        match verify_block(&block, 100, &params) {
+            Err(Error::XfieldFederationMismatch(..)) => {
+                assert!(true, "Error XfieldFederationMismatch")
+            }
+            Ok(()) => assert!(false, "No error"),
+            _ => assert!(false, "Different error type expected"),
+        }
 
         let block = test_block_with_public_key();
-        assert!(verify_aggregated_public_key(&block, 199, &params).is_err());
+        match verify_block(&block, 199, &params) {
+            Err(Error::XfieldFederationMismatch(..)) => {
+                assert!(true, "Error XfieldFederationMismatch")
+            }
+            Ok(()) => assert!(false, "No error"),
+            _ => assert!(false, "Different error type expected"),
+        }
 
         let block = test_block_without_public_key();
-        assert!(verify_aggregated_public_key(&block, 99, &params).is_err());
+        match verify_block(&block, 99, &params) {
+            Err(Error::XfieldFederationMismatch(..)) => {
+                assert!(true, "Error XfieldFederationMismatch")
+            }
+            Ok(()) => assert!(false, "No error"),
+            _ => assert!(false, "Different error type expected"),
+        }
 
         let block = test_block_without_public_key();
-        assert!(verify_aggregated_public_key(&block, 100, &params).is_ok());
+        assert!(verify_block(&block, 100, &params).is_ok())
+    }
+
+    /// Regression test for an off-by-one in `Federation::match_xfield_with_federation`'s
+    /// signature-check skip logic: only the genesis federation (block-height 0) is exempt from
+    /// requiring a signature, but the check used to compare the *candidate block's own height*
+    /// against `1` instead of `0`, so a federation change taking effect at block-height 2 (i.e.
+    /// embedded in the very first candidate block ever produced, height 1) would incorrectly
+    /// skip signature verification entirely.
+    #[test]
+    fn test_verify_aggregated_public_key_skips_signature_check_only_at_genesis() {
+        let federation0 = Federation::new(
+            TEST_KEYS.pubkeys()[4],
+            0,
+            Some(3),
+            Some(node_vss(0)),
+            XField::AggregatePublicKey(TEST_KEYS.aggregated()),
+            None,
+            None,
+        );
+        // A federation change taking effect at height 2 (the earliest a real change can occur),
+        // deliberately left unsigned so a missed signature check would wrongly return Ok.
+        let federation2 = Federation::new(
+            TEST_KEYS.pubkeys()[4],
+            2,
+            Some(3),
+            Some(node_vss(1)),
+            XField::AggregatePublicKey(TEST_KEYS.aggregated()),
+            Some(TEST_KEYS.aggregated()),
+            None,
+        );
+        let federations = Federations::new(vec![federation0, federation2]);
+        let params = NodeParametersBuilder::new()
+            .public_key(TEST_KEYS.pubkeys()[2])
+            .rpc(MockRpc::new())
+            .federations(federations)
+            .build();
+
+        // Candidate block at height 1 announces the federation change taking effect at height 2.
+        let block = test_block_with_public_key();
+        match verify_block(&block, 1, &params) {
+            Err(Error::UnauthorizedFederationChange(..)) => {}
+            Ok(()) => assert!(
+                false,
+                "signature check was skipped for a non-genesis federation change"
+            ),
+            _ => assert!(false, "Different error type expected"),
+        }
+    }
+
+    /// Builds a single-party Schnorr keypair usable with `crypto::multi_party_schnorr::Signature`,
+    /// from a fixed private scalar so the test is deterministic.
+    fn shared_keys_from_hex(private_scalar_hex: &str) -> SharedKeys {
+        let x: FE = ECScalar::from(&BigInt::from_str_radix(private_scalar_hex, 16).unwrap());
+        SharedKeys {
+            y: &ECPoint::generator() * &x,
+            x_i: x,
+        }
+    }
+
+    fn public_key_of(shared_keys: &SharedKeys) -> PublicKey {
+        let compressed: [u8; 33] = shared_keys.y.get_element().serialize();
+        PublicKey::from_slice(&compressed).unwrap()
+    }
+
+    /// Happy-path test: a candidate block carrying a federation change with a genuinely valid
+    /// signature (computed with the same Schnorr signing/verification code the daemon uses, not
+    /// a hand-typed placeholder) must be accepted by `verify_block`. Every other test around
+    /// `match_xfield_with_federation` exercises a rejection path only.
+    #[test]
+    fn test_verify_block_accepts_correctly_signed_federation_change() {
+        let signing_keys =
+            shared_keys_from_hex("e91316f9f31a4c9b2d3e1b62f26a2a4b8b9d63af5c92c14d1b3f0e5d6c7a8b9");
+        let signing_pubkey = public_key_of(&signing_keys);
+
+        let new_max_block_size = XField::MaxBlockSize(2_000_000);
+        let hash = new_max_block_size.signature_hash().unwrap();
+
+        let ephemeral_keys =
+            shared_keys_from_hex("c9f6e6c56f560a6bfb2e8f0f6a2c92a02cba9160bb61ec5b6e64b0f0c9c1a2b");
+        let local_sig = LocalSig::compute(&hash[..], &ephemeral_keys, &signing_keys);
+        let signature = Signature {
+            sigma: local_sig.gamma_i,
+            v: ephemeral_keys.y,
+        };
+        // The fixture itself must be a genuinely valid signature before relying on it below.
+        assert!(signature.verify(&hash[..], &signing_keys.y).is_ok());
+
+        let federation0 = Federation::new(
+            TEST_KEYS.pubkeys()[4],
+            0,
+            None,
+            None,
+            XField::AggregatePublicKey(signing_pubkey),
+            None,
+            None,
+        );
+        let federation100 = Federation::new(
+            TEST_KEYS.pubkeys()[4],
+            100,
+            None,
+            None,
+            new_max_block_size.clone(),
+            Some(signing_pubkey),
+            Some(signature),
+        );
+        let federations = Federations::new(vec![federation0, federation100]);
+        let params = NodeParametersBuilder::new()
+            .public_key(TEST_KEYS.pubkeys()[2])
+            .rpc(MockRpc::new())
+            .federations(federations)
+            .build();
+
+        let mut block = test_block_without_public_key();
+        block.header.xfield = new_max_block_size;
+
+        assert!(verify_block(&block, 99, &params).is_ok());
     }
 }
