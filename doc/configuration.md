@@ -126,6 +126,7 @@ This is required. This specifies the signer's public key, who hosted the node.
 The public key format is compressed hex string.
 * `federations-file`
 This is required. This specifies the path to the TOML file of the federations of the chain.
+This file is watched while `tapyrus-signerd` is running, so edits (e.g. appending a new federation/xfield change) are picked up automatically without a restart. See [federation.md](./federation.md#live-reload-of-federationstoml) for details, including the atomic-write requirement.
 
 ### [rpc] section
 
@@ -214,15 +215,22 @@ This is the threshold the federation requires what number of agreements to produ
 The threshold must be greater than and equal to two-three of federation members count. 
 This item should not specify if the signer is not a member of the federation.
 * `aggregated-public-key`
-This is required.
+This is optional. But either `aggregated-public-key` or `max-block-size` is required.
 This is the public key, which can be used to verify block proofs.
 This public key is aggregate of all federation member's public keys.  
+* `max-block-size`
+This is optional. But either `max-block-size` or `aggregated-public-key` is required.
+This is the maximum size of the blocks that tapyrus-core network is allowed to create.
 * `node-vss`
 This is optional.
 Verifiable Secret Share and commitments from all signers in the federation.
 This field may be empty when the signer is not a member of the federation.
 This item should not specify if the signer is not a member of the federation.
 See also [Tapyrus signer network parameters](./setup.md#tapyrus-signer-network-parameters).
+* `signature`
+This is required.
+This is the threshold signature of the federation to validate an xfield (`aggregated-public-key` `max-block-size`) change. This is generated using _sign_ and _computesig_ commands. The commands allow signing xfield or block.
+This is not required in the genesis block. i.e. federation with block-height 0. In all other federations the signature is verified and only then the xfield is updated in tapyrus network.
 
 Here describe some `federations.toml` examples for particular scenarios.
 

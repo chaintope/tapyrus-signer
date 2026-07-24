@@ -49,10 +49,10 @@ fn main() {
     let con = connect_signer_network(configs.redis_config());
     let rpc = connect_rpc(configs.rpc_config());
 
-    let federations = load_federations(
-        &signer_config.public_key(),
-        signer_config.federations_file(),
-    );
+    // Owned, since it's handed to a background thread (see `federation_watcher::spawn`) that
+    // must outlive `configs`/`signer_config`.
+    let federations_file_path = signer_config.federations_file().to_path_buf();
+    let federations = load_federations(&signer_config.public_key(), &federations_file_path);
 
     let params = NodeParameters::new(
         signer_config.to_address(),
@@ -65,6 +65,10 @@ fn main() {
     );
 
     let node = &mut SignerNode::new(con, params);
+    node.federations_reload_handler(tapyrus_signer::federation_watcher::spawn(
+        federations_file_path,
+        signer_config.public_key(),
+    ));
     node.start();
 }
 
@@ -276,6 +280,18 @@ mod tests {
         .unwrap();
 
         let path = Path::new("tests/resources/federations_has_max_block_size.toml");
+        load_federations(&pubkey, path);
+    }
+
+    #[test]
+    #[should_panic(expected = "federations_file: InvalidSig")]
+    fn test_load_federations_has_invalid_signature() {
+        let pubkey = PublicKey::from_str(
+            "039af53a49a365576de41a2e70cc148353d7d1f4cad45f888fd8bc6d2c94a97657",
+        )
+        .unwrap();
+
+        let path = Path::new("tests/resources/federations_has_invalid_signature.toml");
         load_federations(&pubkey, path);
     }
 }
