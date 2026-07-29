@@ -295,7 +295,7 @@ impl Signature {
     }
 }
 
-fn compute_e(r: &GE, y: &GE, message: &[u8]) -> FE {
+pub(crate) fn compute_e(r: &GE, y: &GE, message: &[u8]) -> FE {
     let mut hasher = Sha256::new();
     hasher.update(&r.get_element().serialize()[1..33]);
     hasher.update(&y.get_element().serialize()[..]);

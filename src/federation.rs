@@ -6,12 +6,14 @@ use crate::sign::Sign;
 use crate::signer_node::{SharedSecret, SharedSecretMap};
 use crate::tapyrus::blockdata::block::XField;
 
+use curv::arithmetic::traits::Converter;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::{
     ShamirSecretSharing, VerifiableSS,
 };
 use curv::elliptic::curves::traits::*;
 use curv::{BigInt, FE, GE};
 use std::collections::HashSet;
+use tapyrus::util::prime::{jacobi, P};
 use tapyrus::PublicKey;
 
 #[derive(Debug, Clone)]
@@ -564,7 +566,23 @@ pub fn multi_party_signature_from_hex(s: &str) -> Result<Signature, Error> {
 
     let v_bytes = hex::decode(v_hex).map_err(|_| Error::InvalidSig)?;
 
+    // GE::from_bytes reconstructs a 32-byte x-only point using a hardcoded "even y"
+    // convention (SEC1 compressed prefix 0x02), but the signing side
+    // (Vss::create_local_sig_from_shares's Jacobi-symbol check) always picks V using
+    // the "quadratic residue y" convention instead. Those two conventions agree on
+    // the y-coordinate only about half the time, so the point must be
+    // re-canonicalized here to match what the signer actually used -- otherwise
+    // verification silently checks against -V instead of V.
     let v_ge = GE::from_bytes(&v_bytes).map_err(|_| Error::InvalidSig)?;
+    let y = v_ge.y_coor().ok_or(Error::InvalidSig)?;
+    let v_ge = if jacobi(&Converter::to_vec(&y)) == 1 {
+        v_ge
+    } else {
+        let x = v_ge.x_coor().ok_or(Error::InvalidSig)?;
+        let field_prime = BigInt::from(&P[..]);
+        let v_ge: GE = ECPoint::from_coor(&x, &(field_prime - y));
+        v_ge
+    };
 
     let sigma = BigInt::from_str_radix(sigma_hex, 16).unwrap();
     let sigma_fe: FE = ECScalar::from(&sigma);
@@ -597,21 +615,88 @@ pub struct SerFederation {
 
 #[cfg(test)]
 mod tests {
-    use crate::crypto::multi_party_schnorr::Signature;
+    use crate::crypto::multi_party_schnorr::{compute_e, Signature};
     use crate::errors::Error;
-    use crate::federation::{Federation, Federations, Vss};
+    use crate::federation::{multi_party_signature_from_hex, Federation, Federations, Vss};
     use crate::hex::FromHex;
     use crate::net::SignerID;
+    use crate::sign::Sign;
     use crate::tapyrus::blockdata::block::XField;
     use crate::tests::helper::keys::TEST_KEYS;
     use crate::tests::helper::node_vss::node_vss;
     use curv::arithmetic::traits::Converter;
     use curv::elliptic::curves::traits::{ECPoint, ECScalar};
-    use curv::{BigInt, GE};
+    use curv::{BigInt, FE, GE};
     use std::str::FromStr;
+    use tapyrus::util::prime::{jacobi, P};
     use tapyrus::PublicKey;
 
     use super::SerFederation;
+
+    #[test]
+    fn test_multi_party_signature_from_hex_recovers_quadratic_residue_y() {
+        let field_prime = BigInt::from(&P[..]);
+
+        // Find a nonce k whose point V = k*G has a y-coordinate that is BOTH a
+        // quadratic residue (the convention the signer actually uses -- see
+        // Vss::create_local_sig_from_shares's Jacobi-symbol check) AND odd: the
+        // worst case for the bug this test guards against, since GE::from_bytes
+        // reconstructs an x-only point using a hardcoded "even y" convention (SEC1
+        // compressed prefix 0x02), a property unrelated to quadratic-residue-ness.
+        let (k, v_correct) = loop {
+            let k: FE = ECScalar::new_random();
+            let v: GE = GE::generator() * &k;
+            let y = v.y_coor().unwrap();
+            let is_odd = Converter::to_vec(&y).last().copied().unwrap_or(0) & 1 == 1;
+            if jacobi(&Converter::to_vec(&y)) == 1 && is_odd {
+                break (k, v);
+            }
+        };
+
+        // The "wrong" point GE::from_bytes alone would reconstruct pre-fix: same
+        // x-coordinate, negated (even) y.
+        let x = v_correct.x_coor().unwrap();
+        let y_correct = v_correct.y_coor().unwrap();
+        let y_wrong = field_prime - &y_correct;
+        let v_wrong: GE = ECPoint::from_coor(&x, &y_wrong);
+
+        assert_ne!(y_correct, y_wrong);
+        assert_eq!(jacobi(&Converter::to_vec(&y_correct)), 1);
+        assert_ne!(jacobi(&Converter::to_vec(&y_wrong)), 1);
+
+        // Build a genuinely valid aggregate signature over v_correct: sigma = k + e*privkey.
+        let privkey: FE = ECScalar::new_random();
+        let pubkey_y: GE = GE::generator() * &privkey;
+        let message = b"xfield change message";
+        let e = compute_e(&v_correct, &pubkey_y, message);
+        let sigma = k + e * privkey;
+        let signature = Signature {
+            sigma,
+            v: v_correct,
+        };
+
+        // The correct point verifies.
+        assert!(signature.verify(&message[..], &pubkey_y).is_ok());
+
+        // The same sigma checked against the wrong-parity point (what
+        // GE::from_bytes alone would give pre-fix) does NOT verify -- confirming
+        // the two points are not interchangeable and the parity really matters.
+        let bad_signature = Signature {
+            sigma: signature.sigma,
+            v: v_wrong,
+        };
+        assert!(bad_signature.verify(&message[..], &pubkey_y).is_err());
+
+        // End-to-end: multi_party_signature_from_hex, given only the lossy x-only
+        // hex encoding (the same 128-char r_x||sigma format Sign::format_signature
+        // produces and federations.toml stores), must recover v_correct -- not
+        // v_wrong -- and the resulting signature must verify.
+        let sig_hex = Sign::format_signature(&signature);
+        let parsed = multi_party_signature_from_hex(&sig_hex).expect("should parse");
+        assert_eq!(parsed.v.x_coor(), v_correct.x_coor());
+        assert_eq!(parsed.v.y_coor(), v_correct.y_coor());
+        assert!(parsed.verify(&message[..], &pubkey_y).is_ok());
+    }
 
     #[test]
     fn test_get_by_block_height() {
@@ -684,7 +769,21 @@ mod tests {
         let v_bytes =
             Vec::from_hex("dde06d981f17045b11c8db7b47846ceca4825f286756440ea158e0b2dba86028")
                 .expect("Failed to decode hex string");
+        // GE::from_bytes reconstructs an x-only point with a hardcoded "even y",
+        // which is not necessarily the quadratic-residue-y point a real signer
+        // would have produced (see multi_party_signature_from_hex) -- canonicalize
+        // here too so this fixture represents a genuine, valid signature and the
+        // to_ser()/from() round trip below exercises the real invariant.
         let v = GE::from_bytes(&v_bytes).expect("Failed to create GE from bytes");
+        let y = v.y_coor().expect("Failed to get y_coor");
+        let v = if jacobi(&Converter::to_vec(&y)) == 1 {
+            v
+        } else {
+            let x = v.x_coor().expect("Failed to get x_coor");
+            let field_prime = BigInt::from(&P[..]);
+            let v: GE = ECPoint::from_coor(&x, &(field_prime - y));
+            v
+        };
 
         let sig = Signature { sigma, v };
 
