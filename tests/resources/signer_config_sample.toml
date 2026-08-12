@@ -9,6 +9,7 @@ rpc-endpoint-host = "localhost"
 rpc-endpoint-port = 12381
 rpc-endpoint-user = "user"
 rpc-endpoint-pass = "pass"
+rpc-endpoint-cookiefile = "/tmp/tapyrus.cookie"
 
 [redis]
 redis-host = "192.168.0.63"

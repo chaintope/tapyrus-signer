@@ -21,6 +21,7 @@ pub const OPTION_NAME_RPC_ENDPOINT_HOST: &str = "rpc_endpoint_host";
 pub const OPTION_NAME_RPC_ENDPOINT_PORT: &str = "rpc_endpoint_port";
 pub const OPTION_NAME_RPC_ENDPOINT_USER: &str = "rpc_endpoint_user";
 pub const OPTION_NAME_RPC_ENDPOINT_PASS: &str = "rpc_endpoint_pass";
+pub const OPTION_NAME_RPC_ENDPOINT_COOKIEFILE: &str = "rpc_endpoint_cookiefile";
 
 /// # Redis Config
 pub const OPTION_NAME_REDIS_HOST: &str = "redis_host";
@@ -85,6 +86,8 @@ pub struct RpcToml {
     rpc_endpoint_user: Option<String>,
     #[serde(rename = "rpc-endpoint-pass")]
     rpc_endpoint_pass: Option<String>,
+    #[serde(rename = "rpc-endpoint-cookiefile")]
+    rpc_endpoint_cookiefile: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -180,6 +183,7 @@ pub struct RpcCommandArgs<'a> {
     pub port: Option<&'a str>,
     pub username: Option<&'a str>,
     pub password: Option<&'a str>,
+    pub cookie_file: Option<&'a str>,
 }
 
 pub struct RpcConfig<'a> {
@@ -219,6 +223,16 @@ impl<'a> RpcConfig<'a> {
             .and_then(|config| config.rpc_endpoint_pass.as_ref())
             .map(|s| s as &str);
         self.command_args.password.or(toml_value)
+    }
+    /// Path to a cookie file (tapyrus-core's auto-generated RPC credential). If set,
+    /// this takes precedence over user_name()/password() -- see rpc::Rpc, which reads
+    /// this file fresh on every RPC call rather than once at startup.
+    pub fn cookie_file(&'a self) -> Option<&'a str> {
+        let toml_value = self
+            .toml_config
+            .and_then(|config| config.rpc_endpoint_cookiefile.as_ref())
+            .map(|s| s as &str);
+        self.command_args.cookie_file.or(toml_value)
     }
 }
 
@@ -390,6 +404,7 @@ impl<'a> CommandArgs<'a> {
                 port: self.matches.value_of(OPTION_NAME_RPC_ENDPOINT_PORT),
                 username: self.matches.value_of(OPTION_NAME_RPC_ENDPOINT_USER),
                 password: self.matches.value_of(OPTION_NAME_RPC_ENDPOINT_PASS),
+                cookie_file: self.matches.value_of(OPTION_NAME_RPC_ENDPOINT_COOKIEFILE),
             },
             toml_config: self.config.as_ref().and_then(|c| c.rpc.as_ref()),
         }
@@ -466,6 +481,10 @@ pub fn get_options<'a, 'b>() -> clap::App<'a, 'b> {
             .long("rpc-pass")
             .value_name("PASS")
             .help("Tapyrus Core RPC user password."))
+        .arg(Arg::with_name(OPTION_NAME_RPC_ENDPOINT_COOKIEFILE)
+            .long("rpc-cookie-file")
+            .value_name("FILE")
+            .help("Path to a cookie file (Tapyrus Core's auto-generated RPC credential), read fresh on every RPC call. Takes precedence over --rpc-user/--rpc-pass if given."))
         .arg(Arg::with_name(OPTION_NAME_REDIS_HOST)
             .long("redis-host")
             .value_name("HOST_NAME or IP")
@@ -564,6 +583,7 @@ fn test_load_from_file() {
     assert_eq!(args.rpc_config().port(), 12381);
     assert_eq!(args.rpc_config().user_name(), Some("user"));
     assert_eq!(args.rpc_config().password(), Some("pass"));
+    assert_eq!(args.rpc_config().cookie_file(), Some("/tmp/tapyrus.cookie"));
 
     // redis parameters are loaded from toml data.
     assert_eq!(args.redis_config().host(), "192.168.0.63");
@@ -596,6 +616,7 @@ fn test_priority_commandline() {
         "--rpc-port=12345",
         "--rpc-user=test",
         "--rpc-pass=test",
+        "--rpc-cookie-file=/tmp/override.cookie",
         "--redis-host=redis.endpoint.dev.chaintope.com",
         "--redis-port=88888",
         "--daemon",
@@ -620,6 +641,10 @@ fn test_priority_commandline() {
     assert_eq!(args.rpc_config().port(), 12345);
     assert_eq!(args.rpc_config().user_name(), Some("test"));
     assert_eq!(args.rpc_config().password(), Some("test"));
+    assert_eq!(
+        args.rpc_config().cookie_file(),
+        Some("/tmp/override.cookie")
+    );
 
     // redis parameters are loaded from toml data.
     assert_eq!(
