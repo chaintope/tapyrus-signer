@@ -96,14 +96,30 @@ fn daemonize(pid: &str, log_file: &str) {
 
 fn connect_rpc(rpc_config: RpcConfig) -> Rpc {
     let url = format!("http://{}:{}", rpc_config.host(), rpc_config.port());
-    let user = rpc_config.user_name().map(str::to_string);
-    let pass = rpc_config.password().map(str::to_string);
-    let rpc = tapyrus_signer::rpc::Rpc::new(&url, user.clone(), pass);
-    rpc.test_connection().expect(&format!(
-        "Tapyrus Core RPC connection failed. Please confirm RPC connection info. url: {}, user: '{}' ,",
-        url,
-        user.unwrap_or("".to_string())
-    ));
+    let rpc = match rpc_config.cookie_file() {
+        Some(cookie_file) => {
+            let rpc = tapyrus_signer::rpc::Rpc::new_with_cookie(
+                &url,
+                Path::new(cookie_file).to_path_buf(),
+            );
+            rpc.test_connection().expect(&format!(
+                "Tapyrus Core RPC connection failed. Please confirm RPC connection info. url: {}, cookie_file: '{}' ,",
+                url, cookie_file
+            ));
+            rpc
+        }
+        None => {
+            let user = rpc_config.user_name().map(str::to_string);
+            let pass = rpc_config.password().map(str::to_string);
+            let rpc = tapyrus_signer::rpc::Rpc::new(&url, user.clone(), pass);
+            rpc.test_connection().expect(&format!(
+                "Tapyrus Core RPC connection failed. Please confirm RPC connection info. url: {}, user: '{}' ,",
+                url,
+                user.unwrap_or("".to_string())
+            ));
+            rpc
+        }
+    };
     rpc
 }
 
@@ -183,6 +199,30 @@ mod tests {
                 port: Some("9999"),
                 username: None,
                 password: None,
+                cookie_file: None,
+            },
+            toml_config: None,
+        };
+
+        connect_rpc(config);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "Tapyrus Core RPC connection failed. Please confirm RPC connection info. url: http://127.0.0.1:9999, cookie_file: '/tmp/tapyrus-signer-test-nonexistent.cookie' "
+    )]
+    fn test_connect_rpc_with_cookie_file() {
+        use tapyrus_signer::command_args::RpcCommandArgs;
+        // cookie_file present -- takes the cookie path, not user/pass, even though
+        // neither is set here either; a nonexistent cookie file is what actually
+        // fails the connection test, proving this branch was really taken.
+        let config = RpcConfig {
+            command_args: RpcCommandArgs {
+                host: Some("127.0.0.1"),
+                port: Some("9999"),
+                username: None,
+                password: None,
+                cookie_file: Some("/tmp/tapyrus-signer-test-nonexistent.cookie"),
             },
             toml_config: None,
         };

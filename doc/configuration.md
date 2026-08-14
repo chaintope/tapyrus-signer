@@ -46,6 +46,8 @@ OPTIONS:
         --redis-host <HOST_NAME or IP>    Redis host.
         --redis-port <PORT>               Redis port.
     -d, --duration <SECs>                 Round interval times(sec).
+        --rpc-cookie-file <FILE>          Path to a cookie file (Tapyrus Core's auto-generated RPC credential), read
+                                          fresh on every RPC call. Takes precedence over --rpc-user/--rpc-pass if given.
         --rpc-host <HOST_NAME or IP>      Tapyrus Core RPC endpoint host.
         --rpc-pass <PASS>                 Tapyrus Core RPC user password.
         --rpc-port <PORT>                 Tapyrus Core RPC endpoint port number. The default is `2377`. Tapyrus-Core
@@ -80,6 +82,7 @@ rpc-endpoint-host = "127.0.0.1"
 rpc-endpoint-port = 2377
 rpc-endpoint-user = "user"
 rpc-endpoint-pass = "pass"
+# rpc-endpoint-cookiefile = "/path/to/.cookie"
 
 [redis]
 redis-host = "127.0.0.1"
@@ -151,6 +154,20 @@ This is optional.
 This is the Tapyrus Core RPC password for authentication.
 This is required if you set a password to your Tapyrus Core RPC Server.
 There is no default value.
+* `rpc-endpoint-cookiefile`
+This is optional.
+This is the path to a cookie file -- Tapyrus Core's own auto-generated RPC credential (written when Tapyrus Core is
+run with neither `-rpcuser` nor `-rpcpassword` set), read fresh on every RPC call rather than once at startup, so a
+Tapyrus Core restart that regenerates the cookie doesn't require restarting `tapyrus-signerd` too.
+There is no default value.
+
+If set -- from either `signer.toml` or `--rpc-cookie-file` -- this takes precedence over `rpc-endpoint-user`/
+`rpc-endpoint-pass` entirely, regardless of which source set which option. Each of the three RPC credential options
+resolves independently (command-line argument, then `signer.toml`, same as every other setting), so a
+`rpc-endpoint-cookiefile` set in `signer.toml` cannot be overridden or disabled by passing `--rpc-user`/`--rpc-pass`
+on the command line -- there is no flag to force user/pass auth once a cookie file is configured anywhere. To use
+user/pass auth instead, remove `rpc-endpoint-cookiefile` from `signer.toml` rather than trying to override it from
+the command line.
 
 ### [redis] seciton
 

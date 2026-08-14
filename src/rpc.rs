@@ -4,9 +4,11 @@ use log::Level::Trace;
 use log::{log_enabled, trace};
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use tapyrus::{Address, PublicKey};
 
 use crate::errors::Error;
+use jsonrpc::simple_http::Builder as SimpleHttpBuilder;
 use jsonrpc::Client;
 use serde_json::value::RawValue;
 use tapyrus::blockdata::block::{Block, XField};
@@ -26,8 +28,21 @@ pub struct GetBlockchainInfoResult {
     pub max_block_sizes: Vec<HashMap<u32, u32>>,
 }
 
+/// Where Rpc gets its credentials from -- resolved fresh into a jsonrpc::Client on
+/// every call (see Rpc::client), not once at construction, so a cookie file that
+/// changes mid-run (e.g. Tapyrus Core restarting) doesn't require restarting this
+/// process to pick up.
+enum RpcAuth {
+    Static {
+        user: Option<String>,
+        pass: Option<String>,
+    },
+    CookieFile(PathBuf),
+}
+
 pub struct Rpc {
-    client: jsonrpc::client::Client,
+    url: String,
+    auth: RpcAuth,
 }
 
 pub trait TapyrusApi {
@@ -53,7 +68,45 @@ impl Rpc {
         // Check that if we have a password, we have a username; other way around is ok
         debug_assert!(pass.is_none() || user.is_some());
         Rpc {
-            client: Client::simple_http(url, user, pass).unwrap(),
+            url: url.to_string(),
+            auth: RpcAuth::Static { user, pass },
+        }
+    }
+
+    /// Authenticates via a cookie file (Tapyrus Core's auto-generated RPC credential,
+    /// `__cookie__:<hex>`) instead of a static user/pass -- read fresh on every call
+    /// (see client() below), so a cookie that changes mid-run doesn't break this
+    /// connection the way a value resolved once, at startup, would.
+    pub fn new_with_cookie(url: &str, cookie_file: PathBuf) -> Self {
+        Rpc {
+            url: url.to_string(),
+            auth: RpcAuth::CookieFile(cookie_file),
+        }
+    }
+
+    /// Builds a fresh client for one call. Cheap: SimpleHttpTransport holds no
+    /// persistent connection (a new TCP connection per request), so rebuilding here
+    /// rather than caching at construction time is what lets a cookie file that
+    /// changes mid-run take effect on the very next call. URL construction failing
+    /// is treated as a startup-time configuration error (same as the original
+    /// Client::simple_http(...).unwrap() this replaces) -- only the cookie file read
+    /// is a genuinely transient, recoverable failure mode, so only that is
+    /// propagated as a Result.
+    fn client(&self) -> Result<jsonrpc::client::Client, Error> {
+        match &self.auth {
+            RpcAuth::Static { user, pass } => {
+                Ok(Client::simple_http(&self.url, user.clone(), pass.clone())
+                    .expect("invalid RPC URL"))
+            }
+            RpcAuth::CookieFile(path) => {
+                let cookie = std::fs::read_to_string(path)?;
+                let transport = SimpleHttpBuilder::new()
+                    .url(&self.url)
+                    .expect("invalid RPC URL")
+                    .cookie_auth(cookie.trim())
+                    .build();
+                Ok(Client::with_transport(transport))
+            }
         }
     }
 
@@ -61,11 +114,12 @@ impl Rpc {
     where
         T: serde::de::DeserializeOwned,
     {
-        let req = self.client.build_request(name, params);
+        let client = self.client()?;
+        let req = client.build_request(name, params);
 
         trace!("JSON-RPC request: {}", serde_json::to_string(&req).unwrap());
 
-        match self.client.send_request(req) {
+        match client.send_request(req) {
             Ok(resp) => {
                 if log_enabled!(Trace) {
                     trace!(
